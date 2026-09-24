@@ -12,7 +12,7 @@
   <Card.Content class="flex justify-start items-center h-24 ">
     <p class="text-4xl lg:text-5xl font-bold bg-transparent text-foreground tabular-nums">{value}</p>
   </Card.Content>
-  <Card.Footer class="items-start text-xs font-extralight">
+  <Card.Footer class="items-start text-xs font-extralight tabular-nums">
     {subtitle}
   </Card.Footer>
 </Card.Root>

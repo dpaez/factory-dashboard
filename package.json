@@ -29,6 +29,7 @@
 		"@vitest/browser-playwright": "^4.1.8",
 		"bits-ui": "^2.18.0",
 		"clsx": "^2.1.1",
+		"drizzle-kit": "1.0.0-rc.4",
 		"playwright": "^1.60.0",
 		"prettier": "^3.8.3",
 		"prettier-plugin-svelte": "^4.1.0",
@@ -48,6 +49,7 @@
 	"dependencies": {
 		"@fontsource/roboto": "^5.3.0",
 		"@tanstack/svelte-table": "^9.2.4",
+		"drizzle-orm": "1.0.0-rc.4",
 		"mode-watcher": "^1.1.0"
 	}
 }
