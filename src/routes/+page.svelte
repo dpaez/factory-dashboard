@@ -59,15 +59,15 @@
       </Badge>
     </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 justify-items-center-safe">
-      <InfoCard title="Tickets" subtitle={ticketsSubtitle} value={activeTickets} />
+    <div class="grid grid-cols-1 md:grid-cols-3 justify-items-center-safe ">
+      <InfoCard title="Active" subtitle={ticketsSubtitle} value={activeTickets} />
       <InfoCostCard title="Cost" value={usage.costUsd} tokensInputUsage={usage.tokensInput} tokensOutputUsage={usage.tokensOutput} tokensCacheRead={usage.tokensCacheRead} tokensCacheWrite={usage.tokensCacheWrite} />
       <InfoCard title="Attention" subtitle={attentionSubtitle} value={counts.review} />
     </div>
   </section>
   <section>
     <h3 class="not-prose text-2xl font-light mb-6">Workflow</h3>
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 justify-items-center-safe">
+    <div class="grid grid-cols-2 lg:grid-cols-4 justify-items-center-safe">
       <WorkCard title="Plan" value={counts.plan} />
       <WorkCard title="Work" value={counts.work} />
       <WorkCard title="Review" value={counts.review} />

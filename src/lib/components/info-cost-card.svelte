@@ -13,12 +13,12 @@
   let { title, value, tokensInputUsage, tokensOutputUsage, tokensCacheRead, tokensCacheWrite }: InfoCostCardProps = $props();
 </script>
 
-<Card.Root class="font-mono text-ellipsis overflow-hidden w-72 md:w-56 lg:w-64 text-muted-foreground" size="sm">
+<Card.Root class="font-mono text-ellipsis overflow-hidden w-64 md:w-56 lg:w-64 text-muted-foreground" size="sm">
   <Card.Header>
     <Card.Title class="text-sm capitalize font-light tracking-wide">{title}</Card.Title>
   </Card.Header>
   <Card.Content class="flex justify-start items-center h-24 ">
-    <p class="text-4xl lg:text-5xl font-bold bg-transparent text-foreground tabular-nums">{value.toFixed(2)}</p>
+    <p class="text-4xl lg:text-5xl font-bold text-foreground tabular-nums">${value.toFixed(2)}</p>
   </Card.Content>
   <Card.Footer class="not-prose items-start flex flex-col gap-1">
     <h4 class="text-xs font-light">Tokens</h4>

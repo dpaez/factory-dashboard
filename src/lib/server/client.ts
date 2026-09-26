@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/node-sqlite';
-import { DB_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 import { relations } from '$lib/db/drizzle/relations';
 
-export const db = drizzle(DB_URL, { relations });
+const url = env.DB_URL;
+if (!url) throw new Error('DB_URL is required');
+
+export const db = drizzle(url, { relations });

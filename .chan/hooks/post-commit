@@ -1,0 +1,3 @@
+#!/bin/sh
+# chan post-commit hook — analyze HEAD and append to .chan/code.md
+chan analyze --auto

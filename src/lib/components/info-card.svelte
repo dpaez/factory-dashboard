@@ -5,7 +5,7 @@
   
 </script>
 
-<Card.Root class="font-mono text-ellipsis overflow-hidden w-72 md:w-56 lg:w-64 text-muted-foreground" size="sm">
+<Card.Root class="font-mono text-ellipsis overflow-hidden w-64 md:w-56 lg:w-64 text-muted-foreground" size="sm">
   <Card.Header>
     <Card.Title class="text-sm capitalize font-light tracking-wide">{title}</Card.Title>
   </Card.Header>
