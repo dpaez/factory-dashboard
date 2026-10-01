@@ -39,3 +39,13 @@
 - **Related code:** PRODUCT.md, DESIGN.md, GLOSSARY.md, docs/adr/0001-direct-sqlite-reads-fstate-events-only.md, docs/adr/0002-docs-via-fstate-not-filesystem.md, src/routes/layout.css (referenced by DESIGN.md for shadcn theme tokens), src/lib/db/drizzle/schema.ts (referenced by PRODUCT.md as the state model)
 - **Related issues:** #1, #2, #3, #4, #5, #6, #7, #8
 
+## Commit 3470144
+
+- **Author:** Diego Paez <diego@geutstudio.com>
+- **Date:** 2026-10-01T00:18:26Z
+- **Files:** `.chan/code.md`, `pnpm-lock.yaml`
+- **Original message:** Update: code.md
+- **Tags:** Chore
+- **Analysis:** Updates code.md (the change-tracking documentation) and adds 9 lines to pnpm-lock.yaml. No manifest (package.json) diffs are included, so no dependency version bumps or added/removed packages can be confirmed from the patch; the lockfile delta is only reflected as an omitted-hunk summary (+9/-0). No source, test, or configuration files were touched, so the commit is a documentation/bookkeeping update with an incidental lockfile sync.
+- **Related code:** code.md, pnpm-lock.yaml
+
