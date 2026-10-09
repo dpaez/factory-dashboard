@@ -24,9 +24,6 @@ importers:
       '@fontsource-variable/jetbrains-mono':
         specifier: ^5.3.0
         version: 5.3.0
-      '@geut/chan':
-        specifier: github:geut/chan#dp/new-ai-module
-        version: https://codeload.github.com/geut/chan/tar.gz/ffb06f9706d36e4bffbe205299cce7c8bc43cb72
       '@internationalized/date':
         specifier: ^3.12.0
         version: 3.12.4
@@ -287,10 +284,6 @@ packages:
 
   '@fontsource/roboto@5.3.0':
     resolution: {integrity: sha512-BapRJOWYP+LZ21zp+wBQjfpPYKRoxc4LspJ/RLuI+HSMBD5u/X4O+ESDrSvEqDSy0rAl7GwBJ+09mdc16cVQ1Q==}
-
-  '@geut/chan@https://codeload.github.com/geut/chan/tar.gz/ffb06f9706d36e4bffbe205299cce7c8bc43cb72':
-    resolution: {gitHosted: true, integrity: sha512-YaTzmn2NWzLvnirnPFWOxjfDA9nH71+Wkq0YxLJ62XE6DRgGRRMzcB/XjZaGUoGkO649UVlQCwhyOECMmieQJg==, tarball: https://codeload.github.com/geut/chan/tar.gz/ffb06f9706d36e4bffbe205299cce7c8bc43cb72}
-    version: 3.2.8
 
   '@internationalized/date@3.12.4':
     resolution: {integrity: sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==}
@@ -1798,8 +1791,6 @@ snapshots:
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
   '@fontsource/roboto@5.3.0': {}
-
-  '@geut/chan@https://codeload.github.com/geut/chan/tar.gz/ffb06f9706d36e4bffbe205299cce7c8bc43cb72': {}
 
   '@internationalized/date@3.12.4':
     dependencies:
