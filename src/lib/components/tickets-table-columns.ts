@@ -3,17 +3,14 @@ import TicketsTableTitleCell from './tickets-table-title-cell.svelte';
 import TicketsTableStatusCell from './tickets-table-status-cell.svelte';
 import TicketsTableCostCell from './tickets-table-cost-cell.svelte';
 import type { TicketsTableFeatures } from './tickets-table-features.js';
-import type { tickets, usage } from '$lib/db/drizzle/schema';
+import type { ExecutionStage, ExecutionStatus, TicketListRow } from '$lib/server/types';
 
-export type TicketRow = typeof tickets.$inferSelect;
-export type UsageRow = typeof usage.$inferSelect;
-export type TicketStatus = TicketRow['status'];
-export type TicketStage = TicketRow['stage'];
-
-/** Shape returned by `db.query.tickets.findMany({ with: { usages: true } })` */
-export type TicketTableRow = TicketRow & {
-	usages: UsageRow[];
-};
+/** One row of the tickets table: the read module's `TicketListRow` (ADR 0004).
+ *  Types only — this import is erased at runtime, so nothing from
+ *  `$lib/server` reaches the client bundle. */
+export type TicketTableRow = TicketListRow;
+export type TicketStatus = ExecutionStatus;
+export type TicketStage = ExecutionStage;
 
 const columnHelper = createColumnHelper<TicketsTableFeatures, TicketTableRow>();
 
@@ -39,7 +36,7 @@ export const columns = columnHelper.columns([
 				status: row.original.status
 			})
 	}),
-	columnHelper.accessor((row) => row.usages.reduce((sum, entry) => sum + entry.costUsd, 0), {
+	columnHelper.accessor((row) => row.costUsd, {
 		id: 'cost',
 		header: 'Cost',
 		cell: ({ getValue }) =>

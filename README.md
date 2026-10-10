@@ -1,6 +1,6 @@
 # Factory Dashboard
 
-A custom factory agents dashboard to visualize activity|blockers, ticket progress, and token usage.
+A custom factory agents dashboard to visualize activity, attention requests, ticket progress, and token usage.
 
 **WIP - The project is in active development**
 
@@ -55,3 +55,36 @@ pnpm i
 ```bash
 pnpm run dev
 ```
+
+### Development data
+
+The dashboard reads a factory controller state database (state schema version 2) **read-only**, named by
+the runtime `DB_URL` environment variable (`/abs/path` or `file:/abs/path`). There are two ways to get one
+to develop against:
+
+1. **A real database** from a factory run: point `DB_URL` at `<project>/.factory/db/state.sqlite` of any
+   project driven by [factory-skills](https://github.com/geut/factory-skills).
+
+   ```bash
+   DB_URL=/absolute/path/to/<project>/.factory/db/state.sqlite pnpm run dev
+   ```
+
+2. **A scratch database** built from the vendored reference schema (`test/fixtures/state-schema.sql`, a
+   provenance-stamped copy of the controller's `schema.sql` — see its header and ADR 0004). This yields an
+   empty but valid v2 database; tests populate scratch copies the same way via `test/scratch-db.ts` and
+   `test/seed.ts`.
+
+   ```bash
+   node -e "
+     const { DatabaseSync } = require('node:sqlite');
+     const { readFileSync } = require('node:fs');
+     const db = new DatabaseSync('/tmp/scratch-state.sqlite');
+     db.exec(readFileSync('test/fixtures/state-schema.sql', 'utf8'));
+     db.close();
+   "
+   DB_URL=/tmp/scratch-state.sqlite pnpm run dev
+   ```
+
+A missing database, or one whose `schema_meta.schema_version` is not 2, renders a readable error page
+instead of serving stale or wrong data. Nothing in this repo ever writes to factory state.
+

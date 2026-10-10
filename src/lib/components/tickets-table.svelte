@@ -49,7 +49,8 @@
 			{#each table.getRowModel().rows as row (row.id)}
 				<Table.Row
 					data-state={row.getIsSelected() && 'selected'}
-					onclick={() => goto(`/tickets/${row.original.id}`)}
+					// Ticket ids are opaque and contain colons — always encode them.
+					onclick={() => goto(`/tickets/${encodeURIComponent(row.original.id)}`)}
 				>
 					{#each row.getVisibleCells() as cell (cell.id)}
 						<Table.Cell class="p-4! {cell.column.id === 'cost' ? 'hidden lg:table-cell' : ''}">
