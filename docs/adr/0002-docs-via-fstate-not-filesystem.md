@@ -4,7 +4,7 @@ Date: 2026-09-29
 
 ## Status
 
-Accepted
+Superseded by ADR 0004 (2026-10). There is no `fstate serve` — the CLI it described no longer exists, and schema v2 stores `ticket_executions.plan_path` and `adr_path` as opaque paths, not content. The operative boundary stands unchanged: the dashboard does not read `.factory/` files. Doc rendering needs a transport that does not exist, so the UI shows paths and ids and never fabricates content.
 
 ## Context
 

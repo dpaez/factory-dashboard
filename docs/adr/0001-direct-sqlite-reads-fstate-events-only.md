@@ -4,7 +4,7 @@ Date: 2026-09-29
 
 ## Status
 
-Accepted
+Superseded by ADR 0004 (2026-10). There is no `fstate server` — the CLI it described no longer exists. Direct SQLite reads remain the decision, but they are now **read-only** (`node:sqlite` `readOnly: true`) against the controller's six dashboard views, and the change cursor is `events.revision` filtered to `direction = 'domain'` (indexed by `dashboard_events`). No notification transport exists yet; the SSE subscription described here was never built.
 
 ## Context
 

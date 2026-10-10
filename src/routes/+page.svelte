@@ -11,53 +11,31 @@
 	import { CalendarClock as CalendarClockIcon } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
+	let overview = $derived(data.overview);
 	let tickets = $derived(data.tickets);
 
-	let counts = $derived.by(() => {
-		const next = { plan: 0, work: 0, review: 0, wrapup: 0, complete: 0 };
-		for (const ticket of tickets) {
-			if (ticket.stage in next) next[ticket.stage as keyof typeof next]++;
-			if (ticket.status === 'complete') next.complete++;
-		}
-		return next;
-	});
-
-	let activeTickets = $derived(counts.plan + counts.work + counts.review + counts.wrapup);
-
-	let ticketsSubtitle = $derived.by(
-		() => `
-    ${counts.complete} complete ▪ ${activeTickets} pending
-  `
+	let ticketsSubtitle = $derived(
+		`${overview.completeCount} complete ▪ ${overview.activeCount} active`
 	);
 
-	let usage = $derived.by(() => {
-		const next = {
-			costUsd: 0,
-			tokensInput: 0,
-			tokensOutput: 0,
-			tokensCacheRead: 0,
-			tokensCacheWrite: 0
-		};
-		for (const ticket of tickets) {
-			next.costUsd += ticket.usages.reduce((acc, usage) => acc + usage.costUsd, 0);
-			next.tokensInput += ticket.usages.reduce((acc, usage) => acc + usage.tokensInput, 0);
-			next.tokensOutput += ticket.usages.reduce((acc, usage) => acc + usage.tokensOutput, 0);
-			next.tokensCacheRead += ticket.usages.reduce((acc, usage) => acc + usage.tokensCacheRead, 0);
-			next.tokensCacheWrite += ticket.usages.reduce(
-				(acc, usage) => acc + usage.tokensCacheWrite,
-				0
-			);
-		}
-		return next;
-	});
+	// The Attention card is driven by open attention requests (title +
+	// question), not by any legacy `blocked` status derivation.
+	let attentionSubtitle = $derived(
+		overview.openAttention.length > 0
+			? overview.openAttention
+					.map((request) => `${request.ticketTitle ?? request.ticketId}: ${request.question}`)
+					.join(' · ')
+			: 'No open attention requests'
+	);
 
-	let attentionSubtitle = $derived.by(() => {
-		return (
-			tickets
-				.filter((ticket) => ticket.status === 'blocked')
-				.map((ticket) => ticket.title)
-				.join(', ') || 'No blocked tickets'
-		);
+	// A real timestamp from the database; `—` when the factory has no
+	// executions yet (the overview must not fabricate data).
+	let updatedLabel = $derived.by(() => {
+		if (overview.updatedAt === null) return 'Updated —';
+		const date = new Date(overview.updatedAt);
+		if (Number.isNaN(date.getTime())) return 'Updated —';
+		const iso = date.toISOString();
+		return `Updated ${iso.slice(0, 10)} · ${iso.slice(11, 16)} UTC`;
 	});
 </script>
 
@@ -71,37 +49,51 @@
 				</p>
 			</div>
 			<Badge variant="outline" class="mt-1 h-auto px-4 py-1 font-mono tabular-nums [&>svg]:size-4!">
-				<CalendarClockIcon class="mr-2" /><span class="text-xs font-light"
-					>Updated Sep 12 · 00:03 UTC</span
-				>
+				<CalendarClockIcon class="mr-2" /><span class="text-xs font-light">{updatedLabel}</span>
 			</Badge>
 		</div>
 
 		<div class="grid grid-cols-1 justify-items-center-safe md:grid-cols-3">
-			<InfoCard title="Active" subtitle={ticketsSubtitle} value={activeTickets} />
+			<InfoCard title="Active" subtitle={ticketsSubtitle} value={overview.activeCount} />
 			<InfoCostCard
 				title="Cost"
-				value={usage.costUsd}
-				tokensInputUsage={usage.tokensInput}
-				tokensOutputUsage={usage.tokensOutput}
-				tokensCacheRead={usage.tokensCacheRead}
-				tokensCacheWrite={usage.tokensCacheWrite}
+				value={overview.totals.costUsd}
+				tokensInputUsage={overview.totals.tokensInput}
+				tokensOutputUsage={overview.totals.tokensOutput}
+				tokensCacheRead={overview.totals.tokensCacheRead}
+				tokensCacheWrite={overview.totals.tokensCacheWrite}
 			/>
-			<InfoCard title="Attention" subtitle={attentionSubtitle} value={counts.review} />
+			<InfoCard
+				title="Attention"
+				subtitle={attentionSubtitle}
+				value={overview.openAttention.length}
+			/>
 		</div>
 	</section>
 	<section>
 		<h3 class="not-prose mb-6 text-2xl font-light">Workflow</h3>
+		<!-- Stage `done` gets no card: completed executions are counted in the
+		     Active card's "complete" figure instead. -->
 		<div class="grid grid-cols-2 justify-items-center-safe lg:grid-cols-4">
-			<WorkCard title="Plan" value={counts.plan} />
-			<WorkCard title="Work" value={counts.work} />
-			<WorkCard title="Review" value={counts.review} />
-			<WorkCard title="Wrap-up" value={counts.wrapup} />
+			<WorkCard title="Plan" value={overview.stageCounts.plan} />
+			<WorkCard title="Work" value={overview.stageCounts.work} />
+			<WorkCard title="Review" value={overview.stageCounts.review} />
+			<WorkCard title="Wrap-up" value={overview.stageCounts.wrapup} />
 		</div>
 	</section>
 
 	<section>
 		<h3 class="not-prose mb-6 text-2xl font-light">Tickets</h3>
-		<TicketsTable data={tickets} {columns} />
+		{#if tickets.length === 0}
+			<div class="not-prose font-mono text-sm text-muted-foreground">
+				<p>No tickets yet.</p>
+				<p class="mt-1 font-extralight">
+					The factory has nothing to show — tickets appear here as soon as the controller records
+					them.
+				</p>
+			</div>
+		{:else}
+			<TicketsTable data={tickets} {columns} />
+		{/if}
 	</section>
 </main>
