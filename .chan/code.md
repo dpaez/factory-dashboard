@@ -49,3 +49,13 @@
 - **Analysis:** Updates code.md (the change-tracking documentation) and adds 9 lines to pnpm-lock.yaml. No manifest (package.json) diffs are included, so no dependency version bumps or added/removed packages can be confirmed from the patch; the lockfile delta is only reflected as an omitted-hunk summary (+9/-0). No source, test, or configuration files were touched, so the commit is a documentation/bookkeeping update with an incidental lockfile sync.
 - **Related code:** code.md, pnpm-lock.yaml
 
+## Commit d1441f7
+
+- **Author:** Diego Paez <diego@geutstudio.com>
+- **Date:** 2026-10-11T17:51:32-03:00
+- **Files:** `package.json`, `pnpm-workspace.yaml`, `test/home.e2e.ts`
+- **Original message:** Update: basic e2e test
+- **Tags:** Test
+- **Analysis:** Introduces the first Playwright-based end-to-end test setup. Adds a `test:e2e` script (`playwright test`) to package.json alongside the existing `test:unit` script, adds a `pnpm-workspace.yaml` declaring `allowBuilds: esbuild: true` (needed so pnpm permits esbuild's postinstall build, likely pulled in by Playwright/Vitest tooling), and creates `test/home.e2e.ts`. The e2e test navigates to `/`, asserts the 'FD' text is visible, and asserts a `navigation` landmark contains the 'Main' and 'Tickets' links, exercising the app shell/home page. Purely additive test/tooling changes; production code and public API untouched. Note the new test file lacks a trailing newline.
+- **Related code:** package.json (scripts.test:e2e), pnpm-workspace.yaml (allowBuilds.esbuild), test/home.e2e.ts, test/home.e2e.ts:test('home'), test/home.e2e.ts:page.getByRole('navigation'), test/home.e2e.ts:page.getByText('FD')
+
