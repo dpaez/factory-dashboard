@@ -113,7 +113,7 @@ Umbrella detection is documented; child-list availability must be verified. If c
 
 **Placement:** the same region below the board as the TicketInspector; selecting a backlog card or a ticket card behaves identically. Content is a separate component, not an inspector mode.
 
-**Display model:** display reference, title, labels, tracker link ("Open in tracker", external), blockers and sub-issues as links, start availability and command state. Planned when the API supplies them ([factory-skills issue](https://github.com/geut/factory-skills/issues) — backlog issue details): author, created/updated time, and the description rendered as markdown. Until then those fields render **Unavailable** with the tracker link; fixtures and stories include them so the full layout is designed.
+**Display model:** display reference, title, labels, tracker link ("Open in tracker", external), blockers and sub-issues as links, start availability and command state. Planned when the API supplies them ([geut/factory-skills#61](https://github.com/geut/factory-skills/issues/61)): author, created/updated time, and the description rendered as markdown. Until then those fields render **Unavailable** with the tracker link; fixtures and stories include them so the full layout is designed.
 
 **After Start:** the preview shows “Starting…”. When the accepted command's ticket key appears in a read, the same selection becomes that ticket's inspector (Plan lane). Rejected starts keep the preview and show the reason.
 

@@ -37,7 +37,7 @@ Selected execution is explicit. Historical executions are readable; mutating con
 
 Displays title, source reference/link, execution number, stage, status, current task/round, and close control. A history control appears when previous executions are available. Show source/tracker warnings separately from execution failures.
 
-**Source section:** the issue (or written brief) the ticket started from: `sourceRef`, an external “Open in tracker” link, and — once the API supplies them — labels, author, dates and the original description, so the operator can compare what was asked with what was planned. Fields the API does not yet return render Unavailable.
+**Source section:** the issue (or written brief) the ticket started from: `sourceRef`, an external “Open in tracker” link, and — once the API supplies them ([geut/factory-skills#61](https://github.com/geut/factory-skills/issues/61)) — labels, author, dates and the original description, so the operator can compare what was asked with what was planned. Fields the API does not yet return render Unavailable.
 
 **Acceptance:** execution identity is visible after rerun; an old run is never presented as the active agent; ready for handoff is distinguishable from merged/complete.
 
