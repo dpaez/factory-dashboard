@@ -4,6 +4,8 @@ Date: 2026-10-02
 
 ## Status
 
+Superseded by ADR 0005 (2026-10-17): the dashboard is a factory API client and no longer reads SQLite.
+
 Amended by ADR 0004 (2026-10). The read-only posture is now enforced by the connection itself (`node:sqlite` `readOnly: true`) — stronger than the convention this ADR asked for. The "including scratch copies" clause is reversed: tests build and populate scratch v2 databases from the vendored reference schema (`test/fixtures/state-schema.sql`), and the schema's own `CHECK` constraints and triggers are what keep fixtures from describing impossible states. `fstate seed` does not exist and is no longer awaited.
 
 ## Context

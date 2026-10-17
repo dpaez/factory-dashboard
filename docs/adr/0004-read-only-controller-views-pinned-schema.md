@@ -4,6 +4,8 @@ Date: 2026-10-09
 
 ## Status
 
+Superseded by ADR 0005 (2026-10-17): the dashboard is a factory API client and no longer reads SQLite.
+
 Accepted. Supersedes ADR 0001 (events-only server) and ADR 0002 (docs via fstate), and amends ADR 0003 (no local state mutation).
 
 The factory controller (`geut/factory-skills`, `src/state/schema.sql`) owns `state.sqlite` and is its only writer; it publishes six SQL views explicitly as the dashboard's read contract. The dashboard therefore opens that file with `node:sqlite` `readOnly: true`, queries the views with hand-written SQL and hand-written row types, and refuses to serve anything whose `schema_meta.schema_version` is not `2` — there is no migration path and no drizzle table mirror. Test fixtures are built by applying a vendored, provenance-stamped copy of the reference `schema.sql` (`test/fixtures/state-schema.sql`) to a scratch database, because `factory-skills` is private and unpublished, so a test run cannot depend on finding it on disk.

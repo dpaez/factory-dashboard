@@ -1,67 +1,149 @@
-# Glossary
+# Factory Dashboard
 
-The domain vocabulary of the Factory Dashboard. Terms here are conceptual; implementation details live in code and specs.
+The operator's command center for one factory: it shows where every ticket is, what needs a person, and what it costs, and sends the factory's commands on the operator's behalf. Factory terms follow the factory's own vocabulary ([factory-skills CONTEXT.md](https://github.com/geut/factory-skills/blob/main/CONTEXT.md)); this glossary adds only what the dashboard needs and pins the choices where the two could drift.
 
-## Turn
+## Language
 
-Whose move it is on a ticket at this moment. Derived, never stored. Exactly one of **needs attention**, **running**, or **stalled** (done tickets are out of the turn question entirely).
+### People and systems
 
-## Needs attention
+**Operator**:
+The person using the dashboard to watch and direct the factory. Commands record the operator's name on behalf of the dashboard's API client, when one is configured.
+_Avoid_: user, admin
 
-A ticket whose Turn is the operator: execution status `waiting_for_user`, or an open **attention request** the operator must answer (kind `agent_question`, `policy_limit`, or `manual_approval`; status `open`). The machine is paused on something *the operator* can act on. The only state that leads the overview.
+**Factory server**:
+The long-running process that owns the controller and serves the factory API. It is the dashboard's only source of truth.
+_Avoid_: backend, daemon, database
 
-## Running
+**API client**:
+A named holder of a factory server token. The dashboard is one API client (`dashboard`); every command it sends is recorded with that client as actor.
+_Avoid_: app, consumer
 
-A ticket whose Turn is the agents: execution status `active`, `queued`, `paused`, or `resuming` with no open attention request. Work is progressing or parked without owing the operator anything.
+### Work items
 
-## Stalled
+**Issue**:
+A work item in the tracker that the factory has not started. It has no plan, tasks, or stage outputs yet; its labels, description, and author are its only context. Starting it puts it on the factory line as a ticket.
+_Avoid_: ticket, backlog ticket, before the factory owns it
 
-A running ticket whose work is stuck without anything the operator can act on — e.g. a `blocked` task with no open attention request, or a `resume_failed` / `failed` execution the operator has not been asked about. The machine is stuck, but acting now would not help. Rendered as a modifier on a running ticket, never as its own bucket.
+**Backlog**:
+The issues in scope for the factory that are not yet tickets.
 
-## Handoff
+**Backlog issue**:
+An issue in the backlog, as shown on the Flow board.
+_Avoid_: backlog ticket, backlog item
 
-The wrap-up output that transitions a ticket to human ownership: the pull request and the supervisor's last message. The dashboard shows the handoff; it does not produce one (the dashboard is read-only).
+**Umbrella issue**:
+An issue with sub-issues. It cannot be started itself; its sub-issues can.
+_Avoid_: epic, parent ticket
 
-## Plan doc / Task doc
+**Blocked issue**:
+A backlog issue another open issue blocks. Starting it is discouraged until the blocker closes.
 
-The durable markdown artifacts a ticket's planning produced (`plan.md`, per-task files). They belong to the factory root; state v2 records them only as opaque paths (`ticket_executions.plan_path`, `ticket_executions.adr_path`, `tasks.task_file`). No doc-serving transport exists, so the dashboard shows the paths and ids and never fabricates content — and it never reads the filesystem itself (ADR 0002, as superseded by ADR 0004).
+**Ticket**:
+An issue, or a written brief, that the factory has started.
+_Avoid_: issue, once the factory owns it; card (that is the board's rendering)
 
-## Ticket execution
+**Ticket key**:
+The factory's stable identity for a ticket, used in every read and command.
+_Avoid_: ticket id, slug, issue number
 
-One generation of running a ticket (`ticket_executions`). A ticket can be executed more than once; exactly one execution is current, and it carries the stage, status, worktree, and usage the dashboard renders.
+**Display reference**:
+The human label of a ticket or issue, such as `owner/repo#42`. Not unique across repositories, so never an identity.
+_Avoid_: key, id
 
-## Attention request
+**Execution**:
+One generation of a ticket. A rerun starts a new execution; exactly one execution is current, and earlier ones stay readable.
+_Avoid_: generation (in UI copy), attempt
 
-A question or approval the factory raised that needs the operator (`attention_requests`): kind `agent_question`, `policy_limit`, or `manual_approval`; status `open` until `answered`, `resolved`, or `cancelled`. Replaces the legacy "blocker with an owner" model.
+**Task**:
+One unit of planned work inside an execution, with dependencies on other tasks. Work, QA, and review run once per task.
 
-## Ticket summary
+**Run**:
+One attempt by an agent to produce a stage's output. A retry or correction is a new run, not a new execution.
+_Avoid_: job, session, attempt
 
-The ticket-level "what's done" statement shown at the top of a ticket's detail. Interim source: the ticket's latest message. Durable source: a persisted summary recorded at wrap-up (upstream requirement in factory-skills).
+**Active agent**:
+A run that is starting or running right now.
+_Avoid_: running ticket (a ticket can be active with no agent running)
 
-## Stage
+### Position and condition
 
-Where a ticket execution sits in the pipeline: `plan`, `work`, `review`, `wrapup`, `done`. A position, not a condition. (Agent sessions carry the same stage values minus `done`.)
+**Stage**:
+Where an execution sits in the pipeline: plan, work, QA, review, wrapup, or done (done applies to executions only). A position, not a condition. QA is optional and may be disabled for the factory.
+_Avoid_: phase, step, lane
 
-## Status
+**Status**:
+An execution's condition: queued, active, waiting for user, paused, resuming, resume failed, failed, ready for handoff, complete, or cancelled. A condition, not a position: a paused execution stays in its stage.
+_Avoid_: state (in UI copy)
 
-The ticket execution's condition: `queued`, `active`, `waiting_for_user`, `paused`, `resuming`, `resume_failed`, `failed`, `ready_for_handoff`, `complete`, `cancelled`. A condition, not a position. Turn is derived from status *plus* open attention requests. Tasks have their own status vocabulary: `pending`, `working`, `ready_for_review`, `reviewing`, `done`, `blocked`, `cancelled`.
+**Task status**:
+A task's condition: pending, active, done, blocked, or cancelled. An active or blocked task is at a stage (work, QA, or review).
 
-## Review pressure
+**Needs attention**:
+A ticket the factory says is waiting on a person: waiting for a reply, paused, failed, or ready for handoff. The factory decides this; the dashboard never derives it. The attention reason says which of these it is.
+_Avoid_: Turn, stalled, blocked, needs user (in UI copy)
 
-How hard a task has fought through review: round count, verdict, finding counts. Signals quality risk on a task before it is done.
+**Attention request**:
+A question, limit, or approval the factory raised for a person on a ticket: open until it is answered, resolved, or cancelled.
+_Avoid_: blocker, owner
 
-## Context pressure
+**Handoff**:
+The end of a ticket's factory work: wrapup prepares it, and the ticket becomes ready for handoff with its pull request. Marking it complete records the handoff; it does not merge code.
+_Avoid_: done, merged
 
-How close a running session is to exhausting its context window (`agent_sessions.context_percent`). A ticking clock the operator may need to act on before an agent run degrades.
+### The board
 
-## Event
+**Flow board**:
+The dashboard's root view: the backlog lane followed by one lane per stage, showing each current execution once.
+_Avoid_: kanban (cards are not dragged)
 
-A row in the factory's revision-ordered `events` log. `events.revision` filtered to `direction = 'domain'` is the change cursor a future live-update transport would resume from (ADR 0004); no transport exists yet, so events are not a dashboard surface today. The SQLite state remains the source of *what is*.
+**Lane**:
+A column of the Flow board: Backlog, Plan, Work, QA, Review, or Handoff. The Handoff lane shows executions in wrapup or ready for handoff.
+_Avoid_: stage (a lane renders a stage; Backlog and Handoff are not stages)
 
-## Factory root
+**Inspector**:
+The single place a ticket's execution is read and operated: tasks, activity, evidence, usage, and its commands. The board, the tickets list, and Stats all open the same inspector.
+_Avoid_: drawer, modal, detail page
 
-The repo-local `.factory/` directory holding one factory's state and ticket artifacts. One dashboard watches exactly one factory root (via its state DB).
+**Issue preview**:
+What the board shows for a selected backlog issue, in the same place as the inspector: its tracker facts, blockers, sub-issues, and Start. Once started, the selection becomes the new ticket's inspector.
+_Avoid_: inspector (an issue has no execution to inspect)
 
-## Operator
+**Source**:
+The issue (or written brief) a ticket was started from, as the tracker holds it. Shown in the inspector with a link to the tracker, so what was asked can be compared with what was planned.
+_Avoid_: origin, brief (unless it was written in the dashboard)
 
-The single human user of this dashboard: the developer running the factory in a terminal elsewhere. The dashboard informs the operator; control lives in the terminal.
+### Commands
+
+**Command**:
+An operator's request to the factory: start, reply, retry, stop, cancel, complete, or rerun (see the factory vocabulary for each). The factory server alone decides whether a command is valid.
+_Avoid_: action (in prose), mutation
+
+**Accepted command**:
+A command the factory has recorded but whose effect has not yet been observed. Accepted is not done: a start can be accepted and its agent launch still fail.
+_Avoid_: success, completed
+
+**Event**:
+A revision-ordered notice that something on the factory changed. It names what changed, never the new state; the dashboard rereads what it names.
+_Avoid_: update, message, push
+
+### Measurement
+
+**Factory stats**:
+Measures of how well the factory turns tickets into merged pull requests, under the factory's published stats definitions.
+_Avoid_: metrics, analytics, insights
+
+**Cohort**:
+The tickets a stats view covers, selected by start time within a window. Every figure on a stats view describes the same cohort.
+_Avoid_: dataset, sample (unless a figure deliberately narrows it)
+
+**Unavailable**:
+A measurement the factory does not supply or cannot supply completely. Shown as unavailable, never as zero.
+_Avoid_: zero, n/a, empty
+
+**Review pressure**:
+How hard a task has fought through review: rounds, review verdict, and finding counts.
+
+### Artifacts
+
+**Plan doc / Task doc**:
+The durable documents a ticket's planning produced. The dashboard shows their references and never fabricates their content; it has no way to read them yet.
