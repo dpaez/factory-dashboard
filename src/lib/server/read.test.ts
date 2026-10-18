@@ -183,7 +183,7 @@ describe('getTicketList', () => {
 
 		const ticketARows = rows.filter((row) => row.id === readFixture.ticketA);
 		expect(ticketARows).toHaveLength(1);
-		expect(ticketARows[0].executionId).toBe(readFixture.executionA1);
+		expect(ticketARows[0]!.executionId).toBe(readFixture.executionA1);
 	});
 
 	it('returns an empty array on an empty database', async () => {
@@ -298,6 +298,8 @@ describe('getTicketDetail', () => {
 		]);
 
 		const [plan, work] = detail?.sessions ?? [];
+		expect(plan).toBeDefined();
+		expect(work).toBeDefined();
 		expect(plan).toMatchObject({
 			stage: 'plan',
 			taskId: null,
@@ -308,7 +310,7 @@ describe('getTicketDetail', () => {
 			contextWindow: 200_000,
 			contextPercent: 25
 		});
-		expect(plan.usage?.costUsd).toBe(0.5);
+		expect(plan!.usage?.costUsd).toBe(0.5);
 
 		expect(work).toMatchObject({
 			stage: 'work',
@@ -318,7 +320,7 @@ describe('getTicketDetail', () => {
 			contextPercent: 75
 		});
 		// The resumed session reports only its latest cumulative snapshot.
-		expect(work.usage).toEqual({
+		expect(work!.usage).toEqual({
 			costUsd: 2.5,
 			tokensInput: 300,
 			tokensOutput: 30,
@@ -373,7 +375,8 @@ describe('getTicketDetail', () => {
 		expect(detail?.priorGenerations).toEqual([]);
 		expect(detail?.tasks).toEqual([]);
 		expect(detail?.attention).toEqual([]);
-		expect(detail?.sessions[0].usage?.costUsd).toBe(1);
+		expect(detail?.sessions[0]).toBeDefined();
+		expect(detail?.sessions[0]!.usage?.costUsd).toBe(1);
 	});
 });
 
