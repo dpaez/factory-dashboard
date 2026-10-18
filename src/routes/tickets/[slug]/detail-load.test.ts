@@ -123,18 +123,19 @@ describe('ticket detail load', () => {
 			taskStatus: 'unknown',
 			contextPercent: 25
 		});
-		expect(detail.sessions[0].usage?.costUsd).toBe(0.5);
+		expect(detail.sessions[0]!.usage?.costUsd).toBe(0.5);
 		expect(detail.sessions[1]).toMatchObject({
 			taskId: '02',
 			taskStatus: 'pending',
 			contextPercent: 75
 		});
-		expect(detail.sessions[1].usage).toMatchObject({ costUsd: 2.5, tokensInput: 300 });
+		expect(detail.sessions[1]!.usage).toMatchObject({ costUsd: 2.5, tokensInput: 300 });
 
 		// Per-stage usage from deltas, plan → work order, cost in USD.
 		expect(detail.usageByStage.map((row) => row.stage)).toEqual(['plan', 'work']);
-		expect(detail.usageByStage[0].costUsd).toBe(0.5);
-		expect(detail.usageByStage[1].costUsd).toBe(2.5);
+		expect(detail.usageByStage).toHaveLength(2);
+		expect(detail.usageByStage[0]!.costUsd).toBe(0.5);
+		expect(detail.usageByStage[1]!.costUsd).toBe(2.5);
 
 		// Nothing legacy leaks through the payload, and no micros integer survives.
 		expect(Object.keys(detail).sort()).toEqual(

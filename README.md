@@ -88,3 +88,28 @@ to develop against:
 A missing database, or one whose `schema_meta.schema_version` is not 2, renders a readable error page
 instead of serving stale or wrong data. Nothing in this repo ever writes to factory state.
 
+### Factory API contract
+
+The dashboard's types for the factory server API come from a committed OpenAPI snapshot,
+`openapi/factory.openapi.json`, and the TypeScript generated from it,
+`src/lib/factory/generated/factory-api.d.ts` (never hand-edit it; it is excluded from Prettier). Builds,
+`pnpm check` and `pnpm test` read only these committed files and never need a running factory.
+
+To refresh both against the local factory server (`factory-up` from the repo root starts it on
+`127.0.0.1:7731` and writes its URL and token to `.factory/dashboard.env`):
+
+```bash
+FACTORY_API_URL=http://127.0.0.1:7731 pnpm api:sync   # api:pull (snapshot) + api:generate (types)
+```
+
+`api:pull` fetches `GET $FACTORY_API_URL/openapi.json` without a token and rejects anything that is not a
+JSON OpenAPI document exposing `/v1/tickets`. Commit both files together and review the diff.
+
+To check for drift without touching the committed files:
+
+```bash
+FACTORY_API_URL=http://127.0.0.1:7731 pnpm api:check
+```
+
+It exits non-zero and names the file(s) that differ from the live server. It needs the network and is
+not part of `pnpm test`. See `.env.example` for the runtime `FACTORY_API_*` variables.
