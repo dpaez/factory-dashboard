@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 
 export default defineConfig({
 	ssr: {
@@ -34,6 +35,30 @@ export default defineConfig({
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
 					exclude: ['src/lib/server/**']
+				}
+			},
+
+			{
+				extends: './vite.config.ts',
+				plugins: [
+					// Every *.stories.svelte runs as a test. The side-by-side theme renders each
+					// story once in a light pane and once in a `.dark` pane.
+					storybookTest({
+						configDir: '.storybook',
+						storybookScript: 'pnpm storybook --ci',
+						initialGlobals: { theme: 'side-by-side' }
+					})
+				],
+				test: {
+					name: 'storybook',
+					// Stories render without explicit assertions; scoped to this project only.
+					expect: { requireAssertions: false },
+					browser: {
+						enabled: true,
+						provider: playwright(),
+						headless: true,
+						instances: [{ browser: 'chromium' }]
+					}
 				}
 			},
 
