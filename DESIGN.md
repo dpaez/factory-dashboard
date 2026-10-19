@@ -18,10 +18,15 @@ colors:
   chart-blue-4: "oklch(0.5 0.134 242.749)"
   chart-blue-5: "oklch(0.443 0.11 240.79)"
   signal-run: "oklch(0.80 0.13 155)"
+  signal-run-dark: "oklch(0.72 0.12 155)"
   signal-wait: "oklch(0.79 0.15 70)"
+  signal-wait-dark: "oklch(0.72 0.14 70)"
   signal-standby: "oklch(0.72 0.012 228)"
+  signal-standby-dark: "oklch(0.62 0.012 228)"
   signal-fault: "oklch(0.55 0.19 25)"
-  signal-clear: "oklch(0.55 0.16 245)"
+  signal-fault-dark: "oklch(0.57 0.18 25)"
+  signal-clear: "oklch(0.53 0.13 245)"
+  signal-clear-dark: "oklch(0.55 0.12 245)"
 typography:
   headline:
     fontFamily: "system-ui sans stack (Roboto self-hosted, wiring pending)"
@@ -107,7 +112,7 @@ Type is a two-instrument pair: JetBrains Mono is the voice of data (values, coun
 
 ## Colors
 
-The palette is an industrial grey field with one amber warning voice and a five-value signal strip for factory states. Theme colors are defined as shadcn CSS variables in `src/routes/layout.css` (oklch is the normative format); the signal strip below is the proposed normative status palette replacing the current one-off Tailwind classes.
+The palette is an industrial grey field with one amber warning voice and a five-value signal strip for factory states. Theme colors are defined as shadcn CSS variables in `src/routes/layout.css` (oklch is the normative format); the signal strip below is the normative status palette, defined there as `--signal-*` tokens.
 
 ### Primary
 - **Beacon Yellow** (`oklch(0.852 0.199 91.936)` light, `oklch(0.795 0.184 86.047)` dark): the `--primary` token. Used for: changed-value flash on workflow stage cards, timeline/progress fill and reached step dots, the top cap border and tinted background of detail stat cards, agent message bubbles' tint source, and the primary button. Text on it is always **Beacon Ink** (`oklch(0.421 0.095 57.708)`), never white.
@@ -118,14 +123,14 @@ The palette is an industrial grey field with one amber warning voice and a five-
 ### Danger
 - **Fault Red** (`oklch(0.577 0.245 27.325)` light, `oklch(0.704 0.191 22.216)` dark): the `--destructive` token, used at 10–20% washes for destructive buttons and error tints. Full-strength it doubles as the fault signal below.
 
-### Signal strip (status semantics — normative proposal)
-Replaces the hard-coded Tailwind utilities (`bg-green-500`, `bg-amber-500`, …) currently on the ticket/task badges. The rule is tonal weight = state weight: in-progress and attention states are light chips carrying ink text; terminal states are deep chips carrying paper-white text.
+### Signal strip (status semantics — normative)
+Defined in `src/routes/layout.css` as `--signal-{run,wait,standby,fault,clear}` with matching `--signal-*-foreground` inks, in both `:root` and `.dark`, and exposed as Tailwind colors (`bg-signal-run text-signal-run-foreground`). `src/lib/factory/status.ts` is the single mapping from API statuses to signals. The rule is tonal weight = state weight: in-progress and attention states are light chips carrying ink text; terminal states are deep chips carrying paper-white text. Every chip/ink pair meets WCAG AA (≥ 4.5:1) in both themes.
 
-- **Signal Run** (`oklch(0.80 0.13 155)`): machine working. Ticket `active`, task `in_progress`. Ink text.
-- **Signal Wait** (`oklch(0.79 0.15 70)`): a human is needed. Ticket `waiting_for_user`, task `ready_for_review`, blocker present. Ink text. (Deliberately deeper and one hue-step orange from Beacon Yellow so the system voice and the wait state don't collapse.)
-- **Signal Standby** (`oklch(0.72 0.012 228)`): not started / not known. Task `pending`, `unknown` status. Ink text.
-- **Signal Fault** (`oklch(0.55 0.19 25)`): stopped broken. Ticket `blocked` or `failed`. Paper-white text (carries ink at large/bold only; prefer white).
-- **Signal Clear** (`oklch(0.55 0.16 245)`): stopped clean. Ticket `complete`, task `done`. Paper-white text.
+- **Signal Run** (`oklch(0.80 0.13 155)` light, `oklch(0.72 0.12 155)` dark): machine working. Execution `active`/`resuming`, task `active` at any stage. Ink text (11.1:1 / 8.4:1).
+- **Signal Wait** (`oklch(0.79 0.15 70)` light, `oklch(0.72 0.14 70)` dark): a human is needed. Execution `queued`, `waiting_for_user`, `ready_for_handoff`. Ink text (9.9:1 / 7.7:1). (Deliberately deeper and one hue-step orange from Beacon Yellow so the system voice and the wait state don't collapse.)
+- **Signal Standby** (`oklch(0.72 0.012 228)` light, `oklch(0.62 0.012 228)` dark): not started / not moving / not known. Execution `paused`, `cancelled`; task `pending`, `cancelled`; any unknown value. Ink text (8.0:1 / 5.4:1).
+- **Signal Fault** (`oklch(0.55 0.19 25)` light, `oklch(0.57 0.18 25)` dark): stopped broken. Execution `failed`, `resume_failed`; task `blocked`. Paper-white text (5.3:1 / 4.9:1).
+- **Signal Clear** (`oklch(0.53 0.13 245)` light, `oklch(0.55 0.12 245)` dark): stopped clean. Execution `complete`, task `done`. Paper-white text (5.2:1 / 4.8:1). Lightness and chroma were lowered from the original `oklch(0.55 0.16 245)` proposal, which was out of sRGB gamut and only 4.7:1 against white.
 
 ### Neutral
 - **Instrument Ink** (`oklch(0.148 0.004 228.8)`): body text / dark-mode background.

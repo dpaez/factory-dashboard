@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Table from '$lib/components/ui/table/index.js';
 	import TasksTableStatusCell from '$lib/components/tasks-table-status-cell.svelte';
+	import { legacyTaskStatus } from '$lib/components/legacy-task-status';
 	import { MoveUp as ArrowUpIcon, MoveDown as ArrowDownIcon } from '@lucide/svelte';
 	// Types only — erased at runtime, so nothing from `$lib/server` reaches the
 	// client bundle.
@@ -57,7 +58,7 @@
 					{session.contextPercent === null ? '—' : `${session.contextPercent}%`}
 				</Table.Cell>
 				<Table.Cell class="text-end">
-					<TasksTableStatusCell status={session.taskStatus} />
+					<TasksTableStatusCell {...legacyTaskStatus(session.taskStatus)} />
 				</Table.Cell>
 			</Table.Row>
 		{/each}

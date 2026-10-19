@@ -9,6 +9,7 @@
 	import UsageList from '$lib/components/usage-list.svelte';
 	import TasksTableStatusCell from '$lib/components/tasks-table-status-cell.svelte';
 	import TicketsTableStatusCell from '$lib/components/tickets-table-status-cell.svelte';
+	import { legacyTaskStatus } from '$lib/components/legacy-task-status';
 	import type { TicketDetailTask } from '$lib/server/types';
 
 	const { data }: PageProps = $props();
@@ -143,7 +144,7 @@
 									<span class="text-muted-foreground">{task.ordinal}.</span>
 									{task.title ?? task.taskId}
 								</p>
-								<TasksTableStatusCell status={task.status} />
+								<TasksTableStatusCell {...legacyTaskStatus(task.status)} />
 							</div>
 							<p class="text-muted-foreground">
 								review round <span class="tabular-nums">{task.reviewRound}</span>
