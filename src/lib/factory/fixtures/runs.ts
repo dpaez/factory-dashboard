@@ -5,7 +5,7 @@
  */
 import type { components } from '$lib/factory/generated/factory-api';
 
-import { ticketMultiExecution } from './tickets';
+import { ticketMultiExecution } from './tickets.ts';
 
 type Schemas = components['schemas'];
 
@@ -315,3 +315,26 @@ export const agentList = {
 		}
 	]
 } satisfies Schemas['AgentList'];
+
+/** The runs of the multi-execution ticket's first, finished execution. */
+export const runPageFirstExecution = {
+	items: [
+		{
+			...runPlanPassed,
+			id: 'run_gen1_plan',
+			activity: 'Planned one task for the first attempt.',
+			startedAt: '2026-10-05T08:01:00Z',
+			endedAt: '2026-10-05T08:10:00Z',
+			outcome: 'Planned 1 task'
+		},
+		{
+			...runReviewApproved,
+			id: 'run_gen1_review',
+			sequence: 2,
+			round: 1,
+			startedAt: '2026-10-07T16:00:00Z',
+			endedAt: '2026-10-07T16:20:00Z'
+		}
+	],
+	nextCursor: null
+} satisfies Schemas['RunPage'];

@@ -32,9 +32,9 @@ describe('README sbx-shell-pi kit integration section', () => {
 		expect(section).toMatch(/`factory` workload/);
 	});
 
-	it('keeps Herdr as entrypoint and the dashboard read-only on the state db', () => {
+	it('keeps Herdr as entrypoint and the dashboard on the factory server API', () => {
 		expect(section).toMatch(/Herdr stays the entrypoint/);
-		expect(section).toContain('`.factory/db/state.sqlite`');
+		expect(section).toMatch(/factory server API/);
 		expect(section).toMatch(/terminal remains the control path/);
 	});
 

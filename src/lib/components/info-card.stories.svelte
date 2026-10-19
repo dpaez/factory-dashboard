@@ -29,3 +29,17 @@
 	name="Large value"
 	args={{ title: 'Active', value: 128_400, subtitle: 'Across 37 tickets and 52 executions' }}
 />
+
+<Story
+	name="Needs attention"
+	args={{
+		title: 'Needs attention',
+		value: 3,
+		subtitle: 'dpaez/factory-dashboard#23 · dpaez/factory-dashboard#24 · KAI-12'
+	}}
+/>
+
+<Story
+	name="Active agents unavailable"
+	args={{ title: 'Active agents', value: '—', subtitle: 'Unavailable' }}
+/>

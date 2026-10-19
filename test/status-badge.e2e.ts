@@ -1,7 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
-import { createScratchDb, type ScratchDb } from './scratch-db';
-import { insertExecution, insertTask, insertTicket } from './seed';
+import { ticketDetailActiveInWork } from '../src/lib/factory/fixtures/tickets.ts';
 
 // QA for ticket #19, task 02: StatusBadge and the status cells that delegate to it.
 const SB = 'http://localhost:6006';
@@ -113,77 +111,26 @@ test('AC4: badge colors come from --signal-* tokens with Two-Ink text, in light 
 	await shot(page, 'ac4-all-signals');
 });
 
-// AC7 needs the real detail page on seeded data: the built app on a scratch database.
-const APP_PORT = 4187;
-let scratch: ScratchDb;
-let server: ChildProcess;
-const CASES: [string, string, string][] = [
-	['working', 'Active · work', 'run'],
-	['ready_for_review', 'Active · review', 'run'],
-	['reviewing', 'Active · review', 'run'],
-	['pending', 'Pending', 'standby'],
-	['done', 'Done', 'clear'],
-	['blocked', 'Blocked', 'fault'],
-	['cancelled', 'Cancelled', 'standby']
-];
+// AC7: the real detail page against the fake factory (Playwright's preview server).
+// The fixture's tasks cover every API task status; the chip comes straight from `{status, stage}`.
+const EXPECTED: Record<string, [string, string]> = {
+	'01': ['Done', 'clear'],
+	'02': ['Active · review', 'run'],
+	'03': ['Pending', 'standby'],
+	'04': ['Blocked · QA', 'fault'],
+	'05': ['Cancelled · work', 'standby']
+};
 
-test.describe('AC7: ticket detail page', () => {
-	test.beforeAll(async () => {
-		scratch = createScratchDb();
-		const { db } = scratch;
-		// The schema allows one working/review/blocked task per execution: one ticket each.
-		CASES.forEach(([status], i) => {
-			const ticketId = `github:github.com:QA19-${status}`;
-			const executionId = `exec:QA19-${status}`;
-			insertTicket(db, { id: ticketId, title: `Legacy ${status}` });
-			insertExecution(db, { id: executionId, ticketId, stage: 'work', status: 'active' });
-			insertTask(db, {
-				executionId,
-				taskId: '01',
-				ordinal: 1,
-				title: `Task ${status}`,
-				taskFile: `${i}-task.md`,
-				status
-			});
-		});
-		server = spawn('node', ['build'], {
-			env: { ...process.env, PORT: String(APP_PORT), DB_URL: scratch.path },
-			stdio: 'ignore'
-		});
-		await expect
-			.poll(
-				async () => {
-					try {
-						return (await fetch(`http://localhost:${APP_PORT}/`)).status;
-					} catch {
-						return 0;
-					}
-				},
-				{ timeout: 30_000 }
-			)
-			.toBe(200);
-	});
-
-	test.afterAll(() => {
-		server?.kill();
-		scratch?.dispose();
-	});
-
-	test('AC7: legacy task statuses render chips with correct tones through the adapter', async ({
-		page
-	}) => {
-		for (const [status, label, signal] of CASES) {
-			await page.goto(
-				`http://localhost:${APP_PORT}/tickets/${encodeURIComponent(`github:github.com:QA19-${status}`)}`
-			);
-			const chip = page.getByText(`Task ${status}`).locator('xpath=..').locator('[data-signal]');
-			await expect.soft(chip, status).toHaveText(label);
-			await expect.soft(chip, status).toHaveAttribute('data-signal', signal);
-		}
-		await page.goto(
-			`http://localhost:${APP_PORT}/tickets/${encodeURIComponent('github:github.com:QA19-working')}`
-		);
-		await expect(page.locator('[data-signal]', { hasText: 'Active · work' })).toBeVisible();
-		await shot(page, 'ac7-ticket-detail-legacy-chips');
-	});
+test('AC7: API task statuses render chips with correct tones on the ticket detail page', async ({
+	page
+}) => {
+	await page.goto(`/tickets/${encodeURIComponent(ticketDetailActiveInWork.key)}`);
+	expect(ticketDetailActiveInWork.tasks.map((task) => task.id)).toEqual(Object.keys(EXPECTED));
+	for (const task of ticketDetailActiveInWork.tasks) {
+		const [label, signal] = EXPECTED[task.id]!;
+		const chip = page.locator(`[data-task="${task.id}"] [data-signal]`);
+		await expect.soft(chip, task.status).toHaveText(label);
+		await expect.soft(chip, task.status).toHaveAttribute('data-signal', signal);
+	}
+	await shot(page, 'ac7-ticket-detail-api-chips');
 });

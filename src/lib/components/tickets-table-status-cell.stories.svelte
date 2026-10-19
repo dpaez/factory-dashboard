@@ -1,7 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import TicketsTableStatusCell from './tickets-table-status-cell.svelte';
-	import type { TicketStatus } from './tickets-table-columns.ts';
+	import type { ExecutionStatus as TicketStatus } from '$lib/factory/models';
 	import { ticketSummaries } from '$lib/factory/fixtures';
 
 	const statuses: TicketStatus[] = [

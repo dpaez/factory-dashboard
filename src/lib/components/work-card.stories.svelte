@@ -20,6 +20,7 @@
 	<div class="flex flex-wrap gap-4">
 		<WorkCard title="Plan" value={3} />
 		<WorkCard title="Work" value={5} />
+		<WorkCard title="QA" value={2} />
 		<WorkCard title="Review" value={1} />
 		<WorkCard title="Wrap-up" value={0} />
 	</div>

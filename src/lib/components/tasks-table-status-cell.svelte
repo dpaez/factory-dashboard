@@ -6,8 +6,10 @@
 	type Task = components['schemas']['Task'];
 
 	/** Unknown strings render as a Standby badge with the raw value, for API drift. */
-	let { status, stage = null }: { status: Task['status'] | (string & {}); stage?: Task['stage'] } =
-		$props();
+	let {
+		status,
+		stage = null
+	}: { status: Task['status'] | (string & {}); stage?: Task['stage'] | (string & {}) } = $props();
 
 	const badge = $derived(taskStatusSignal(status, stage));
 </script>

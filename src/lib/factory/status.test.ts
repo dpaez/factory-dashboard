@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
 	EXECUTION_STATUS_SIGNALS,
+	RUN_STATUS_SIGNALS,
 	TASK_STAGE_LABELS,
 	TASK_STATUS_SIGNALS,
 	executionStatusSignal,
+	runStatusSignal,
 	taskStatusSignal,
 	type Signal
 } from './status';
@@ -134,5 +136,18 @@ describe('taskStatusSignal', () => {
 
 	it('never returns an empty label', () => {
 		expect(taskStatusSignal('', null).label.trim()).not.toBe('');
+	});
+});
+
+describe('runStatusSignal', () => {
+	const runStatuses = enumValues('Run', 'status');
+
+	it.each(runStatuses)('maps run status %s explicitly', (status) => {
+		expect(Object.hasOwn(RUN_STATUS_SIGNALS, status)).toBe(true);
+		expect(SIGNALS).toContain(runStatusSignal(status).signal);
+	});
+
+	it('maps unknown values to standby with the raw value', () => {
+		expect(runStatusSignal('exploded')).toEqual({ signal: 'standby', label: 'exploded' });
 	});
 });
