@@ -9,21 +9,9 @@
 		taskPending,
 		tasksOfEveryStatus
 	} from '$lib/factory/fixtures';
-	import { legacyTaskStatus } from './legacy-task-status';
 
 	const statuses = ['pending', 'active', 'done', 'blocked', 'cancelled'];
 	const stages = [null, 'plan', 'work', 'qa', 'review', 'wrapup'];
-	const legacyStatuses = [
-		'pending',
-		'working',
-		'ready_for_review',
-		'reviewing',
-		'done',
-		'blocked',
-		'cancelled',
-		'unknown'
-	] as const;
-
 	const { Story } = defineMeta({
 		title: 'Components/TasksTable/StatusCell',
 		component: TasksTableStatusCell,
@@ -55,15 +43,6 @@
 	<div class="flex flex-wrap items-center gap-2">
 		{#each tasksOfEveryStatus as task (task.id)}
 			<TasksTableStatusCell status={task.status} stage={task.stage} />
-		{/each}
-	</div>
-</Story>
-
-<!-- TODO(#21): delete with the legacy adapter. -->
-<Story name="Legacy vocabulary" asChild>
-	<div class="flex flex-wrap items-center gap-2">
-		{#each legacyStatuses as status (status)}
-			<TasksTableStatusCell {...legacyTaskStatus(status)} />
 		{/each}
 	</div>
 </Story>

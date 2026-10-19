@@ -71,3 +71,21 @@ export function taskStatusSignal(
 	const stageLabel = lookup<string>(TASK_STAGE_LABELS, stage) ?? stage;
 	return { signal: base.signal, label: `${base.label} · ${stageLabel}` };
 }
+
+export type RunStatus = components['schemas']['Run']['status'];
+
+/**
+ * A run's own status. `terminal` says only that the run ended, not how, so it
+ * is Standby rather than Clear; the run's outcome text says the rest.
+ */
+export const RUN_STATUS_SIGNALS = {
+	prepared: { signal: 'wait', label: 'Prepared' },
+	starting: { signal: 'run', label: 'Starting' },
+	running: { signal: 'run', label: 'Running' },
+	terminal: { signal: 'standby', label: 'Ended' }
+} as const satisfies Record<RunStatus, StatusSignal>;
+
+/** Accepts any string so runtime drift from the API still renders, as standby. */
+export function runStatusSignal(status: RunStatus | (string & {})): StatusSignal {
+	return lookup<StatusSignal>(RUN_STATUS_SIGNALS, status) ?? unknown(status);
+}

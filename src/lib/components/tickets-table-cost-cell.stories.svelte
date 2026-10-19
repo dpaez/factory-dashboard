@@ -14,3 +14,5 @@
 <Story name="Small" args={{ cost: 0.37 }} />
 
 <Story name="Large" args={{ cost: 1843.7 }} />
+
+<Story name="Unavailable" args={{ cost: null }} />

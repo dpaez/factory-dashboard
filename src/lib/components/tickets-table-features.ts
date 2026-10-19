@@ -2,10 +2,8 @@ import {
 	columnFilteringFeature,
 	columnVisibilityFeature,
 	createFilteredRowModel,
-	createPaginatedRowModel,
 	createSortedRowModel,
 	filterFn_includesString,
-	rowPaginationFeature,
 	rowSelectionFeature,
 	rowSortingFeature,
 	sortFn_alphanumeric,
@@ -13,14 +11,14 @@ import {
 	tableFeatures
 } from '@tanstack/svelte-table';
 
+// No pagination: the table has no pager, so a paginated model would hide rows
+// silently. Lists are bounded by the server-side pager instead.
 export const features = tableFeatures({
 	columnFilteringFeature,
 	columnVisibilityFeature,
-	rowPaginationFeature,
 	rowSelectionFeature,
 	rowSortingFeature,
 	filteredRowModel: createFilteredRowModel(),
-	paginatedRowModel: createPaginatedRowModel(),
 	sortedRowModel: createSortedRowModel(),
 	filterFns: { includesString: filterFn_includesString },
 	sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text }

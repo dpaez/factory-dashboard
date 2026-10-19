@@ -5,7 +5,7 @@
  */
 import type { components } from '$lib/factory/generated/factory-api';
 
-import { tasksOfEveryStatus } from './tasks';
+import { tasksOfEveryStatus } from './tasks.ts';
 
 type Schemas = components['schemas'];
 
@@ -413,4 +413,143 @@ export const ticketDetailMultiExecution = {
 	attention: [],
 	tasks: [],
 	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
+/** A ticket with long values, for layout stories. Not part of `ticketSummaries`. */
+export const ticketLongValues = {
+	...baseTicket,
+	id: 'tkt_16',
+	key: 'very-long-organisation-name-very-long-repository-name-1234-0f1e2d3c',
+	displayRef: 'very-long-organisation-name/very-long-repository-name#1234',
+	sourceRef: 'https://github.com/very-long-organisation-name/very-long-repository-name/issues/1234',
+	title:
+		'Make the dashboard show every ticket the factory server knows about, including finished and cancelled ones, with their stage and progress',
+	stage: 'work',
+	status: 'waiting_for_user',
+	needsUser: true,
+	progress: {
+		current: { label: 'A task with a long title', step: '17/128' },
+		done: 17,
+		next: null,
+		total: 128
+	}
+} satisfies Schemas['TicketSummary'];
+
+/** Tasks with the live summary shapes. Typed wide so stage keys stay open. */
+const qaTicketTasks: Schemas['Task'][] = [
+	{
+		blockedBy: [],
+		id: '01',
+		ordinal: 1,
+		stage: null,
+		status: 'done',
+		summaries: {
+			review: { counts: { blocking: 0, findings: 2 }, label: 'approve', round: 2 },
+			qa: { counts: { gaps: 1, tested: 4 }, label: 'passed', round: 1 }
+		},
+		title: 'Event stream proxy'
+	},
+	{
+		blockedBy: ['01'],
+		id: '02',
+		ordinal: 2,
+		stage: 'qa',
+		status: 'active',
+		summaries: {
+			review: { counts: { blocking: 1, findings: 3 }, label: 'changes_requested', round: 2 }
+		},
+		title: 'Board live updates'
+	},
+	{
+		blockedBy: ['01', '02'],
+		id: '03',
+		ordinal: 3,
+		stage: null,
+		status: 'pending',
+		summaries: {},
+		title: 'Reconnect banner'
+	}
+];
+
+/**
+ * A ticket in QA whose tasks carry the live summary shapes: review
+ * `{findings, blocking}` and QA `{tested, gaps}` counts.
+ */
+export const ticketDetailActiveInQa = {
+	...ticketActiveInQa,
+	pullRequest: pullRequestOpen,
+	statusReason: 'QA is exercising the event stream against a real browser.',
+	attention: [
+		{
+			id: 'att_10',
+			kind: 'manual_approval',
+			question: [
+				'Approve the QA plan before it runs?',
+				'',
+				'| check                  | result  |',
+				'| ---------------------- | ------- |',
+				'| reconnect after 30s    | pending |',
+				'| replays missed events  | pending |'
+			].join('\n'),
+			replies: [
+				{
+					actor: startedByDashboard,
+					answer: 'Run the reconnect check first.',
+					createdAt: '2026-10-14T08:00:00Z',
+					current: false,
+					version: 1
+				},
+				{
+					actor: { client: 'cli', onBehalfOf: null },
+					answer: 'Approved as written.',
+					createdAt: '2026-10-14T08:30:00Z',
+					current: true,
+					version: 2
+				}
+			],
+			runId: null,
+			status: 'resolved'
+		},
+		{
+			id: 'att_11',
+			kind: 'agent_question',
+			question: 'Should the stream reconnect forever, or give up after 5 tries?',
+			replies: [],
+			runId: null,
+			status: 'open'
+		}
+	],
+	tasks: qaTicketTasks,
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
+/** The first, finished execution of the multi-execution ticket. */
+export const ticketDetailMultiExecutionFirst = {
+	...ticketDetailMultiExecution,
+	execution: 1,
+	stage: 'done',
+	status: 'complete',
+	pullRequest: pullRequestMerged,
+	finishedAt: '2026-10-07T17:20:00Z',
+	updatedAt: '2026-10-07T17:20:00Z',
+	progress: { current: null, done: 1, next: null, total: 1 },
+	tasks: [
+		{
+			blockedBy: [],
+			id: '01',
+			ordinal: 1,
+			stage: null,
+			status: 'done',
+			summaries: { review: { counts: { blocking: 0, findings: 0 }, label: 'approve', round: 1 } },
+			title: 'Timeline grouping, first attempt'
+		}
+	],
+	usage: {
+		costUsd: 1.17,
+		tokensCacheRead: 240_000,
+		tokensCacheWrite: 21_000,
+		tokensInput: 41_000,
+		tokensOutput: 12_300,
+		tokensTotal: 314_300
+	}
 } satisfies Schemas['TicketDetail'];
