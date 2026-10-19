@@ -73,7 +73,8 @@ test('AC2: every baseline story renders in light, in dark, and side by side', as
 		for (const theme of ['light', 'dark'] as const) {
 			await page.goto(`${SB}/iframe.html?id=${s.id}&viewMode=story&globals=theme:${theme}`);
 			const root = page.locator('#storybook-root');
-			await expect.soft(root, `${s.id} ${theme} renders`).not.toBeEmpty();
+			// storybook.e2e.ts runs build-storybook in parallel, which can slow a cold story render past 5s.
+			await expect.soft(root, `${s.id} ${theme} renders`).not.toBeEmpty({ timeout: 20_000 });
 			await expect.soft(page.locator('.sb-errordisplay'), `${s.id} ${theme} no error`).toBeHidden();
 			await expect.soft
 				.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), {
