@@ -26,3 +26,7 @@ test-results
 
 # chan
 .chanrc
+
+# Storybook
+storybook-static
+*storybook.log

@@ -56,6 +56,19 @@ pnpm i
 pnpm run dev
 ```
 
+### Storybook
+
+[Storybook](https://storybook.js.org/) renders components in isolation, with the app's real CSS (`src/routes/layout.css`: tokens, Tailwind, Roboto and JetBrains Mono).
+
+```bash
+pnpm storybook        # dev server at http://localhost:6006
+pnpm build-storybook  # static build in storybook-static/ (gitignored)
+```
+
+- **Where stories live:** next to their component, named `<component>.stories.svelte` (for example `src/lib/components/ui/button/button.stories.svelte`). Stories use [Svelte CSF](https://github.com/storybookjs/addon-svelte-csf) (`defineMeta` + `<Story>`). Any `src/**/*.stories.svelte` file is picked up.
+- **Themes:** the **Theme** toolbar button switches between Light, Dark and Light and dark. Light and Dark toggle the `.dark` class on `<html>`, the same way ModeWatcher does in the app. Light and dark renders the story twice, side by side, with the right pane inside a `.dark` wrapper.
+- **Stories are tests:** `pnpm test` runs a `storybook` Vitest project next to `server` and `client`. It renders every story in headless Chromium in the light and dark side-by-side theme, so a story that throws fails the suite. Accessibility checks (`@storybook/addon-a11y`) run too, but are report-only for now. If Chromium is missing, run `pnpm exec playwright install chromium`.
+
 ### Development data
 
 The dashboard reads a factory controller state database (state schema version 2) **read-only**, named by
