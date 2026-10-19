@@ -3,13 +3,15 @@ import TicketsTableTitleCell from './tickets-table-title-cell.svelte';
 import TicketsTableStatusCell from './tickets-table-status-cell.svelte';
 import TicketsTableCostCell from './tickets-table-cost-cell.svelte';
 import type { TicketsTableFeatures } from './tickets-table-features.js';
-import type { ExecutionStage, ExecutionStatus, TicketListRow } from '$lib/server/types';
+import type { ExecutionStage, TicketListRow } from '$lib/server/types';
+import type { components } from '$lib/factory/generated/factory-api';
 
 /** One row of the tickets table: the read module's `TicketListRow` (ADR 0004).
  *  Types only — this import is erased at runtime, so nothing from
  *  `$lib/server` reaches the client bundle. */
 export type TicketTableRow = TicketListRow;
-export type TicketStatus = ExecutionStatus;
+/** The API execution vocabulary; identical to the SQLite one (plan.md → Discoveries). */
+export type TicketStatus = components['schemas']['TicketSummary']['status'];
 export type TicketStage = ExecutionStage;
 
 const columnHelper = createColumnHelper<TicketsTableFeatures, TicketTableRow>();

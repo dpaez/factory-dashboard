@@ -1,47 +1,15 @@
 <script lang="ts">
-	import clsx from 'clsx';
-	import Badge from '$lib/components/ui/badge/badge.svelte';
-	// Types only — erased at runtime, so nothing from `$lib/server` reaches the
-	// client bundle. The vocabulary lives in one place: the read module types.
-	import type { TaskStatus as ControllerTaskStatus } from '$lib/server/types';
+	import StatusBadge from '$lib/components/factory/status-badge.svelte';
+	import { taskStatusSignal } from '$lib/factory/status';
+	import type { components } from '$lib/factory/generated/factory-api';
 
-	/**
-	 * The v2 task status vocabulary (`tasks.status`, state schema 2) plus
-	 * `unknown` for a session whose task is missing. The legacy `in_progress`
-	 * value is gone; `working` replaced it.
-	 */
-	export type TaskStatus = ControllerTaskStatus | 'unknown';
+	type Task = components['schemas']['Task'];
 
-	let { status }: { status: TaskStatus } = $props();
+	/** Unknown strings render as a Standby badge with the raw value, for API drift. */
+	let { status, stage = null }: { status: Task['status'] | (string & {}); stage?: Task['stage'] } =
+		$props();
 
-	// Every value in the vocabulary gets a deliberate class; nothing falls
-	// through to an unstyled badge. Grouping mirrors the execution-status cell:
-	// run = working; wait = ready_for_review/reviewing; clear = done;
-	// fault = blocked; muted = pending/cancelled/unknown.
-	const statusClasses = $derived(
-		clsx({
-			'bg-gray-400 text-white': status === 'pending',
-			'bg-green-500 text-white': status === 'working',
-			'bg-yellow-500 text-white': status === 'ready_for_review',
-			'bg-amber-500 text-white': status === 'reviewing',
-			'bg-blue-500 text-white': status === 'done',
-			'bg-rose-500 text-white': status === 'blocked',
-			'bg-gray-500 text-white': status === 'cancelled' || status === 'unknown'
-		})
-	);
-
-	const statusLabels: Record<TaskStatus, string> = {
-		pending: 'Pending',
-		working: 'Working',
-		ready_for_review: 'Ready for review',
-		reviewing: 'Reviewing',
-		done: 'Done',
-		blocked: 'Blocked',
-		cancelled: 'Cancelled',
-		unknown: 'Unknown'
-	};
+	const badge = $derived(taskStatusSignal(status, stage));
 </script>
 
-<Badge variant="secondary" class={clsx('text-xs font-medium lg:p-2 lg:text-sm', statusClasses)}
-	>{statusLabels[status]}</Badge
->
+<StatusBadge {...badge} />

@@ -2,8 +2,9 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import TicketsTableStatusCell from './tickets-table-status-cell.svelte';
 	import type { TicketStatus } from './tickets-table-columns.ts';
+	import { ticketSummaries } from '$lib/factory/fixtures';
 
-	const statuses: (TicketStatus | 'unknown')[] = [
+	const statuses: TicketStatus[] = [
 		'queued',
 		'active',
 		'waiting_for_user',
@@ -13,14 +14,23 @@
 		'failed',
 		'ready_for_handoff',
 		'complete',
-		'cancelled',
-		'unknown'
+		'cancelled'
 	];
 
 	const { Story } = defineMeta({
 		title: 'Components/TicketsTable/StatusCell',
 		component: TicketsTableStatusCell,
-		argTypes: { status: { control: 'select', options: statuses } }
+		argTypes: { status: { control: 'select', options: statuses } },
+		parameters: {
+			// Strict for this file only: axe color-contrast fails the story in both theme panes.
+			a11y: { test: 'error' },
+			docs: {
+				description: {
+					component:
+						'Execution status cell; delegates to StatusBadge. Loading, empty and error states: N/A: pure component.'
+				}
+			}
+		}
 	});
 </script>
 
@@ -34,12 +44,20 @@
 <Story name="Ready for handoff" args={{ status: 'ready_for_handoff' }} />
 <Story name="Complete" args={{ status: 'complete' }} />
 <Story name="Cancelled" args={{ status: 'cancelled' }} />
-<Story name="Unknown" args={{ status: 'unknown' }} />
+<Story name="Unknown value" args={{ status: 'archived' }} />
 
 <Story name="All statuses" asChild>
 	<div class="flex flex-wrap items-center gap-2">
 		{#each statuses as status (status)}
 			<TicketsTableStatusCell {status} />
+		{/each}
+	</div>
+</Story>
+
+<Story name="Ticket fixtures" asChild>
+	<div class="flex flex-wrap items-center gap-2">
+		{#each ticketSummaries as ticket (ticket.id)}
+			<TicketsTableStatusCell status={ticket.status} />
 		{/each}
 	</div>
 </Story>
