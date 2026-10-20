@@ -61,6 +61,20 @@ export function executionStatusSignal(status: ExecutionStatus | (string & {})): 
 	return lookup<StatusSignal>(EXECUTION_STATUS_SIGNALS, status) ?? unknown(status);
 }
 
+export const PREPARING_HANDOFF: StatusSignal = { signal: 'run', label: 'Preparing handoff' };
+
+const HANDOFF_RUNNING_STATUSES: readonly string[] = ['active', 'queued', 'resuming'];
+
+/**
+ * The badge for a ticket in the Handoff (wrapup) lane: a running wrapup reads
+ * "Preparing handoff", `ready_for_handoff` reads "Ready for handoff", and any
+ * other status keeps its normal execution signal.
+ */
+export function handoffStatusSignal(status: ExecutionStatus | (string & {})): StatusSignal {
+	if (HANDOFF_RUNNING_STATUSES.includes(status)) return PREPARING_HANDOFF;
+	return executionStatusSignal(status);
+}
+
 /** Label is `Status · stage` when a stage is present, else the status alone. */
 export function taskStatusSignal(
 	status: TaskStatus | (string & {}),

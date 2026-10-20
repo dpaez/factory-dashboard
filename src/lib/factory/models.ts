@@ -30,10 +30,6 @@ export type Usage = Schemas['Usage'];
 export type Actor = Schemas['Actor'];
 export type PullRequest = NonNullable<Schemas['TicketSummary']['pullRequest']>;
 
-/** The stages the overview counts. `done` is excluded: finished tickets live on `/tickets`. */
-export const OVERVIEW_STAGES = ['plan', 'work', 'qa', 'review', 'wrapup'] as const;
-export type OverviewStage = (typeof OVERVIEW_STAGES)[number];
-
 export type TicketProgress = {
 	done: number;
 	total: number;
@@ -60,27 +56,6 @@ export type TicketList = {
 	rows: TicketRow[];
 	/** False when the pager stopped at its bound before the last page. */
 	complete: boolean;
-};
-
-export type TicketRef = { key: TicketKey; displayRef: string };
-
-/** Ticket usage card: a labelled known total, or unavailable. */
-export type UsageCard =
-	{ available: true; label: string; usage: Usage } | { available: false; label: string };
-
-export type Overview = {
-	/** Open tickets per stage. */
-	stageCounts: Record<OverviewStage, number>;
-	/** Counted only from the factory's `needsUser`; the dashboard derives nothing. */
-	needsAttention: { count: number; refs: TicketRef[] };
-	/** Null when the agents read failed. */
-	activeAgents: number | null;
-	usage: UsageCard;
-	/** The most recent ticket change; null when there are no tickets. */
-	updatedAt: string | null;
-	/** False when the ticket list was cut at the pager bound; counts are then partial. */
-	complete: boolean;
-	tickets: TicketRow[];
 };
 
 export type TicketHeader = {

@@ -1,13 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
 
-import {
-	FAKE_FACTORY_URL,
-	agentList,
-	allTickets,
-	openTickets,
-	openTicketsCostUsd
-} from './fake-factory';
+import { FAKE_FACTORY_URL, agentList, allTickets, openTickets } from './fake-factory';
 
 const SHOTS = process.env.QA_SCREENSHOTS;
 const shot = async (page: Page, name: string) => {
@@ -19,35 +13,32 @@ async function factoryRequests(): Promise<{ method: string; path: string }[]> {
 	return (await fetch(`${FAKE_FACTORY_URL}/__fake/requests`)).json();
 }
 
-test('home: nav, overview cards from the factory, and ticket links by key', async ({ page }) => {
+test('home: nav, the Flow board from the factory, and a selected-ticket link by key', async ({
+	page
+}) => {
 	await page.goto('/');
 	await expect(page.getByText('FD')).toBeVisible();
-	await expect(page.getByRole('navigation')).toContainText('Main');
-	await expect(page.getByRole('navigation')).toContainText('Tickets');
+	const nav = page.getByRole('navigation');
+	await expect(nav).toContainText('Flow board');
+	await expect(nav).toContainText('Tickets');
+	await expect(nav).toContainText('Stats');
+	await expect(page.getByRole('heading', { name: 'Flow board', level: 2 })).toBeVisible();
 
-	const needsUser = openTickets.filter((ticket) => ticket.needsUser);
-	const attention = page.getByTestId('needs-attention-card');
-	await expect(attention).toContainText('Needs attention');
-	await expect(attention).toContainText(String(needsUser.length));
-	for (const ticket of needsUser) await expect(attention).toContainText(ticket.displayRef);
+	const onBoard = openTickets.filter((ticket) => ticket.status !== 'cancelled');
+	const cards = page.locator('[data-slot="ticket-card"]');
+	await expect(cards).toHaveCount(onBoard.length);
+	await expect(page.locator('[data-summary="agents-running"]')).toContainText(
+		String(agentList.items.length)
+	);
 
-	const agents = page.getByTestId('active-agents-card');
-	await expect(agents).toContainText('Active agents');
-	await expect(agents).toContainText(String(agentList.items.length));
-
-	const qa = page.getByTestId('stage-cards').locator('[data-stage="qa"]');
-	await expect(qa).toContainText('QA');
-	await expect(qa).toContainText(String(openTickets.filter((t) => t.stage === 'qa').length));
-
-	const cost = page.getByTestId('cost-card');
-	await expect(cost).toContainText('Cost · open tickets');
-	await expect(cost.getByTestId('cost-value')).toHaveText(`$${openTicketsCostUsd.toFixed(2)}`);
-
-	const first = openTickets[0]!;
-	const link = page.getByRole('link', { name: first.displayRef, exact: true });
-	await expect(link).toHaveAttribute('href', `/tickets/${encodeURIComponent(first.key)}`);
-	await expect(page.locator('tbody tr')).toHaveCount(openTickets.length);
-	await shot(page, 'home-overview');
+	const first = onBoard[0]!;
+	await page.locator(`[data-ticket-key="${first.key}"]`).click();
+	await expect(page).toHaveURL(`/?ticket=${encodeURIComponent(first.key)}`);
+	await expect(page.getByRole('link', { name: 'Open ticket' })).toHaveAttribute(
+		'href',
+		`/tickets/${encodeURIComponent(first.key)}`
+	);
+	await shot(page, 'home-flow-board');
 
 	expect((await factoryRequests()).every((request) => request.method === 'GET')).toBe(true);
 });
@@ -100,7 +91,7 @@ test.describe('bad token', () => {
 	});
 
 	for (const path of ['/', '/tickets', `/tickets/${encodeURIComponent(allTickets[0]!.key)}`]) {
-		test(`${path} renders the configuration error, not an empty table`, async ({ page }) => {
+		test(`${path} renders the configuration error, not an empty page`, async ({ page }) => {
 			const response = await page.goto(`http://localhost:${BAD_TOKEN_PORT}${path}`);
 			expect(response?.status()).toBe(503);
 			await expect(
@@ -108,6 +99,7 @@ test.describe('bad token', () => {
 			).toBeVisible();
 			await expect(page.locator('body')).toContainText('FACTORY_API_TOKEN');
 			await expect(page.locator('table')).toHaveCount(0);
+			await expect(page.locator('[data-slot="flow-board"]')).toHaveCount(0);
 			await shot(
 				page,
 				`bad-token${path === '/' ? '-home' : path === '/tickets' ? '-tickets' : '-detail'}`

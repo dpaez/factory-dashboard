@@ -120,12 +120,6 @@ export function executionsFor(key: string): Schemas['ExecutionList'] {
 	};
 }
 
-/** The open tickets' summed cost, as the overview card should show it. */
-export const openTicketsCostUsd = openTickets.reduce(
-	(sum, ticket) => sum + (ticketDetails.get(ticket.key)?.usage.costUsd ?? 0),
-	0
-);
-
 export type FakeFactoryOptions = {
 	token?: string;
 	/** Answer this problem for `GET /v1/tickets/{key}` of these keys. */
