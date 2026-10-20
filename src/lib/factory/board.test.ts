@@ -251,7 +251,8 @@ describe('toBoard summary', () => {
 			inProgress: cards,
 			inProgressComplete: true,
 			agentsRunning: agentList.items.length,
-			readyToStart: null
+			readyToStart: null,
+			readyToStartComplete: true
 		});
 		expect(cards).toBe(ticketSummaries.length - 2);
 	});

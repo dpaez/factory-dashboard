@@ -7,10 +7,13 @@ import {
 	ticketReadyForHandoff,
 	ticketWaitingForAgentQuestion
 } from '../src/lib/factory/fixtures/tickets.ts';
+import { backlogIssues } from '../src/lib/factory/fixtures/backlog.ts';
 import { agentList, openTickets } from './fake-factory';
 
 // Ticket #23, task 03: / is the Flow board, with `?ticket=` selection and the nav.
 const SHOTS = process.env.QA_SCREENSHOTS;
+/** Backlog issues neither blocked nor umbrella: the summary's ready to start. */
+const READY = backlogIssues.filter((issue) => !issue.blocked && !issue.umbrella).length;
 const shot = async (page: Page, name: string) => {
 	if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 };
@@ -50,7 +53,7 @@ test('AC1: / shows the five lanes with one card per open ticket in its lane', as
 	await shot(page, 'flow-board');
 });
 
-test('AC2: the summary counts cards and agents, and ready to start is Unavailable', async ({
+test('AC2: the summary counts cards, agents and backlog issues ready to start', async ({
 	page
 }) => {
 	await page.goto('/');
@@ -61,14 +64,15 @@ test('AC2: the summary counts cards and agents, and ready to start is Unavailabl
 		`${agentList.items.length} agents running`
 	);
 	await expect(page.locator('[data-summary="ready-to-start"]')).toContainText(
-		'Unavailable ready to start'
+		`${READY} ready to start`
 	);
 });
 
 test('AC4: Tab reaches cards; Enter and Space select into ?ticket= without refetching', async ({
 	page
 }) => {
-	await page.goto('/');
+	// Wait for hydration: a key pressed before the click handlers attach does nothing.
+	await page.goto('/', { waitUntil: 'networkidle' });
 	const dataRequests: string[] = [];
 	page.on('request', (request) => {
 		if (request.url().includes('__data.json')) dataRequests.push(request.url());

@@ -9,6 +9,11 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['@tanstack/svelte-table']
 	},
+	// Pre-bundle up front: a dependency discovered on first story visit makes the
+	// Storybook dev server re-optimize and reload every open page.
+	optimizeDeps: {
+		include: ['marked']
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

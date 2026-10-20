@@ -11,6 +11,7 @@
 import { createServer, type Server } from 'node:http';
 
 import type { components } from '../src/lib/factory/generated/factory-api.d.ts';
+import { backlogIssues, backlogPage } from '../src/lib/factory/fixtures/backlog.ts';
 import {
 	agentList,
 	executionList,
@@ -134,7 +135,20 @@ export type FakeFactoryOptions = {
 	failExecutions?: Problem;
 	/** Tickets `GET /v1/tickets?status=all` lists (default: every fixture). */
 	tickets?: Schemas['TicketSummary'][];
+	/** Issues `GET /v1/backlog` lists (default: every backlog fixture). */
+	backlog?: Schemas['BacklogIssue'][];
+	/** Answer this problem for `GET /v1/backlog`. */
+	failBacklog?: Problem;
+	/** Answer this problem for `GET /v1/backlog?refresh=true` only. */
+	failBacklogOnRefresh?: Problem;
+	/** The `fetchedAt` a `?refresh=true` page answers (default: the fixed time). */
+	backlogRefreshedAt?: string;
+	/** Issues a `?refresh=true` read lists, and every read after it (default: `backlog`). */
+	backlogOnRefresh?: Schemas['BacklogIssue'][];
 };
+
+/** The fixed time the fake says it last asked the tracker. */
+export const FAKE_BACKLOG_FETCHED_AT = backlogPage.fetchedAt;
 
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -162,6 +176,7 @@ const methodNotAllowed: Problem = {
 export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	const token = options.token ?? FAKE_FACTORY_TOKEN;
 	const listed = options.tickets ?? allTickets;
+	let backlog = options.backlog ?? backlogIssues;
 	const requests: { method: string; path: string }[] = [];
 
 	async function handle(request: Request): Promise<Response> {
@@ -191,6 +206,24 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				items: items.slice(start, end),
 				nextCursor: end < items.length ? String(end) : null
 			} satisfies Schemas['TicketPage']);
+		}
+		if (path === '/v1/backlog') {
+			if (options.failBacklog) return problem(options.failBacklog);
+			if (options.failBacklogOnRefresh && url.searchParams.get('refresh') === 'true') {
+				return problem(options.failBacklogOnRefresh);
+			}
+			const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), FAKE_PAGE_SIZE);
+			const start = Number(url.searchParams.get('cursor') ?? 0);
+			const end = start + limit;
+			if (options.backlogOnRefresh && url.searchParams.get('refresh') === 'true') {
+				backlog = options.backlogOnRefresh;
+			}
+			const refreshed = url.searchParams.get('refresh') === 'true' && options.backlogRefreshedAt;
+			return json({
+				fetchedAt: refreshed || FAKE_BACKLOG_FETCHED_AT,
+				items: backlog.slice(start, end),
+				nextCursor: end < backlog.length ? String(end) : null
+			} satisfies Schemas['BacklogPage']);
 		}
 
 		const match = path.match(/^\/v1\/tickets\/([^/]+)(\/executions|\/runs)?$/);

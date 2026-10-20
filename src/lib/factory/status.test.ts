@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+	BACKLOG_AVAILABILITY_SIGNALS,
 	EXECUTION_STATUS_SIGNALS,
 	RUN_STATUS_SIGNALS,
 	TASK_STAGE_LABELS,
 	TASK_STATUS_SIGNALS,
+	backlogAvailabilitySignal,
 	executionStatusSignal,
 	handoffStatusSignal,
 	runStatusSignal,
@@ -167,5 +169,23 @@ describe('runStatusSignal', () => {
 
 	it('maps unknown values to standby with the raw value', () => {
 		expect(runStatusSignal('exploded')).toEqual({ signal: 'standby', label: 'exploded' });
+	});
+});
+
+describe('backlogAvailabilitySignal', () => {
+	it('maps Blocked to the Wait tone', () => {
+		expect(backlogAvailabilitySignal('blocked')).toEqual({ signal: 'wait', label: 'Blocked' });
+	});
+
+	it('maps Ready and Umbrella to a non-terminal tone, never Clear', () => {
+		expect(backlogAvailabilitySignal('ready')).toEqual({ signal: 'standby', label: 'Ready' });
+		expect(backlogAvailabilitySignal('umbrella')).toEqual({ signal: 'standby', label: 'Umbrella' });
+	});
+
+	it('uses only the five signal tones', () => {
+		for (const value of Object.values(BACKLOG_AVAILABILITY_SIGNALS)) {
+			expect(SIGNALS).toContain(value.signal);
+			expect(value.signal).not.toBe('clear');
+		}
 	});
 });

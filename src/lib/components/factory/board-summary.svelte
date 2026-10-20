@@ -3,8 +3,8 @@
 
 	/**
 	 * The Flow board's compact count strip. A count that was not read reads
-	 * "Unavailable"; an in-progress count from a partial ticket list is marked
-	 * as a lower bound, never a bare total.
+	 * "Unavailable"; a count from a partial ticket or backlog list is marked as
+	 * a lower bound, never a bare total.
 	 */
 	let { summary }: { summary: BoardSummary } = $props();
 
@@ -16,7 +16,12 @@
 			partial: !summary.inProgressComplete
 		},
 		{ id: 'agents-running', label: 'agents running', value: summary.agentsRunning, partial: false },
-		{ id: 'ready-to-start', label: 'ready to start', value: summary.readyToStart, partial: false }
+		{
+			id: 'ready-to-start',
+			label: 'ready to start',
+			value: summary.readyToStart,
+			partial: !summary.readyToStartComplete
+		}
 	]);
 </script>
 

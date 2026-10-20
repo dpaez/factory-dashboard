@@ -9,6 +9,7 @@ import {
 	ticketReadyForHandoff,
 	ticketWaitingForManualApproval
 } from '../src/lib/factory/fixtures/tickets.ts';
+import { backlogIssues } from '../src/lib/factory/fixtures/backlog.ts';
 import {
 	FAKE_FACTORY_TOKEN,
 	agentList,
@@ -19,6 +20,8 @@ import {
 
 // QA for ticket #23, task 03: / is the Flow board, with ?ticket= selection and the nav.
 const SHOTS = process.env.QA_SCREENSHOTS;
+/** Backlog issues neither blocked nor umbrella: the summary's ready to start. */
+const READY = backlogIssues.filter((issue) => !issue.blocked && !issue.umbrella).length;
 const shot = async (page: Page, name: string) => {
 	if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 };
@@ -26,8 +29,9 @@ const shot = async (page: Page, name: string) => {
 const onBoard = openTickets.filter((t) => t.status !== 'complete' && t.status !== 'cancelled');
 const lane = (page: Page, name: string) =>
 	page.getByRole('group', { name: new RegExp(`^${name}\\b`) });
+// Ticket cards only: since #24 a backlog issue may share a ticket's title.
 const cardIn = (scope: ReturnType<Page['locator']> | Page, title: string) =>
-	scope.getByRole('button').filter({ hasText: title });
+	scope.locator('[data-slot="ticket-card"]').filter({ hasText: title });
 const allCards = (page: Page) =>
 	page
 		.getByRole('group')
@@ -86,9 +90,7 @@ test('AC1: / shows the five lanes with each open ticket in its lane and no cance
 	await shot(page, 'ac1-flow-board');
 });
 
-test('AC2: the summary shows in progress, agents running, and ready to start Unavailable', async ({
-	page
-}) => {
+test('AC2: the summary shows in progress, agents running, and ready to start', async ({ page }) => {
 	await page.goto('/');
 	const summary = page.getByRole('list', { name: 'Board summary' });
 	await expect(summary.getByRole('listitem').filter({ hasText: 'in progress' })).toHaveText(
@@ -98,7 +100,8 @@ test('AC2: the summary shows in progress, agents running, and ready to start Una
 		new RegExp(`^\\s*${agentList.items.length}\\s+agents running\\s*$`)
 	);
 	await expect(summary.getByRole('listitem').filter({ hasText: 'ready to start' })).toHaveText(
-		/^\s*Unavailable\s+ready to start\s*$/
+		// #24: the backlog's ready-to-start count replaces Unavailable.
+		new RegExp(`^\\s*${READY}\\s+ready to start\\s*$`)
 	);
 });
 
@@ -128,7 +131,7 @@ test('AC4: Tab focuses a card; Enter and Space select it into ?ticket= with an O
 	page
 }) => {
 	await page.goto('/');
-	const focusedCard = page.locator('button:focus');
+	const focusedCard = page.locator('[data-slot="ticket-card"]:focus');
 	let title: string | null = null;
 	for (let i = 0; i < 40 && title === null; i++) {
 		await page.keyboard.press('Tab');

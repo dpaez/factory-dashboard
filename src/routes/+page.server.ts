@@ -1,4 +1,5 @@
 import { toBoard } from '$lib/factory/board';
+import { readBacklog } from '$lib/server/factory/backlog';
 import { factoryClientFromEnv, type FactoryClient } from '$lib/server/factory/client';
 import { isConfigurationFailure, listAllTickets, throwPageError } from '$lib/server/factory/pages';
 import { getTicket, listAgents, type FactoryResult } from '$lib/server/factory/reads';
@@ -18,6 +19,11 @@ function secondary<T>(result: FactoryResult<T>): T | null {
  * The Flow board. The selected ticket (`?ticket=`) lives in the page, not
  * here: this load never reads `url.search*`, so selecting a card does not
  * refetch the board.
+ *
+ * The backlog is returned unawaited, so it streams: a slow or failing tracker
+ * never delays or breaks the stage lanes. It always resolves to a safe
+ * `BacklogResult`, never rejects, and contains configuration and auth
+ * failures too (unlike `secondary()`): the ticket read decides the page error.
  */
 export const load: PageServerLoad = async ({ fetch }) => {
 	let client: FactoryClient;
@@ -26,6 +32,8 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	} catch (cause) {
 		throwPageError(cause);
 	}
+
+	const backlog = readBacklog(fetch).then((read) => read.result);
 
 	// Agents do not depend on the ticket list: read them alongside it.
 	const agentsRead = listAgents(client);
@@ -39,6 +47,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	]);
 
 	return {
+		backlog,
 		board: toBoard({
 			tickets: tickets.data.items,
 			complete: tickets.data.complete,
