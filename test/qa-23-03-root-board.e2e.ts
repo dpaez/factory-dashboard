@@ -111,13 +111,14 @@ test.describe('AC3: one ticket detail read fails', () => {
 		}
 	});
 
-	test('AC3: that card shows Unavailable cost and the rest of the board renders', async ({
+	test('AC3: that card shows Unavailable tokens and the rest of the board renders', async ({
 		page
 	}) => {
 		await page.goto(`${base}/`);
 		await expect(cardIn(page, failing.title)).toContainText('Unavailable');
 		await expect(allCards(page)).toHaveCount(onBoard.length);
-		await expect(cardIn(page, onBoard[0]!.title)).toContainText(/\$\d+\.\d\d/);
+		await expect(cardIn(page, onBoard[0]!.title)).toContainText(/In [\d,]+ · Out [\d,]+/);
+		await expect(allCards(page).filter({ hasText: '$' })).toHaveCount(0);
 		await expect(cardIn(page, onBoard[0]!.title)).not.toContainText('Unavailable');
 		await shot(page, 'ac3-cost-unavailable');
 	});

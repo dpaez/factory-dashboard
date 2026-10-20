@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
 	import type { BoardCard } from '$lib/factory/board';
-	import { formatTimestamp } from '$lib/factory/format';
+	import { formatCount, formatTimestamp } from '$lib/factory/format';
 	import StatusBadge from './status-badge.svelte';
 	import TaskProgress from './task-progress.svelte';
 
@@ -23,7 +23,17 @@
 		onselect?: (key: string) => void;
 	} = $props();
 
-	const cost = $derived(card.costUsd === null ? 'Unavailable' : `$${card.costUsd.toFixed(2)}`);
+	// Tokens, not USD: cost belongs to the ticket page's usage breakdown.
+	const tokens = $derived(
+		card.tokens === null
+			? 'Tokens Unavailable'
+			: `In ${formatCount(card.tokens.input)} · Out ${formatCount(card.tokens.output)}`
+	);
+	const tokensLabel = $derived(
+		card.tokens === null
+			? 'Token usage unavailable'
+			: `${formatCount(card.tokens.input)} input tokens, ${formatCount(card.tokens.output)} output tokens`
+	);
 </script>
 
 <button
@@ -71,6 +81,6 @@
 		class="flex flex-wrap items-center justify-between gap-x-2 font-mono text-[0.625rem] text-foreground/75 tabular-nums"
 	>
 		<span>Updated {formatTimestamp(card.updatedAt)}</span>
-		<span data-slot="ticket-cost">{cost}</span>
+		<span data-slot="ticket-tokens" title={tokensLabel}>{tokens}</span>
 	</span>
 </button>

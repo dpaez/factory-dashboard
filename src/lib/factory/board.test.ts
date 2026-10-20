@@ -196,19 +196,22 @@ describe('toBoard QA lane', () => {
 });
 
 describe('toBoard cards', () => {
-	it('takes cost from the ticket detail, and null only where the read failed', () => {
+	it('takes input/output tokens from the ticket detail, and null only where the read failed', () => {
 		const result = board(
 			[ticketActiveInWork, ticketQueuedInPlan, ticketActiveInPlan],
 			[ticketDetailActiveInWork, ticketDetailQueued, null]
 		);
-		const cost = Object.fromEntries(
-			result.lanes.flatMap((l) => l.cards).map((card) => [card.key, card.costUsd])
+		const tokens = Object.fromEntries(
+			result.lanes.flatMap((l) => l.cards).map((card) => [card.key, card.tokens])
 		);
-		expect(cost).toEqual({
-			[ticketActiveInWork.key]: 3.42,
-			[ticketQueuedInPlan.key]: 0,
+		expect(tokens).toEqual({
+			[ticketActiveInWork.key]: { input: 120_500, output: 38_200 },
+			[ticketQueuedInPlan.key]: { input: 0, output: 0 },
 			[ticketActiveInPlan.key]: null
 		});
+		for (const card of result.lanes.flatMap((l) => l.cards)) {
+			expect(card).not.toHaveProperty('costUsd');
+		}
 	});
 
 	it('keeps done, total and current task, and represents total 0 as is', () => {

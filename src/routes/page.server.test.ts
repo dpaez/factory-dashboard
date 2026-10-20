@@ -112,7 +112,8 @@ describe('/ load', () => {
 			readyToStart: null
 		});
 		for (const card of cards(board)) {
-			expect(card.costUsd).toBe(ticketDetails.get(card.key)?.usage.costUsd);
+			const usage = ticketDetails.get(card.key)?.usage;
+			expect(card.tokens).toEqual({ input: usage?.tokensInput, output: usage?.tokensOutput });
 		}
 	});
 
@@ -165,10 +166,10 @@ describe('/ load', () => {
 		});
 		expect(data.board.summary.agentsRunning).toBeNull();
 		expect(cards(data.board)).toHaveLength(onBoard.length);
-		expect(cards(data.board).every((card) => card.costUsd !== null)).toBe(true);
+		expect(cards(data.board).every((card) => card.tokens !== null)).toBe(true);
 	});
 
-	it('one failing detail read makes only that card cost unavailable', async () => {
+	it("one failing detail read makes only that card's tokens unavailable", async () => {
 		const { data } = await run({
 			failDetail: {
 				keys: [ticketActiveInWork.key],
@@ -177,9 +178,9 @@ describe('/ load', () => {
 		});
 		const board = cards(data.board);
 		expect(board).toHaveLength(onBoard.length);
-		expect(board.find((card) => card.key === ticketActiveInWork.key)?.costUsd).toBeNull();
+		expect(board.find((card) => card.key === ticketActiveInWork.key)?.tokens).toBeNull();
 		expect(
-			board.filter((card) => card.key !== ticketActiveInWork.key).every((c) => c.costUsd !== null)
+			board.filter((card) => card.key !== ticketActiveInWork.key).every((c) => c.tokens !== null)
 		).toBe(true);
 		expect(data.board.summary.agentsRunning).toBe(agentList.items.length);
 	});

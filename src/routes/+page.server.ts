@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	const tickets = await listAllTickets(client, { status: 'open' });
 	if (!tickets.ok) throwPageError(tickets.failure);
 
-	// One detail per open ticket, for its card's cost. A failed read blanks only that card.
+	// One detail per open ticket, for its card's token usage. A failed read blanks only that card.
 	const [agents, detailReads] = await Promise.all([
 		agentsRead,
 		Promise.all(tickets.data.items.map((ticket) => getTicket(client, ticket.key)))

@@ -36,7 +36,7 @@
 			docs: {
 				description: {
 					component:
-						'One current execution. The whole card is a single selection button (aria-pressed). A cost the factory did not supply reads "Unavailable".'
+						'One current execution. The whole card is a single selection button (aria-pressed). It shows input/output token usage, not USD; usage the factory did not supply reads "Unavailable".'
 				}
 			}
 		}
@@ -44,12 +44,13 @@
 </script>
 
 <Story
-	name="Work with cost"
+	name="Work with tokens"
 	args={{ card: cardOf(ticketActiveInWork, [ticketDetailActiveInWork]) }}
 	play={async ({ canvasElement }) => {
 		const card = firstCard(canvasElement);
 		await expect(card).toHaveTextContent('2/5 approved');
-		await expect(card).toHaveTextContent('$3.42');
+		await expect(card).toHaveTextContent('In 120,500 · Out 38,200');
+		await expect(card).not.toHaveTextContent('$');
 		await expect(card).toHaveAttribute('aria-pressed', 'false');
 	}}
 />
@@ -60,12 +61,13 @@
 />
 
 <Story
-	name="Cost unavailable"
+	name="Tokens unavailable"
 	args={{ card: cardOf(ticketActiveInWork) }}
 	play={async ({ canvasElement }) => {
 		const card = firstCard(canvasElement);
 		await expect(card).toHaveTextContent('Unavailable');
-		await expect(card).not.toHaveTextContent('$0.00');
+		await expect(card).not.toHaveTextContent('$');
+		await expect(card).not.toHaveTextContent('In 0');
 	}}
 />
 

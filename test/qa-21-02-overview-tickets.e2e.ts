@@ -89,11 +89,11 @@ test.describe('AC2: one failing detail read', () => {
 		}
 	});
 
-	test('AC2: that ticket card shows Unavailable cost instead of $0.00', async ({ page }) => {
+	test('AC2: that ticket card shows Unavailable tokens instead of zeros', async ({ page }) => {
 		await page.goto(`${base}/`);
 		const card = page.locator(`[data-ticket-key="${openTickets[0]!.key}"]`);
-		await expect(card.locator('[data-slot="ticket-cost"]')).toHaveText('Unavailable');
-		await expect(card).not.toContainText('$0.00');
+		await expect(card.locator('[data-slot="ticket-tokens"]')).toHaveText('Tokens Unavailable');
+		await expect(card).not.toContainText('In 0');
 		await shot(page, 'ac2-cost-unavailable');
 	});
 });

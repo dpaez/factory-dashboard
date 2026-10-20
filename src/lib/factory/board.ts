@@ -48,9 +48,11 @@ export type BoardCard = {
 	/** `total === 0` means the execution has no tasks yet; never a percentage. */
 	progress: TicketProgress;
 	updatedAt: string;
-	/** The current execution's cost; null when its detail was not read. */
-	costUsd: number | null;
+	/** The current execution's input/output tokens; null when its detail was not read. USD cost stays on the ticket page. */
+	tokens: BoardTokens | null;
 };
+
+export type BoardTokens = { input: number; output: number };
 
 export type BoardLane = {
 	id: BoardLaneId;
@@ -103,7 +105,7 @@ function hasQaSummary(detail: Schemas['TicketDetail']): boolean {
 	return detail.tasks.some((task) => Object.hasOwn(task.summaries, 'qa'));
 }
 
-function toCard(ticket: Schemas['TicketSummary'], costUsd: number | null): BoardCard {
+function toCard(ticket: Schemas['TicketSummary'], usage: Schemas['Usage'] | null): BoardCard {
 	const lane = laneOf(ticket.stage);
 	const current = ticket.progress.current?.label ?? null;
 	return {
@@ -121,7 +123,7 @@ function toCard(ticket: Schemas['TicketSummary'], costUsd: number | null): Board
 		currentTask: current,
 		progress: { done: ticket.progress.done, total: ticket.progress.total, current },
 		updatedAt: ticket.updatedAt,
-		costUsd
+		tokens: usage === null ? null : { input: usage.tokensInput, output: usage.tokensOutput }
 	};
 }
 
@@ -138,7 +140,7 @@ export function toBoard(input: BoardInput): Board {
 	const cardsByLane = new Map<BoardLaneId, BoardCard[]>();
 	for (const ticket of tickets) {
 		const id = laneOf(ticket.stage)?.id ?? OTHER_LANE.id;
-		const card = toCard(ticket, detailByKey.get(ticket.key)?.usage.costUsd ?? null);
+		const card = toCard(ticket, detailByKey.get(ticket.key)?.usage ?? null);
 		cardsByLane.set(id, [...(cardsByLane.get(id) ?? []), card]);
 	}
 

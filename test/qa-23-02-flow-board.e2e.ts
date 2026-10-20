@@ -248,26 +248,27 @@ test('AC3: the focused, selected card stays focused and selected after it moves 
 	await shot(page, 'ac3-moved-card-focused-in-review');
 });
 
-test('AC4: unknown cost reads Unavailable and a plan card without tasks reads Planning tasks', async ({
+test('AC4: unknown token usage reads Unavailable and a plan card without tasks reads Planning tasks', async ({
 	page
 }) => {
-	await open(page, 'components-factory-ticketcard--cost-unavailable', 'light');
+	await open(page, 'components-factory-ticketcard--tokens-unavailable', 'light');
 	const card = root(page).getByRole('button');
 	await expect(card).toContainText('Unavailable', { timeout: 20_000 });
-	await expect(card).not.toContainText('$0.00');
+	await expect(card).not.toContainText('$');
 	await expect(card).not.toContainText('—');
 
 	await open(page, 'components-factory-ticketcard--planning-tasks', 'light');
 	await expect(card).toContainText('Planning tasks', { timeout: 20_000 });
 	await expect(card).not.toContainText('0/0');
 
-	// On the board, no card shows a zero or dash cost, and no plan card shows 0/0.
+	// On the board, every card shows tokens or Unavailable, never USD or a dash, and no plan card shows 0/0.
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await open(page, `${BOARD}--every-lane-populated`, 'light');
 	const all = root(page).locator('[data-ticket-key]');
 	await expect(all.first()).toBeVisible({ timeout: 20_000 });
 	for (const text of await all.allTextContents()) {
-		expect.soft(text).toMatch(/\$\d+\.\d{2}|Unavailable/);
+		expect.soft(text).toMatch(/In [\d,]+ · Out [\d,]+|Unavailable/);
+		expect.soft(text).not.toContain('$');
 		expect.soft(text).not.toContain('—');
 		expect.soft(text).not.toMatch(/\b0\/0\b/);
 	}
