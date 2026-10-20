@@ -1,4 +1,4 @@
-import { toOverview } from '$lib/factory/adapters';
+import { toBoard } from '$lib/factory/board';
 import { factoryClientFromEnv, type FactoryClient } from '$lib/server/factory/client';
 import { isConfigurationFailure, listAllTickets, throwPageError } from '$lib/server/factory/pages';
 import { getTicket, listAgents, type FactoryResult } from '$lib/server/factory/reads';
@@ -14,6 +14,11 @@ function secondary<T>(result: FactoryResult<T>): T | null {
 	return null;
 }
 
+/**
+ * The Flow board. The selected ticket (`?ticket=`) lives in the page, not
+ * here: this load never reads `url.search*`, so selecting a card does not
+ * refetch the board.
+ */
 export const load: PageServerLoad = async ({ fetch }) => {
 	let client: FactoryClient;
 	try {
@@ -27,22 +32,18 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	const tickets = await listAllTickets(client, { status: 'open' });
 	if (!tickets.ok) throwPageError(tickets.failure);
 
-	// One detail per open ticket, for its usage total.
+	// One detail per open ticket, for its card's token usage. A failed read blanks only that card.
 	const [agents, detailReads] = await Promise.all([
 		agentsRead,
 		Promise.all(tickets.data.items.map((ticket) => getTicket(client, ticket.key)))
 	]);
 
-	const activeAgents = secondary(agents);
-	const details = detailReads.map(secondary);
-	const everyDetail = details.every((detail) => detail !== null);
-
 	return {
-		overview: toOverview({
+		board: toBoard({
 			tickets: tickets.data.items,
 			complete: tickets.data.complete,
-			agents: activeAgents,
-			details: everyDetail ? details.filter((detail) => detail !== null) : null
+			agents: secondary(agents),
+			details: detailReads.map(secondary)
 		})
 	};
 };

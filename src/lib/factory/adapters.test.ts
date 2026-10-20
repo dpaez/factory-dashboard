@@ -21,11 +21,8 @@ import {
 import type { components } from '$lib/factory/generated/factory-api';
 
 import {
-	NO_OPEN_TICKETS_USAGE_LABEL,
-	OPEN_TICKETS_USAGE_LABEL,
 	toAttention,
 	toExecutions,
-	toOverview,
 	toRun,
 	toTasks,
 	toTicketDetail,
@@ -78,105 +75,6 @@ describe('toTicketList', () => {
 		expect(list.complete).toBe(false);
 		expect(list.rows.map((row) => row.key)).toEqual(ticketSummaries.map((t) => t.key));
 		expect(list.rows.every((row) => row.costUsd === null)).toBe(true);
-	});
-});
-
-describe('toOverview', () => {
-	const open = ticketSummaries.filter((ticket) => ticket.stage !== 'done');
-
-	it('counts open tickets by stage including qa and excluding done', () => {
-		const overview = toOverview({
-			tickets: ticketSummaries,
-			complete: true,
-			agents: null,
-			details: null
-		});
-		expect(Object.keys(overview.stageCounts)).toEqual(['plan', 'work', 'qa', 'review', 'wrapup']);
-		expect(overview.stageCounts).toEqual({ plan: 3, work: 4, qa: 2, review: 3, wrapup: 2 });
-	});
-
-	it('counts needs attention only from needsUser', () => {
-		const overview = toOverview({
-			tickets: ticketSummaries,
-			complete: true,
-			agents: null,
-			details: null
-		});
-		const expected = ticketSummaries.filter((ticket) => ticket.needsUser);
-		expect(overview.needsAttention.count).toBe(expected.length);
-		expect(overview.needsAttention.refs).toEqual(
-			expected.map(({ key, displayRef }) => ({ key, displayRef }))
-		);
-	});
-
-	it('does not derive needs attention from status', () => {
-		// A waiting ticket the factory says needs nobody is not counted;
-		// an active ticket it flags is.
-		const tickets = [
-			{ ...ticketActiveInWork, status: 'waiting_for_user', needsUser: false },
-			{ ...ticketActiveInQa, status: 'active', needsUser: true }
-		] satisfies Schemas['TicketSummary'][];
-		const overview = toOverview({ tickets, complete: true, agents: null, details: null });
-		expect(overview.needsAttention.refs.map((ref) => ref.key)).toEqual([ticketActiveInQa.key]);
-	});
-
-	it('counts active agents from the agent list, or null when unread', () => {
-		expect(
-			toOverview({ tickets: [], complete: true, agents: agentList, details: [] }).activeAgents
-		).toBe(2);
-		expect(
-			toOverview({ tickets: [], complete: true, agents: null, details: [] }).activeAgents
-		).toBeNull();
-	});
-
-	it('sums the open tickets usage when every detail was read', () => {
-		const tickets = [ticketActiveInWork, ticketDetailQueued];
-		const details = [ticketDetailActiveInWork, ticketDetailQueued];
-		const overview = toOverview({ tickets, complete: true, agents: agentList, details });
-		expect(overview.usage).toEqual({
-			available: true,
-			label: OPEN_TICKETS_USAGE_LABEL,
-			usage: ticketDetailActiveInWork.usage
-		});
-		expect(overview.tickets.map((row) => row.costUsd)).toEqual([3.42, 0]);
-	});
-
-	it('marks usage unavailable when a detail read failed, never partial', () => {
-		const tickets = [ticketActiveInWork, ticketActiveInQa];
-		const failed = toOverview({ tickets, complete: true, agents: agentList, details: null });
-		expect(failed.usage).toEqual({ available: false, label: OPEN_TICKETS_USAGE_LABEL });
-		expect(failed.tickets.every((row) => row.costUsd === null)).toBe(true);
-
-		const missingOne = toOverview({
-			tickets,
-			complete: true,
-			agents: agentList,
-			details: [ticketDetailActiveInWork]
-		});
-		expect(missingOne.usage.available).toBe(false);
-	});
-
-	it('marks usage unavailable when the ticket list is partial', () => {
-		const overview = toOverview({
-			tickets: [ticketActiveInWork],
-			complete: false,
-			agents: agentList,
-			details: [ticketDetailActiveInWork]
-		});
-		expect(overview.complete).toBe(false);
-		expect(overview.usage.available).toBe(false);
-	});
-
-	it('shows a known zero with no open tickets', () => {
-		const overview = toOverview({ tickets: [], complete: true, agents: agentList, details: [] });
-		expect(overview.usage).toMatchObject({ available: true, label: NO_OPEN_TICKETS_USAGE_LABEL });
-		expect(overview.usage.available && overview.usage.usage.costUsd).toBe(0);
-		expect(overview.updatedAt).toBeNull();
-	});
-
-	it('reports the newest ticket change', () => {
-		const overview = toOverview({ tickets: open, complete: true, agents: null, details: null });
-		expect(overview.updatedAt).toBe('2026-10-13T09:45:00Z');
 	});
 });
 

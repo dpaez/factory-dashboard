@@ -435,6 +435,26 @@ export const ticketLongValues = {
 	}
 } satisfies Schemas['TicketSummary'];
 
+/**
+ * A ticket in a stage the contract does not list yet, as a newer factory
+ * might send. The schema's stage enum rejects `'triage'`, so only `stage` is
+ * cast; every other field is still checked against the schema. Not part of
+ * `ticketSummaries`, so the fake factory and its e2e counts stay unchanged.
+ */
+export const ticketUnknownStage = {
+	...({
+		...baseTicket,
+		id: 'tkt_17',
+		key: 'dpaez-factory-dashboard-29-2b3c4d5e',
+		displayRef: 'dpaez/factory-dashboard#29',
+		sourceRef: 'https://github.com/dpaez/factory-dashboard/issues/29',
+		title: 'Triage incoming issues',
+		status: 'active',
+		updatedAt: '2026-10-13T12:00:00Z'
+	} satisfies Schemas['TicketSummary']),
+	stage: 'triage' as unknown as Schemas['TicketSummary']['stage']
+} satisfies Schemas['TicketSummary'];
+
 /** Tasks with the live summary shapes. Typed wide so stage keys stay open. */
 const qaTicketTasks: Schemas['Task'][] = [
 	{

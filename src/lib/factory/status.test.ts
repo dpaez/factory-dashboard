@@ -6,6 +6,7 @@ import {
 	TASK_STAGE_LABELS,
 	TASK_STATUS_SIGNALS,
 	executionStatusSignal,
+	handoffStatusSignal,
 	runStatusSignal,
 	taskStatusSignal,
 	type Signal
@@ -75,6 +76,23 @@ describe('executionStatusSignal', () => {
 
 	it('never returns an empty label', () => {
 		expect(executionStatusSignal('').label.trim()).not.toBe('');
+	});
+});
+
+describe('handoffStatusSignal', () => {
+	it('reads Preparing handoff while wrapup runs', () => {
+		for (const status of ['active', 'queued', 'resuming']) {
+			expect(handoffStatusSignal(status)).toEqual({ signal: 'run', label: 'Preparing handoff' });
+		}
+	});
+
+	it('reads Ready for handoff when ready, and the normal signal otherwise', () => {
+		expect(handoffStatusSignal('ready_for_handoff')).toEqual({
+			signal: 'wait',
+			label: 'Ready for handoff'
+		});
+		expect(handoffStatusSignal('paused')).toEqual(executionStatusSignal('paused'));
+		expect(handoffStatusSignal('hibernating')).toEqual({ signal: 'standby', label: 'hibernating' });
 	});
 });
 

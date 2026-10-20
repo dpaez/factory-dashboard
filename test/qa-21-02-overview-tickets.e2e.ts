@@ -55,18 +55,16 @@ function scenario(fakePort: number, appPort: number, options: FakeFactoryOptions
 	return `http://localhost:${appPort}`;
 }
 
-test('AC1: / shows needs-attention, active agents and a QA stage card from the factory', async ({
-	page
-}) => {
+// Ticket #23 replaced the overview on / with the Flow board; AC1 now checks the board.
+test('AC1: / shows the board summary and a QA lane card from the factory', async ({ page }) => {
 	await page.goto('/');
-	const needsUser = openTickets.filter((ticket) => ticket.needsUser);
-	expect(needsUser.length).toBeGreaterThan(0);
-	await expect(page.getByTestId('needs-attention-card')).toContainText('Needs attention');
-	await expect(page.getByTestId('needs-attention-card')).toContainText(String(needsUser.length));
-	await expect(page.getByTestId('active-agents-card')).toContainText(
+	await expect(page.locator('[data-summary="agents-running"]')).toContainText(
 		String(agentList.items.length)
 	);
-	await expect(page.getByTestId('stage-cards').getByText('QA', { exact: true })).toBeVisible();
+	const qa = page.getByRole('group', { name: /^QA\b/ });
+	for (const ticket of openTickets.filter((t) => t.stage === 'qa')) {
+		await expect(qa.locator(`[data-ticket-key="${ticket.key}"]`)).toBeVisible();
+	}
 	await shot(page, 'ac1-overview');
 });
 
@@ -91,12 +89,11 @@ test.describe('AC2: one failing detail read', () => {
 		}
 	});
 
-	test('AC2: the open-ticket cost card shows — instead of $0.00', async ({ page }) => {
+	test('AC2: that ticket card shows Unavailable tokens instead of zeros', async ({ page }) => {
 		await page.goto(`${base}/`);
-		const cost = page.getByTestId('cost-card');
-		await expect(cost).toContainText('Cost · open tickets');
-		await expect(cost.getByTestId('cost-value')).toHaveText('—');
-		await expect(cost).not.toContainText('$0.00');
+		const card = page.locator(`[data-ticket-key="${openTickets[0]!.key}"]`);
+		await expect(card.locator('[data-slot="ticket-tokens"]')).toHaveText('Tokens Unavailable');
+		await expect(card).not.toContainText('In 0');
 		await shot(page, 'ac2-cost-unavailable');
 	});
 });

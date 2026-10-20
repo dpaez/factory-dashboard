@@ -1,15 +1,21 @@
 import { isHttpError } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OPEN_TICKETS_USAGE_LABEL } from '$lib/factory/adapters';
-import { agentList, ticketActiveInWork } from '$lib/factory/fixtures';
-import type { Overview } from '$lib/factory/models';
+import type { Board, BoardCard } from '$lib/factory/board';
+import {
+	agentList,
+	ticketActiveInQa,
+	ticketActiveInWork,
+	ticketCancelled,
+	ticketPaused,
+	ticketReadyForHandoff
+} from '$lib/factory/fixtures';
 
 import {
 	FAKE_FACTORY_TOKEN,
 	createFakeFactory,
 	openTickets,
-	openTicketsCostUsd,
+	ticketDetails,
 	type FakeFactoryOptions
 } from '../../test/fake-factory';
 import { load } from './+page.server';
@@ -43,8 +49,9 @@ afterEach(() => {
 
 async function run(options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
+	// No `url`: the load must not read the search params, so selection never refetches.
 	const event = { fetch: fake.handle } as unknown as Parameters<typeof load>[0];
-	const data = (await load(event)) as { overview: Overview };
+	const data = (await load(event)) as { board: Board };
 	return { data, requests: fake.requests };
 }
 
@@ -58,10 +65,19 @@ async function pageError(options: FakeFactoryOptions = {}) {
 	throw new Error('load did not throw');
 }
 
+const cards = (board: Board): BoardCard[] => board.lanes.flatMap((lane) => lane.cards);
+const laneOf = (board: Board, key: string) =>
+	board.lanes.find((lane) => lane.cards.some((card) => card.key === key))?.id;
+
+/** Open, non-terminal tickets: the ones the board shows. */
+const onBoard = openTickets.filter(
+	(ticket) => !['complete', 'cancelled'].includes(ticket.status) && ticket.stage !== 'done'
+);
+
 describe('/ load', () => {
-	it('reads open tickets, agents and each open ticket, and builds the overview', async () => {
+	it('reads open tickets, agents and each open ticket, and builds the board', async () => {
 		const { data, requests } = await run();
-		const { overview } = data;
+		const { board } = data;
 
 		expect(requests.every((request) => request.method === 'GET')).toBe(true);
 		expect(
@@ -72,26 +88,39 @@ describe('/ load', () => {
 			expect(requests.some((r) => r.path === `/v1/tickets/${ticket.key}`)).toBe(true);
 		}
 
-		expect(overview.complete).toBe(true);
-		expect(overview.tickets.map((row) => row.key)).toEqual(openTickets.map((t) => t.key));
-		expect(overview.needsAttention.count).toBe(openTickets.filter((t) => t.needsUser).length);
-		expect(overview.activeAgents).toBe(agentList.items.length);
-		expect(overview.stageCounts.qa).toBe(openTickets.filter((t) => t.stage === 'qa').length);
-		expect(overview.stageCounts.qa).toBeGreaterThan(0);
-		expect(overview.usage).toMatchObject({ available: true, label: OPEN_TICKETS_USAGE_LABEL });
-		if (!overview.usage.available) throw new Error('usage unavailable');
-		expect(overview.usage.usage.costUsd).toBeCloseTo(openTicketsCostUsd);
-		expect(overview.tickets.every((row) => row.costUsd !== null)).toBe(true);
+		expect(board.lanes.map((lane) => lane.label)).toEqual([
+			'Plan',
+			'Work',
+			'QA',
+			'Review',
+			'Handoff'
+		]);
+		expect(
+			cards(board)
+				.map((card) => card.key)
+				.sort()
+		).toEqual(onBoard.map((ticket) => ticket.key).sort());
+		expect(laneOf(board, ticketActiveInQa.key)).toBe('qa');
+		expect(laneOf(board, ticketPaused.key)).toBe('work');
+		expect(laneOf(board, ticketReadyForHandoff.key)).toBe('handoff');
+		expect(laneOf(board, ticketCancelled.key)).toBeUndefined();
+
+		expect(board.summary).toEqual({
+			inProgress: onBoard.length,
+			inProgressComplete: true,
+			agentsRunning: agentList.items.length,
+			readyToStart: null
+		});
+		for (const card of cards(board)) {
+			const usage = ticketDetails.get(card.key)?.usage;
+			expect(card.tokens).toEqual({ input: usage?.tokensInput, output: usage?.tokensOutput });
+		}
 	});
 
-	it('shows $0.00 with "no open tickets" when nothing is open', async () => {
+	it('shows empty lanes when nothing is open', async () => {
 		const { data } = await run({ tickets: [] });
-		expect(data.overview.tickets).toEqual([]);
-		expect(data.overview.usage).toMatchObject({
-			available: true,
-			label: 'no open tickets',
-			usage: { costUsd: 0 }
-		});
+		expect(cards(data.board)).toEqual([]);
+		expect(data.board.summary.inProgress).toBe(0);
 	});
 
 	it.each([
@@ -103,7 +132,7 @@ describe('/ load', () => {
 		expect(error.body.kind).toBe('configuration');
 	});
 
-	it('a wrong token is the configuration error, not an empty overview', async () => {
+	it('a wrong token is the configuration error, not an empty board', async () => {
 		process.env.FACTORY_API_TOKEN = 'not-the-token';
 		const error = await pageError();
 		expect(error.status).toBe(503);
@@ -131,25 +160,29 @@ describe('/ load', () => {
 		}
 	);
 
-	it('a failing agents read makes only that card unavailable', async () => {
+	it('a failing agents read makes only agents running unavailable', async () => {
 		const { data } = await run({
 			failAgents: { status: 500, title: 'Internal error', type: 'internal_error' }
 		});
-		expect(data.overview.activeAgents).toBeNull();
-		expect(data.overview.usage.available).toBe(true);
-		expect(data.overview.tickets).toHaveLength(openTickets.length);
+		expect(data.board.summary.agentsRunning).toBeNull();
+		expect(cards(data.board)).toHaveLength(onBoard.length);
+		expect(cards(data.board).every((card) => card.tokens !== null)).toBe(true);
 	});
 
-	it('one failing detail read makes the usage card unavailable, not a partial sum', async () => {
+	it("one failing detail read makes only that card's tokens unavailable", async () => {
 		const { data } = await run({
 			failDetail: {
 				keys: [ticketActiveInWork.key],
 				problem: { status: 500, title: 'Internal error', type: 'internal_error' }
 			}
 		});
-		expect(data.overview.usage).toEqual({ available: false, label: OPEN_TICKETS_USAGE_LABEL });
-		expect(data.overview.activeAgents).toBe(agentList.items.length);
-		expect(data.overview.tickets).toHaveLength(openTickets.length);
+		const board = cards(data.board);
+		expect(board).toHaveLength(onBoard.length);
+		expect(board.find((card) => card.key === ticketActiveInWork.key)?.tokens).toBeNull();
+		expect(
+			board.filter((card) => card.key !== ticketActiveInWork.key).every((c) => c.tokens !== null)
+		).toBe(true);
+		expect(data.board.summary.agentsRunning).toBe(agentList.items.length);
 	});
 
 	it('serialized page data has no token, factory URL or host', async () => {
