@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+	ATTENTION_REASON_SIGNALS,
 	BACKLOG_AVAILABILITY_SIGNALS,
 	EXECUTION_STATUS_SIGNALS,
 	RUN_STATUS_SIGNALS,
 	TASK_STAGE_LABELS,
 	TASK_STATUS_SIGNALS,
+	attentionReasonSignal,
 	backlogAvailabilitySignal,
 	executionStatusSignal,
 	handoffStatusSignal,
@@ -184,6 +186,28 @@ describe('backlogAvailabilitySignal', () => {
 
 	it('uses only the five signal tones', () => {
 		for (const value of Object.values(BACKLOG_AVAILABILITY_SIGNALS)) {
+			expect(SIGNALS).toContain(value.signal);
+			expect(value.signal).not.toBe('clear');
+		}
+	});
+});
+
+describe('attentionReasonSignal', () => {
+	it('maps every reason to its label and tone', () => {
+		expect(ATTENTION_REASON_SIGNALS).toEqual({
+			question: { signal: 'wait', label: 'Question' },
+			limit: { signal: 'wait', label: 'Limit' },
+			approval: { signal: 'wait', label: 'Approval' },
+			waiting: { signal: 'wait', label: 'Waiting for a reply' },
+			paused: { signal: 'standby', label: 'Paused' },
+			failed: { signal: 'fault', label: 'Failed' },
+			handoff: { signal: 'wait', label: 'Ready for handoff' }
+		});
+		expect(attentionReasonSignal('failed')).toEqual({ signal: 'fault', label: 'Failed' });
+	});
+
+	it('never uses Clear', () => {
+		for (const value of Object.values(ATTENTION_REASON_SIGNALS)) {
 			expect(SIGNALS).toContain(value.signal);
 			expect(value.signal).not.toBe('clear');
 		}

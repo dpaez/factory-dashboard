@@ -23,6 +23,7 @@ import {
 	FAKE_FACTORY_TOKEN,
 	FAKE_PAGE_SIZE,
 	createFakeFactory,
+	openTickets,
 	type FakeFactoryOptions
 } from '../../../../test/fake-factory';
 
@@ -211,6 +212,35 @@ describe('listAllBacklog', () => {
 			expect(result.failure.type).toBe('tracker_unavailable');
 			expect(result.failure).toEqual(failureAlone.failure);
 		}
+	});
+});
+
+describe('fake factory GET /v1/tickets?needsUser', () => {
+	function fakeClient() {
+		return createFactoryClient({
+			baseUrl: BASE_URL,
+			token: FAKE_FACTORY_TOKEN,
+			fetch: createFakeFactory().handle
+		});
+	}
+
+	it('lists only needs-attention tickets for needsUser=true', async () => {
+		const result = await listAllTickets(fakeClient(), { status: 'open', needsUser: 'true' });
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const expected = openTickets.filter((ticket) => ticket.needsUser);
+		expect(expected.length).toBeGreaterThan(FAKE_PAGE_SIZE);
+		expect(result.data.items).toEqual(expected);
+	});
+
+	it('lists only the others for needsUser=false, and both without the filter', async () => {
+		const client = fakeClient();
+		const others = await listAllTickets(client, { status: 'open', needsUser: 'false' });
+		const all = await listAllTickets(client, { status: 'open' });
+
+		expect(others.ok && others.data.items).toEqual(openTickets.filter((t) => !t.needsUser));
+		expect(all.ok && all.data.items).toEqual(openTickets);
 	});
 });
 

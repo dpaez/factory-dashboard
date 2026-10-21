@@ -129,6 +129,8 @@ export type FakeFactoryOptions = {
 	failAgents?: Problem;
 	/** Answer this problem for `GET /v1/tickets`. */
 	failTickets?: Problem;
+	/** Answer this problem for `GET /v1/tickets?needsUser=true` only: the attention read. */
+	failAttention?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}/runs`. */
 	failRuns?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}/executions`. */
@@ -192,13 +194,21 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		}
 		if (path === '/v1/tickets') {
 			if (options.failTickets) return problem(options.failTickets);
+			if (options.failAttention && url.searchParams.get('needsUser') === 'true') {
+				return problem(options.failAttention);
+			}
 			const status = url.searchParams.get('status') ?? 'open';
-			const items =
+			const byStatus =
 				status === 'all'
 					? listed
 					: status === 'finished'
 						? listed.filter((ticket) => !isOpen(ticket))
 						: listed.filter(isOpen);
+			const needsUser = url.searchParams.get('needsUser');
+			const items =
+				needsUser === 'true' || needsUser === 'false'
+					? byStatus.filter((ticket) => ticket.needsUser === (needsUser === 'true'))
+					: byStatus;
 			const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), FAKE_PAGE_SIZE);
 			const start = Number(url.searchParams.get('cursor') ?? 0);
 			const end = start + limit;

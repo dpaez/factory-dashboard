@@ -2,6 +2,7 @@ import { isHttpError } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BacklogResult } from '$lib/factory/backlog';
+import { toAttention } from '$lib/factory/attention';
 import type { Board, BoardCard } from '$lib/factory/board';
 import {
 	agentList,
@@ -22,7 +23,7 @@ import {
 	ticketDetails,
 	type FakeFactoryOptions
 } from '../../test/fake-factory';
-import { load } from './+page.server';
+import { load, type AttentionResult } from './+page.server';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
@@ -55,7 +56,11 @@ async function run(options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
 	// No `url`: the load must not read the search params, so selection never refetches.
 	const event = { fetch: fake.handle } as unknown as Parameters<typeof load>[0];
-	const data = (await load(event)) as { board: Board; backlog: Promise<BacklogResult> };
+	const data = (await load(event)) as {
+		board: Board;
+		backlog: Promise<BacklogResult>;
+		attention: AttentionResult;
+	};
 	return { data, requests: fake.requests };
 }
 
@@ -120,6 +125,70 @@ describe('/ load', () => {
 			const usage = ticketDetails.get(card.key)?.usage;
 			expect(card.tokens).toEqual({ input: usage?.tokensInput, output: usage?.tokensOutput });
 		}
+	});
+
+	it('reads needsUser=true and builds the attention model from the details already read', async () => {
+		const { data, requests } = await run();
+		const attentionReads = requests.filter(
+			(r) => r.path.startsWith('/v1/tickets?') && r.path.includes('needsUser=true')
+		);
+		expect(attentionReads.length).toBeGreaterThan(0);
+		expect(attentionReads.every((r) => r.path.includes('status=open'))).toBe(true);
+		// No new detail fetch: each open ticket's detail is read exactly once.
+		for (const ticket of openTickets) {
+			expect(requests.filter((r) => r.path === `/v1/tickets/${ticket.key}`)).toHaveLength(1);
+		}
+
+		const needsAttention = openTickets.filter((ticket) => ticket.needsUser);
+		expect(needsAttention.length).toBeGreaterThan(0);
+		expect(data.attention).toEqual({
+			ok: true,
+			model: toAttention({
+				tickets: needsAttention,
+				complete: true,
+				details: needsAttention.map((ticket) => ticketDetails.get(ticket.key) ?? null)
+			})
+		});
+		if (!data.attention.ok) return;
+		expect(data.attention.model.headline.count).toBe(needsAttention.length);
+		expect(data.attention.model.groups.map((group) => group.reason)).toEqual(
+			expect.arrayContaining(['question', 'limit', 'approval', 'paused', 'failed', 'handoff'])
+		);
+	});
+
+	it('reads no attention when nothing needs attention', async () => {
+		const { data } = await run({ tickets: openTickets.filter((ticket) => !ticket.needsUser) });
+		expect(data.attention).toEqual({
+			ok: true,
+			model: { headline: { count: 0, complete: true }, groups: [], queue: [] }
+		});
+	});
+
+	it('a failing attention read stays in attention; the board is intact', async () => {
+		const { data } = await run({
+			failAttention: {
+				status: 500,
+				title: 'Internal error',
+				type: 'internal_error',
+				detail: 'upstream-attention-detail'
+			}
+		});
+		expect(data.attention).toEqual({
+			ok: false,
+			failure: { title: 'Internal error', retryable: true }
+		});
+		expect(cards(data.board)).toHaveLength(onBoard.length);
+		expect(data.board.summary.inProgress).toBe(onBoard.length);
+		expect(data.board.summary.agentsRunning).toBe(agentList.items.length);
+		expect(JSON.stringify(data)).not.toContain('upstream-attention-detail');
+	});
+
+	it('a 401 on the attention read is the configuration error', async () => {
+		const error = await pageError({
+			failAttention: { status: 401, title: 'Unauthorized', type: 'unauthorized' }
+		});
+		expect(error.status).toBe(503);
+		expect(error.body.kind).toBe('configuration');
 	});
 
 	it('shows empty lanes when nothing is open', async () => {
@@ -223,12 +292,21 @@ describe('/ load', () => {
 		}
 	);
 
-	it('serialized page data and the resolved backlog have no token, factory URL or upstream body', async () => {
+	it('serialized page data, attention included, and the resolved backlog have no token, factory URL or upstream body', async () => {
 		const upstream = 'upstream-secret-body-marker';
 		for (const options of [
 			{},
 			{ failBacklog: { ...problemTrackerUnavailable, detail: undefined } },
-			{ failBacklog: { status: 502, title: upstream, type: 'nonsense' } as never }
+			{ failBacklog: { status: 502, title: upstream, type: 'nonsense' } as never },
+			{ failAttention: { status: 502, title: upstream, type: 'nonsense' } as never },
+			{
+				failAttention: {
+					status: 500,
+					title: 'Internal error',
+					type: 'internal_error',
+					detail: upstream
+				} as const
+			}
 		]) {
 			const { data } = await run(options);
 			const serialized = JSON.stringify({ ...data, backlog: await data.backlog });
