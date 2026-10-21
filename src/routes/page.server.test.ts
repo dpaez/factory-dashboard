@@ -1,9 +1,12 @@
 import { isHttpError } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BacklogResult } from '$lib/factory/backlog';
 import type { Board, BoardCard } from '$lib/factory/board';
 import {
 	agentList,
+	backlogIssues,
+	problemTrackerUnavailable,
 	ticketActiveInQa,
 	ticketActiveInWork,
 	ticketCancelled,
@@ -12,6 +15,7 @@ import {
 } from '$lib/factory/fixtures';
 
 import {
+	FAKE_BACKLOG_FETCHED_AT,
 	FAKE_FACTORY_TOKEN,
 	createFakeFactory,
 	openTickets,
@@ -51,7 +55,7 @@ async function run(options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
 	// No `url`: the load must not read the search params, so selection never refetches.
 	const event = { fetch: fake.handle } as unknown as Parameters<typeof load>[0];
-	const data = (await load(event)) as { board: Board };
+	const data = (await load(event)) as { board: Board; backlog: Promise<BacklogResult> };
 	return { data, requests: fake.requests };
 }
 
@@ -109,7 +113,8 @@ describe('/ load', () => {
 			inProgress: onBoard.length,
 			inProgressComplete: true,
 			agentsRunning: agentList.items.length,
-			readyToStart: null
+			readyToStart: null,
+			readyToStartComplete: true
 		});
 		for (const card of cards(board)) {
 			const usage = ticketDetails.get(card.key)?.usage;
@@ -183,6 +188,55 @@ describe('/ load', () => {
 			board.filter((card) => card.key !== ticketActiveInWork.key).every((c) => c.tokens !== null)
 		).toBe(true);
 		expect(data.board.summary.agentsRunning).toBe(agentList.items.length);
+	});
+
+	it('streams the backlog with every page followed', async () => {
+		const { data, requests } = await run();
+		expect(data.backlog).toBeInstanceOf(Promise);
+		const backlog = await data.backlog;
+		expect(backlog).toEqual({
+			ok: true,
+			items: backlogIssues,
+			fetchedAt: FAKE_BACKLOG_FETCHED_AT,
+			complete: true
+		});
+		const backlogReads = requests.filter((r) => r.path.startsWith('/v1/backlog'));
+		expect(backlogReads.length).toBeGreaterThan(1);
+		expect(backlogReads.some((r) => r.path.includes('refresh='))).toBe(false);
+	});
+
+	it.each([
+		['tracker_unavailable', problemTrackerUnavailable],
+		['unauthorized', { status: 401, title: 'Unauthorized', type: 'unauthorized' } as const]
+	])(
+		'a %s backlog read leaves the board intact and resolves to a failure',
+		async (type, problem) => {
+			const { data } = await run({ failBacklog: problem });
+			expect(cards(data.board)).toHaveLength(onBoard.length);
+			expect(data.board.summary.inProgress).toBe(onBoard.length);
+			expect(data.board.summary.agentsRunning).toBe(agentList.items.length);
+			const backlog = await data.backlog;
+			expect(backlog).toEqual({
+				ok: false,
+				failure: expect.objectContaining({ type, title: problem.title })
+			});
+		}
+	);
+
+	it('serialized page data and the resolved backlog have no token, factory URL or upstream body', async () => {
+		const upstream = 'upstream-secret-body-marker';
+		for (const options of [
+			{},
+			{ failBacklog: { ...problemTrackerUnavailable, detail: undefined } },
+			{ failBacklog: { status: 502, title: upstream, type: 'nonsense' } as never }
+		]) {
+			const { data } = await run(options);
+			const serialized = JSON.stringify({ ...data, backlog: await data.backlog });
+			expect(serialized).not.toContain(FAKE_FACTORY_TOKEN);
+			expect(serialized).not.toContain(FACTORY_URL);
+			expect(serialized).not.toContain(FACTORY_HOST);
+			expect(serialized).not.toContain(upstream);
+		}
 	});
 
 	it('serialized page data has no token, factory URL or host', async () => {

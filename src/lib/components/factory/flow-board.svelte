@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { toBoard, type BoardLane } from '$lib/factory/board';
 	import StageLane from './stage-lane.svelte';
 
@@ -10,12 +11,16 @@
 	 * would lose focus to `body`. The board remembers the focused card's key
 	 * and, after lanes change, refocuses that card when focus fell to `body`.
 	 * Focus the user moved elsewhere is never taken back.
+	 *
+	 * An optional `backlog` snippet renders as the first column, before Plan,
+	 * with a divider on its trailing edge at desktop widths.
 	 */
 	let {
 		lanes,
 		selectedKey = null,
 		loading = false,
 		error = null,
+		backlog = undefined,
 		onselect
 	}: {
 		lanes: BoardLane[];
@@ -23,6 +28,8 @@
 		loading?: boolean;
 		/** A board-level read failure, shown in every lane. */
 		error?: string | null;
+		/** The Backlog lane, shown as the first column. */
+		backlog?: Snippet;
 		onselect?: (key: string) => void;
 	} = $props();
 
@@ -78,6 +85,11 @@
 	{onfocusin}
 	{onfocusout}
 >
+	{#if backlog}
+		<div data-slot="flow-board-backlog" class="min-w-0 lg:border-r lg:border-border lg:pr-3">
+			{@render backlog()}
+		</div>
+	{/if}
 	{#each shown as lane (lane.id)}
 		<StageLane {lane} {selectedKey} {loading} {error} {onselect} />
 	{/each}

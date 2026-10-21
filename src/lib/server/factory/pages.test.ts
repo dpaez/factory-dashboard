@@ -2,6 +2,12 @@ import { isHttpError } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+	backlogBlockedIssue,
+	backlogIssueBare,
+	backlogIssuePlain,
+	backlogIssues,
+	backlogPageEmpty,
+	backlogUmbrellaIssue,
 	problemTicketNotFound,
 	problemTrackerUnavailable,
 	problemUnauthorized,
@@ -12,9 +18,17 @@ import {
 	ticketQueuedInPlan
 } from '$lib/factory/fixtures';
 
+import {
+	FAKE_BACKLOG_FETCHED_AT,
+	FAKE_FACTORY_TOKEN,
+	FAKE_PAGE_SIZE,
+	createFakeFactory,
+	type FakeFactoryOptions
+} from '../../../../test/fake-factory';
+
 import { createFactoryClient, factoryClientFromEnv } from './client';
 import { normalizeFactoryFailure } from './errors';
-import { listAllTickets, throwPageError } from './pages';
+import { listAllBacklog, listAllTickets, throwPageError } from './pages';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
@@ -112,6 +126,133 @@ describe('listAllTickets', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.failure.type).toBe('tracker_unavailable');
 		expect(result).not.toHaveProperty('data');
+	});
+});
+
+describe('listAllBacklog', () => {
+	const firstAt = '2026-10-13T11:00:00Z';
+	const laterAt = '2026-10-13T11:00:05Z';
+
+	it('follows nextCursor to the end, keeps the first fetchedAt and reports complete', async () => {
+		const { client, requests } = scriptedClient([
+			() => json({ fetchedAt: firstAt, items: [backlogIssuePlain], nextCursor: 'b2' }),
+			() => json({ fetchedAt: laterAt, items: [backlogUmbrellaIssue], nextCursor: 'b3' }),
+			() => json({ fetchedAt: laterAt, items: [backlogBlockedIssue], nextCursor: null })
+		]);
+
+		const result = await listAllBacklog(client);
+
+		expect(result).toEqual({
+			ok: true,
+			data: {
+				items: [backlogIssuePlain, backlogUmbrellaIssue, backlogBlockedIssue],
+				fetchedAt: firstAt,
+				complete: true
+			}
+		});
+		const searches = requests.map((request) => new URL(request.url));
+		expect(searches.every((url) => url.pathname === '/v1/backlog')).toBe(true);
+		expect(searches.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'b2', 'b3']);
+		expect(searches.every((url) => url.searchParams.get('limit') === '100')).toBe(true);
+		expect(searches.every((url) => !url.searchParams.has('refresh'))).toBe(true);
+	});
+
+	it('sends refresh=true on the first request only', async () => {
+		const { client, requests } = scriptedClient([
+			() => json({ fetchedAt: firstAt, items: [backlogIssuePlain], nextCursor: 'b2' }),
+			() => json({ fetchedAt: laterAt, items: [backlogIssueBare], nextCursor: null })
+		]);
+
+		const result = await listAllBacklog(client, { refresh: true });
+
+		expect(result.ok && result.data.fetchedAt).toBe(firstAt);
+		const refresh = requests.map((request) => new URL(request.url).searchParams.get('refresh'));
+		expect(refresh).toEqual(['true', null]);
+	});
+
+	it('returns an empty complete backlog', async () => {
+		const { client } = scriptedClient([() => json(backlogPageEmpty)]);
+		expect(await listAllBacklog(client)).toEqual({
+			ok: true,
+			data: { items: [], fetchedAt: backlogPageEmpty.fetchedAt, complete: true }
+		});
+	});
+
+	it('reports incomplete when the page bound is hit', async () => {
+		const { client, requests } = scriptedClient([
+			() => json({ fetchedAt: firstAt, items: [backlogIssuePlain], nextCursor: 'b2' }),
+			() => json({ fetchedAt: laterAt, items: [backlogIssueBare], nextCursor: 'b3' })
+		]);
+
+		const result = await listAllBacklog(client, {}, { pages: 2, limit: 1 });
+
+		expect(result).toEqual({
+			ok: true,
+			data: { items: [backlogIssuePlain, backlogIssueBare], fetchedAt: firstAt, complete: false }
+		});
+		expect(requests).toHaveLength(2);
+		expect(new URL(requests[0]!.url).searchParams.get('limit')).toBe('1');
+	});
+
+	it('returns the first failure unchanged, never a partial list', async () => {
+		const { client } = scriptedClient([
+			() => json({ fetchedAt: firstAt, items: [backlogIssuePlain], nextCursor: 'b2' }),
+			() => problem(problemTrackerUnavailable, 503),
+			() => json({ fetchedAt: laterAt, items: [backlogIssueBare], nextCursor: null })
+		]);
+		const direct = scriptedClient([() => problem(problemTrackerUnavailable, 503)]);
+
+		const result = await listAllBacklog(client);
+		const failureAlone = await listAllBacklog(direct.client);
+
+		expect(result.ok).toBe(false);
+		expect(result).not.toHaveProperty('data');
+		if (!result.ok && !failureAlone.ok) {
+			expect(result.failure.type).toBe('tracker_unavailable');
+			expect(result.failure).toEqual(failureAlone.failure);
+		}
+	});
+});
+
+describe('fake factory GET /v1/backlog', () => {
+	function fakeClient(options: FakeFactoryOptions = {}) {
+		const fake = createFakeFactory(options);
+		const client = createFactoryClient({
+			baseUrl: BASE_URL,
+			token: FAKE_FACTORY_TOKEN,
+			fetch: fake.handle
+		});
+		return { client, requests: fake.requests };
+	}
+
+	it('serves every backlog fixture in pages of FAKE_PAGE_SIZE', async () => {
+		const { client, requests } = fakeClient();
+
+		const result = await listAllBacklog(client, { refresh: true });
+
+		expect(result).toEqual({
+			ok: true,
+			data: { items: backlogIssues, fetchedAt: FAKE_BACKLOG_FETCHED_AT, complete: true }
+		});
+		expect(backlogIssues.length).toBeGreaterThan(FAKE_PAGE_SIZE);
+		expect(requests).toHaveLength(Math.ceil(backlogIssues.length / FAKE_PAGE_SIZE));
+		expect(requests[0]).toEqual({ method: 'GET', path: '/v1/backlog?limit=100&refresh=true' });
+		expect(requests[1]?.path).toBe(`/v1/backlog?limit=100&cursor=${FAKE_PAGE_SIZE}`);
+	});
+
+	it('serves the backlog option', async () => {
+		const { client } = fakeClient({ backlog: [backlogBlockedIssue] });
+		const result = await listAllBacklog(client);
+		expect(result.ok && result.data.items).toEqual([backlogBlockedIssue]);
+	});
+
+	it('answers failBacklog with the problem', async () => {
+		const { client } = fakeClient({ failBacklog: problemTrackerUnavailable });
+		const result = await listAllBacklog(client);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.failure).toMatchObject({ status: 503, type: 'tracker_unavailable' });
+		}
 	});
 });
 

@@ -9,6 +9,7 @@ import type { components } from '$lib/factory/generated/factory-api';
 import type { FactoryClient } from './client';
 import { CONFIGURATION_ERROR, normalizeFactoryFailure, type FactoryApiFailure } from './errors';
 import {
+	getBacklog,
 	listRuns,
 	listTickets,
 	type FactoryResult,
@@ -19,6 +20,7 @@ import {
 
 type TicketSummary = components['schemas']['TicketSummary'];
 type Run = components['schemas']['Run'];
+type BacklogIssue = components['schemas']['BacklogIssue'];
 
 /** At most this many pages are read per list. */
 export const TICKET_PAGE_BOUND = 20;
@@ -93,6 +95,52 @@ export async function listAllRuns(
 		cursor = result.data.nextCursor;
 	}
 	return { ok: true, data: { items, complete: false } };
+}
+
+/** At most this many backlog pages are read per load. */
+export const BACKLOG_PAGE_BOUND = 10;
+/** Page size the backlog pager asks for. */
+export const BACKLOG_PAGE_LIMIT = 100;
+
+export type AllBacklog = {
+	items: BacklogIssue[];
+	/** When the tracker was last asked, from the first page. */
+	fetchedAt: string;
+	/** False when the pager stopped at its bound with pages left. */
+	complete: boolean;
+};
+
+/**
+ * Follow the backlog's pages until the last page or the bound. `refresh`
+ * asks the tracker again on the first page only; later pages follow its
+ * cursor through the cache. Returns the first failure as is.
+ */
+export async function listAllBacklog(
+	client: FactoryClient,
+	query: { refresh?: boolean } = {},
+	bound: { pages?: number; limit?: number } = {}
+): Promise<FactoryResult<AllBacklog>> {
+	const pages = bound.pages ?? BACKLOG_PAGE_BOUND;
+	const limit = bound.limit ?? BACKLOG_PAGE_LIMIT;
+	const items: BacklogIssue[] = [];
+	let fetchedAt: string | undefined;
+	let cursor: string | undefined;
+
+	for (let page = 0; page < pages; page += 1) {
+		const result = await getBacklog(client, {
+			limit,
+			...(cursor && { cursor }),
+			...(page === 0 && query.refresh && { refresh: 'true' as const })
+		});
+		if (!result.ok) return result;
+		fetchedAt ??= result.data.fetchedAt;
+		items.push(...result.data.items);
+		if (result.data.nextCursor === null || result.data.nextCursor === '') {
+			return { ok: true, data: { items, fetchedAt, complete: true } };
+		}
+		cursor = result.data.nextCursor;
+	}
+	return { ok: true, data: { items, fetchedAt: fetchedAt ?? '', complete: false } };
 }
 
 /** Failures that mean the dashboard's own configuration or token is wrong. */

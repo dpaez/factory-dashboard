@@ -16,14 +16,17 @@ const open = async (page: Page, id: string, theme = 'light') => {
 	await expect
 		.poll(
 			() =>
-				page.evaluate(
-					() =>
-						(
-							window as unknown as {
-								__STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } };
-							}
-						).__STORYBOOK_PREVIEW__?.currentRender?.phase
-				),
+				page
+					.evaluate(
+						() =>
+							(
+								window as unknown as {
+									__STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } };
+								}
+							).__STORYBOOK_PREVIEW__?.currentRender?.phase
+					)
+					// A cold dev server may reload the iframe once while it optimizes deps.
+					.catch(() => undefined),
 			{ timeout: 30_000 }
 		)
 		.toBe('finished');
@@ -303,7 +306,8 @@ test('AC6: BoardSummary shows in progress, agents running and ready to start as 
 	await expect(summary.getByRole('listitem')).toHaveText([
 		/12\s*in progress/,
 		/2\s*agents running/,
-		/Unavailable\s*ready to start/
+		// #24 fills in the ready-to-start count; its Unavailable form has its own story.
+		/5\s*ready to start/
 	]);
 	await shot(page, 'ac6-board-summary');
 });

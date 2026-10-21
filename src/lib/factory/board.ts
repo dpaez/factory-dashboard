@@ -69,8 +69,14 @@ export type BoardSummary = {
 	inProgressComplete: boolean;
 	/** Null when the agents read failed. */
 	agentsRunning: number | null;
-	/** Unavailable until the backlog lands (#24). */
-	readyToStart: null;
+	/**
+	 * Backlog issues that are neither blocked nor umbrella. Null while the
+	 * backlog has not loaded or its latest read failed. `toBoard` never reads
+	 * the backlog, so it is always null there; the page merges the count in.
+	 */
+	readyToStart: number | null;
+	/** False when the backlog pager stopped at its bound; `readyToStart` is then a lower bound. */
+	readyToStartComplete: boolean;
 };
 
 export type Board = {
@@ -162,7 +168,8 @@ export function toBoard(input: BoardInput): Board {
 			inProgress: tickets.length,
 			inProgressComplete: complete,
 			agentsRunning: agents === null ? null : agents.items.length,
-			readyToStart: null
+			readyToStart: null,
+			readyToStartComplete: true
 		}
 	};
 }

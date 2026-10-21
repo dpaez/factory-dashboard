@@ -103,3 +103,20 @@ export const RUN_STATUS_SIGNALS = {
 export function runStatusSignal(status: RunStatus | (string & {})): StatusSignal {
 	return lookup<StatusSignal>(RUN_STATUS_SIGNALS, status) ?? unknown(status);
 }
+
+export type BacklogAvailability = 'ready' | 'blocked' | 'umbrella';
+
+/**
+ * A backlog issue's availability. Blocked waits on another issue (Wait).
+ * Ready and Umbrella are labels, not outcomes, so they are Standby: never
+ * Clear, and never Beacon Yellow.
+ */
+export const BACKLOG_AVAILABILITY_SIGNALS = {
+	ready: { signal: 'standby', label: 'Ready' },
+	blocked: { signal: 'wait', label: 'Blocked' },
+	umbrella: { signal: 'standby', label: 'Umbrella' }
+} as const satisfies Record<BacklogAvailability, StatusSignal>;
+
+export function backlogAvailabilitySignal(availability: BacklogAvailability): StatusSignal {
+	return BACKLOG_AVAILABILITY_SIGNALS[availability];
+}
