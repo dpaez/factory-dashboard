@@ -104,6 +104,28 @@ export function runStatusSignal(status: RunStatus | (string & {})): StatusSignal
 	return lookup<StatusSignal>(RUN_STATUS_SIGNALS, status) ?? unknown(status);
 }
 
+/** Why a needs-attention ticket needs a person, in display order. */
+export type AttentionReason =
+	'question' | 'limit' | 'approval' | 'waiting' | 'paused' | 'failed' | 'handoff';
+
+/**
+ * Attention reasons. A person is awaited, so most are Wait; Paused is
+ * Standby and Failed is Fault. Never Clear, and never Beacon Yellow.
+ */
+export const ATTENTION_REASON_SIGNALS = {
+	question: { signal: 'wait', label: 'Question' },
+	limit: { signal: 'wait', label: 'Limit' },
+	approval: { signal: 'wait', label: 'Approval' },
+	waiting: { signal: 'wait', label: 'Waiting for a reply' },
+	paused: { signal: 'standby', label: 'Paused' },
+	failed: { signal: 'fault', label: 'Failed' },
+	handoff: { signal: 'wait', label: 'Ready for handoff' }
+} as const satisfies Record<AttentionReason, StatusSignal>;
+
+export function attentionReasonSignal(reason: AttentionReason): StatusSignal {
+	return ATTENTION_REASON_SIGNALS[reason];
+}
+
 export type BacklogAvailability = 'ready' | 'blocked' | 'umbrella';
 
 /**

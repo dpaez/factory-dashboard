@@ -415,6 +415,34 @@ export const ticketDetailMultiExecution = {
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
 
+/**
+ * The failed ticket with an open `agent_question` and a cancelled approval: two
+ * attention reasons (Question and Failed) on one ticket. Not served by the fake.
+ */
+export const ticketDetailFailedWithQuestion = {
+	...ticketFailed,
+	attention: [
+		{
+			id: 'att_04',
+			kind: 'agent_question',
+			question: 'Planning failed twice. Split the import into two tickets?',
+			replies: [],
+			runId: null,
+			status: 'open'
+		},
+		{
+			id: 'att_05',
+			kind: 'manual_approval',
+			question: 'Import every Linear issue?',
+			replies: [],
+			runId: null,
+			status: 'cancelled'
+		}
+	],
+	tasks: [],
+	usage: usageEmpty
+} satisfies Schemas['TicketDetail'];
+
 /** A ticket with long values, for layout stories. Not part of `ticketSummaries`. */
 export const ticketLongValues = {
 	...baseTicket,

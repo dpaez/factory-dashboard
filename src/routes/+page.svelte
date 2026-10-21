@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
+	import AttentionStrip from '$lib/components/factory/attention-strip.svelte';
 	import BacklogLane from '$lib/components/factory/backlog-lane.svelte';
 	import BoardSummary from '$lib/components/factory/board-summary.svelte';
 	import FlowBoard from '$lib/components/factory/flow-board.svelte';
@@ -12,6 +13,7 @@
 
 	let { data }: PageProps = $props();
 	let board = $derived(data.board);
+	let attention = $derived(data.attention);
 
 	const backlogState = new BacklogState();
 	// The load streams the backlog; a rerun of the load seeds it again.
@@ -54,6 +56,12 @@
 	<section class="not-prose mt-2 flex flex-col gap-3">
 		<h2 class="text-4xl font-light">Flow board</h2>
 		<BoardSummary {summary} />
+		<AttentionStrip
+			attention={attention.ok ? attention.model : null}
+			error={attention.ok ? null : attention.failure.title}
+			{selectedKey}
+			onselect={(key) => select('ticket', key)}
+		/>
 	</section>
 
 	<section aria-label="Flow board lanes">
