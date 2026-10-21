@@ -39,6 +39,9 @@ export default defineConfig({
 						instances: [{ browser: 'chromium', headless: true }]
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					// A few short files: run them one at a time so a click never waits on
+					// another file's iframe while the storybook project is busy.
+					fileParallelism: false,
 					exclude: ['src/lib/server/**']
 				}
 			},

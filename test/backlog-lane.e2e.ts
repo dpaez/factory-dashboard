@@ -132,20 +132,20 @@ test('by keyboard, backlog and ticket cards share one selection region', async (
 	);
 	await shot(page, 'backlog-issue-selected');
 
-	const ticket = page.locator(`[data-ticket-key="${onBoard[0]!.key}"]`);
+	const ticket = page.locator(`[data-slot="ticket-card"][data-ticket-key="${onBoard[0]!.key}"]`);
 	await ticket.focus();
 	await page.keyboard.press('Space');
 	await expect(page).toHaveURL(`/?ticket=${encodeURIComponent(onBoard[0]!.key)}`);
 	await expect(ticket).toHaveAttribute('aria-pressed', 'true');
 	await expect(issue).toHaveAttribute('aria-pressed', 'false');
-	await expect(region(page).getByTestId('selected-ticket')).toContainText(onBoard[0]!.title);
+	await expect(region(page).getByTestId('ticket-inspector')).toContainText(onBoard[0]!.title);
 	await expect(preview).toHaveCount(0);
 
 	await issue.focus();
 	await page.keyboard.press('Space');
 	await expect(page).toHaveURL(`/?issue=${encodeURIComponent(backlogBlockedIssue.id)}`);
 	await expect(ticket).toHaveAttribute('aria-pressed', 'false');
-	await expect(region(page).getByTestId('selected-ticket')).toHaveCount(0);
+	await expect(region(page).getByTestId('ticket-inspector')).toHaveCount(0);
 });
 
 test('/?issue= loads the preview directly; an unknown id is not in the backlog', async ({

@@ -601,3 +601,134 @@ export const ticketDetailMultiExecutionFirst = {
 		tokensTotal: 314_300
 	}
 } satisfies Schemas['TicketDetail'];
+
+/*
+ * Inspector details for the statuses the inspector stories need. None has an
+ * open attention request or a QA summary, so serving them from the fake
+ * leaves the board's attention reasons and its QA lane unchanged.
+ */
+
+/** Planning in progress: no tasks yet. */
+export const ticketDetailPlanning = {
+	...ticketActiveInPlan,
+	attention: [],
+	tasks: [],
+	usage: usageEmpty
+} satisfies Schemas['TicketDetail'];
+
+/** Typed wide so the stage keys stay open. */
+const pausedTicketTasks: Schemas['Task'][] = [
+	{
+		blockedBy: [],
+		id: '01',
+		ordinal: 1,
+		stage: null,
+		status: 'done',
+		summaries: {
+			review: { counts: { blocking: 0, findings: 1 }, label: 'approve', round: 1 }
+		},
+		title: 'Arrow keys move between cards'
+	},
+	{
+		blockedBy: ['01'],
+		id: '02',
+		ordinal: 2,
+		stage: 'work',
+		status: 'active',
+		summaries: { work: { counts: { tests: 6 }, label: 'Work', round: 2 } },
+		title: 'Home and End jump to lane ends'
+	}
+];
+
+/** Paused by the operator mid-work, with its work round recorded. */
+export const ticketDetailPaused = {
+	...ticketPaused,
+	attention: [],
+	tasks: pausedTicketTasks,
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
+/** Failed in planning, with no open attention request. */
+export const ticketDetailFailed = {
+	...ticketFailed,
+	attention: [],
+	tasks: [],
+	usage: usageEmpty
+} satisfies Schemas['TicketDetail'];
+
+/** Every task done and an open pull request: ready for handoff. */
+export const ticketDetailReadyForHandoff = {
+	...ticketReadyForHandoff,
+	attention: [],
+	tasks: [
+		{
+			blockedBy: [],
+			id: '01',
+			ordinal: 1,
+			stage: null,
+			status: 'done',
+			summaries: {
+				review: { counts: { blocking: 0, findings: 0 }, label: 'approve', round: 1 }
+			},
+			title: 'Color tokens'
+		},
+		{
+			blockedBy: ['01'],
+			id: '02',
+			ordinal: 2,
+			stage: null,
+			status: 'done',
+			summaries: {
+				review: { counts: { blocking: 0, findings: 2 }, label: 'approve', round: 2 }
+			},
+			title: 'Type scale'
+		}
+	],
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
+/** Finished with a merged pull request. */
+export const ticketDetailComplete = {
+	...ticketCompleteInDone,
+	attention: [],
+	tasks: [
+		{
+			blockedBy: [],
+			id: '01',
+			ordinal: 1,
+			stage: null,
+			status: 'done',
+			summaries: {
+				review: { counts: { blocking: 0, findings: 0 }, label: 'approve', round: 1 }
+			},
+			title: 'Lanes and cards'
+		}
+	],
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
+/** Cancelled mid-work; its source is a file, not a URL. */
+export const ticketDetailCancelled = {
+	...ticketCancelled,
+	attention: [],
+	tasks: [
+		{
+			blockedBy: [],
+			id: '01',
+			ordinal: 1,
+			stage: 'work',
+			status: 'cancelled',
+			summaries: {},
+			title: 'Drag a card between lanes'
+		}
+	],
+	usage: usageEmpty
+} satisfies Schemas['TicketDetail'];
+
+/** Tracker warnings beside a failure (`resume_failed`), shown apart from it. */
+export const ticketDetailTrackerWarnings = {
+	...ticketResumeFailed,
+	attention: [],
+	tasks: [],
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];

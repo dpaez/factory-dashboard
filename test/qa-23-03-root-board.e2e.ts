@@ -149,6 +149,7 @@ test('AC4: Tab focuses a card; Enter and Space select it into ?ticket= with an O
 	await expect(firstCard).toBeFocused();
 	const open = page.getByRole('link', { name: 'Open ticket' });
 	await expect(open).toHaveAttribute('href', `/tickets/${encodeURIComponent(first.key)}`);
+	await expect(page.getByTestId('ticket-inspector')).toHaveAttribute('data-ticket-key', first.key);
 	await shot(page, 'ac4-card-selected');
 
 	await page.keyboard.press('Tab');
@@ -162,6 +163,7 @@ test('AC4: Tab focuses a card; Enter and Space select it into ?ticket= with an O
 	await expect(firstCard).toHaveAttribute('aria-pressed', 'false');
 	await expect(secondCard).toBeFocused();
 	await expect(open).toHaveAttribute('href', `/tickets/${encodeURIComponent(second.key)}`);
+	await expect(page.getByTestId('ticket-inspector')).toHaveAttribute('data-ticket-key', second.key);
 });
 
 test('AC5: no element on / is draggable', async ({ page }) => {

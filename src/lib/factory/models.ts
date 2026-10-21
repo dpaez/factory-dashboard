@@ -58,10 +58,24 @@ export type TicketList = {
 	complete: boolean;
 };
 
+/** Where the ticket came from. `href` is set only when `ref` is an http(s) URL. */
+export type SourceView = {
+	ref: string;
+	href: string | null;
+};
+
+/** The task in progress and, when the factory recorded one, its round at its current stage. */
+export type CurrentTaskView = {
+	label: string;
+	/** Null when the active task has no summary for its current stage; never invented. */
+	round: number | null;
+};
+
 export type TicketHeader = {
 	key: TicketKey;
 	displayRef: string;
 	sourceRef: string;
+	source: SourceView;
 	title: string;
 	stage: Stage;
 	status: ExecutionStatus;
@@ -74,6 +88,8 @@ export type TicketHeader = {
 	pullRequest: PullRequest | null;
 	trackerWarnings: string[];
 	progress: TicketProgress;
+	/** Null when the factory names no current task. */
+	currentTask: CurrentTaskView | null;
 	updatedAt: string;
 };
 
@@ -148,8 +164,8 @@ export type TicketDetailView = {
 	header: TicketHeader;
 	tasks: TaskView[];
 	attention: AttentionView[];
-	/** The shown execution's usage total. */
-	usage: Usage;
+	/** The shown execution's usage total; null when the factory sent none. */
+	usage: Usage | null;
 	executions: ExecutionView[];
 	runs: RunView[];
 	/** The latest run's activity, newest run with any first. */

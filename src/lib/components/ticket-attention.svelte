@@ -18,7 +18,7 @@
 <div class="flex flex-col gap-4 font-mono text-xs font-light tabular-nums" data-testid="attention">
 	{#each ordered as request (request.id)}
 		<div class="flex min-w-0 flex-col gap-2" data-attention={request.id}>
-			<p class="text-muted-foreground">
+			<p class="text-foreground/75">
 				{words(request.kind)} · <span data-testid="attention-status">{words(request.status)}</span>
 			</p>
 			<pre
@@ -28,7 +28,7 @@
 					{#each request.replies as reply, index (index)}
 						<li class="flex flex-col gap-0.5" data-reply-current={reply.current}>
 							<p class="whitespace-pre-wrap">{reply.answer}</p>
-							<p class="text-muted-foreground">
+							<p class="text-foreground/75">
 								{actorText(reply.actor)} · {formatTimestamp(reply.createdAt)}
 								{#if reply.current}· <span class="text-foreground">current</span>{/if}
 							</p>
@@ -36,10 +36,10 @@
 					{/each}
 				</ol>
 			{:else}
-				<p class="text-muted-foreground">No replies yet.</p>
+				<p class="text-foreground/75">No replies yet.</p>
 			{/if}
 		</div>
 	{:else}
-		<p class="text-muted-foreground">No attention requests.</p>
+		<p class="text-foreground/75">No attention requests.</p>
 	{/each}
 </div>

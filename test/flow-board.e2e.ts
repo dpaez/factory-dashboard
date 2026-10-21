@@ -31,7 +31,8 @@ const onBoard = openTickets.filter(
 );
 const lane = (page: Page, name: string) =>
 	page.getByRole('group', { name: new RegExp(`^${name}\\b`) });
-const card = (page: Page, key: string) => page.locator(`[data-ticket-key="${key}"]`);
+const card = (page: Page, key: string) =>
+	page.locator(`[data-slot="ticket-card"][data-ticket-key="${key}"]`);
 
 test('AC1: / shows the five lanes with one card per open ticket in its lane', async ({ page }) => {
 	await page.goto('/');
@@ -123,15 +124,17 @@ test('AC4: a ?ticket= key loaded directly selects that card and shows its ref', 
 	const ticket = ticketWaitingForAgentQuestion;
 	await page.goto(`/?ticket=${encodeURIComponent(ticket.key)}`);
 	await expect(card(page, ticket.key)).toHaveAttribute('aria-pressed', 'true');
-	const region = page.getByTestId('selected-ticket');
+	const region = page.getByTestId('ticket-inspector');
+	await expect(region).toHaveAttribute('data-state', 'loaded');
 	await expect(region).toContainText(ticket.displayRef);
-	await expect(region).toContainText(ticket.title);
+	await expect(region.getByRole('heading', { level: 2 })).toHaveText(ticket.title);
 	await region.getByRole('link', { name: 'Open ticket' }).click();
 	await expect(page).toHaveURL(`/tickets/${encodeURIComponent(ticket.key)}`);
 });
 
 test('AC4: a key that is not on the board still shows the Open ticket link', async ({ page }) => {
 	await page.goto(`/?ticket=${encodeURIComponent('not on/board')}`);
+	await expect(page.getByTestId('ticket-inspector')).toHaveAttribute('data-state', 'not_found');
 	await expect(page.getByRole('link', { name: 'Open ticket' })).toHaveAttribute(
 		'href',
 		`/tickets/${encodeURIComponent('not on/board')}`

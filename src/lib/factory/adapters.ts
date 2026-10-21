@@ -10,6 +10,8 @@ import type { components } from '$lib/factory/generated/factory-api';
 
 import {
 	type AttentionView,
+	type CurrentTaskView,
+	type SourceView,
 	type ExecutionView,
 	type RunView,
 	type StageSummary,
@@ -139,6 +141,35 @@ function latestActivity(runs: Schemas['Run'][]): string | null {
 	return withActivity.reduce((a, b) => (b.sequence > a.sequence ? b : a)).activity;
 }
 
+/** The source reference, with an href only when it is an http(s) URL. */
+export function toSource(sourceRef: string): SourceView {
+	let href: string | null = null;
+	try {
+		const url = new URL(sourceRef);
+		if (url.protocol === 'http:' || url.protocol === 'https:') href = url.href;
+	} catch {
+		// Not a URL, such as `KAI-12` or `notes/ticket.md`: shown as text.
+	}
+	return { ref: sourceRef, href };
+}
+
+/**
+ * The current task's label from `progress.current`, and the round of the
+ * first active task's summary for its current stage when that summary exists.
+ */
+export function toCurrentTask(
+	progress: Schemas['Progress'],
+	tasks: Schemas['Task'][]
+): CurrentTaskView | null {
+	const label = progress.current?.label;
+	if (!label) return null;
+	const active = tasks.find((task) => task.status === 'active');
+	const stage = active?.stage;
+	const summary =
+		active && stage && Object.hasOwn(active.summaries, stage) ? active.summaries[stage] : undefined;
+	return { label, round: summary?.round ?? null };
+}
+
 export type TicketDetailInput = {
 	detail: Schemas['TicketDetail'];
 	executions: Schemas['ExecutionList'];
@@ -153,6 +184,7 @@ export function toTicketDetail(input: TicketDetailInput): TicketDetailView {
 			key: detail.key,
 			displayRef: detail.displayRef,
 			sourceRef: detail.sourceRef,
+			source: toSource(detail.sourceRef),
 			title: detail.title,
 			stage: detail.stage,
 			status: detail.status,
@@ -163,11 +195,12 @@ export function toTicketDetail(input: TicketDetailInput): TicketDetailView {
 			pullRequest: detail.pullRequest,
 			trackerWarnings: [...detail.trackerWarnings],
 			progress: toProgress(detail.progress),
+			currentTask: toCurrentTask(detail.progress, detail.tasks),
 			updatedAt: detail.updatedAt
 		},
 		tasks: toTasks(detail.tasks),
 		attention: toAttention(detail.attention),
-		usage: { ...detail.usage },
+		usage: detail.usage ? { ...detail.usage } : null,
 		executions: toExecutions(executions, detail.execution),
 		runs: runs.map(toRun),
 		latestActivity: latestActivity(runs)
