@@ -4,6 +4,8 @@ import {
 	actorText,
 	formatCost,
 	formatCount,
+	formatDuration,
+	formatElapsed,
 	formatTimestamp,
 	stageLabel,
 	summaryText
@@ -63,5 +65,41 @@ describe('actorText', () => {
 		expect(actorText({ client: 'dashboard', onBehalfOf: 'Diego' })).toBe('dashboard (Diego)');
 		expect(actorText({ client: 'cli', onBehalfOf: null })).toBe('cli');
 		expect(actorText(null)).toBe('—');
+	});
+});
+
+describe('formatDuration', () => {
+	it('shows milliseconds, seconds and minutes, or "—"', () => {
+		expect(formatDuration(4)).toBe('4 ms');
+		expect(formatDuration(2_100)).toBe('2.1 s');
+		expect(formatDuration(18_250)).toBe('18.3 s');
+		expect(formatDuration(125_000)).toBe('2 m 5 s');
+		expect(formatDuration(0)).toBe('0 ms');
+		expect(formatDuration(null)).toBe('—');
+		expect(formatDuration(Number.NaN)).toBe('—');
+	});
+});
+
+describe('formatElapsed', () => {
+	const at = (seconds: number) =>
+		new Date(Date.UTC(2026, 9, 13, 9) + seconds * 1_000).toISOString();
+	const start = at(0);
+
+	it('picks seconds, minutes or hours by length', () => {
+		expect(formatElapsed(start, at(0.2))).toBe('<1 s');
+		expect(formatElapsed(start, at(42))).toBe('42 s');
+		expect(formatElapsed(start, at(60))).toBe('1 m');
+		expect(formatElapsed(start, at(690))).toBe('11 m 30 s');
+		expect(formatElapsed(start, at(3_600))).toBe('1 h');
+		expect(formatElapsed(start, at(7_500))).toBe('2 h 5 m');
+		expect(formatElapsed(start, at(90_000))).toBe('25 h');
+	});
+
+	it('is unavailable, never 0, without both ends or with bad times', () => {
+		expect(formatElapsed(null, at(10))).toBe('—');
+		expect(formatElapsed(start, null)).toBe('—');
+		expect(formatElapsed(undefined, undefined)).toBe('—');
+		expect(formatElapsed('not a date', at(10))).toBe('—');
+		expect(formatElapsed(at(10), start)).toBe('—');
 	});
 });

@@ -15,12 +15,14 @@
 	import {
 		inspectorHref,
 		parseExecution,
+		parseRun,
 		parseTab,
 		ticketPageHref,
 		type InspectorState,
 		type InspectorTab
 	} from '$lib/factory/inspector';
 	import { TicketInspectorState } from '$lib/factory/inspector-state.svelte';
+	import { RunDetailState } from '$lib/factory/run-detail-state.svelte';
 
 	let { data }: PageProps = $props();
 	let board = $derived(data.board);
@@ -50,6 +52,7 @@
 
 	/** Select into the URL; the other selection parameter is dropped. */
 	function select(param: 'ticket' | 'issue', value: string) {
+		// Only the selection parameter survives: execution, tab and run are cleared.
 		goto(`?${param}=${encodeURIComponent(value)}`, {
 			keepFocus: true,
 			noScroll: true,
@@ -64,6 +67,9 @@
 	let executionParam = $derived(parseExecution(page.url.searchParams.get('execution')));
 	let selectedExecution = $derived(executionParam.valid ? executionParam.execution : undefined);
 	let tab = $derived(parseTab(page.url.searchParams.get('tab')));
+	let selectedRun = $derived(parseRun(page.url.searchParams.get('run')));
+	// Run detail, read lazily by the Inspector and cached per (execution, run).
+	const runDetail = new RunDetailState();
 	$effect(() => {
 		if (selectedKey === null) inspector.clear();
 		else if (executionParam.valid) void inspector.select(selectedKey, selectedExecution);
@@ -87,15 +93,25 @@
 		goto(inspectorHref(page.url, { tab: next }), STAY);
 	}
 
+	// Choosing a run pushes a history entry and keeps focus on the run's row.
+	function chooseRun(id: string | null) {
+		goto(inspectorHref(page.url, { run: id }), STAY);
+	}
+
+	// Another execution is another run list: its links drop the selected run.
 	function hrefForExecution(execution: number) {
 		return inspectorHref(page.url, {
-			execution: execution === currentExecution ? null : execution
+			execution: execution === currentExecution ? null : execution,
+			run: null
 		});
 	}
 
 	async function close() {
 		const key = selectedKey;
-		await goto(inspectorHref(page.url, { ticket: null, execution: null, tab: null }), STAY);
+		await goto(
+			inspectorHref(page.url, { ticket: null, execution: null, tab: null, run: null }),
+			STAY
+		);
 		await tick();
 		const card =
 			key === null
@@ -210,9 +226,16 @@
 						state={inspectorView}
 						{tab}
 						ontabchange={chooseTab}
+						run={selectedRun}
+						onrunchange={chooseRun}
+						{runDetail}
 						{hrefForExecution}
 						onclose={close}
-						openHref={ticketPageHref(selectedKey, { execution: selectedExecution, tab })}
+						openHref={ticketPageHref(selectedKey, {
+							execution: selectedExecution,
+							tab,
+							run: selectedRun
+						})}
 						onretry={() => inspector.retry()}
 						headingId={INSPECTOR_HEADING}
 					/>

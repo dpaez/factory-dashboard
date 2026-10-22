@@ -13,7 +13,11 @@ import {
 	type CurrentTaskView,
 	type SourceView,
 	type ExecutionView,
+	type ReviewView,
+	type RunDetailView,
+	type RunReviewSummary,
 	type RunView,
+	type ValidationView,
 	type StageSummary,
 	type TaskView,
 	type TicketDetailView,
@@ -116,6 +120,18 @@ export function toExecutions(
 	}));
 }
 
+function toRunReviewSummary(review: Schemas['Review'] | null | undefined): RunReviewSummary | null {
+	if (!review) return null;
+	return {
+		verdict: review.verdict,
+		round: review.round,
+		findings: {
+			total: review.findings.length,
+			blocking: review.findings.filter((finding) => finding.blocking).length
+		}
+	};
+}
+
 export function toRun(run: Schemas['Run']): RunView {
 	const usage = run.usage ?? null;
 	return {
@@ -123,14 +139,67 @@ export function toRun(run: Schemas['Run']): RunView {
 		sequence: run.sequence,
 		stage: run.stage,
 		task: run.task,
+		purpose: run.purpose,
+		round: run.round,
 		model: run.model,
+		thinking: run.thinking,
 		status: run.status,
+		terminalKind: run.terminalKind ?? null,
 		outcome: run.outcome,
+		validationStatus: run.validation?.status ?? null,
+		review: toRunReviewSummary(run.review),
 		usage,
 		costUsd: usage === null ? null : usage.costUsd,
 		startedAt: run.startedAt,
 		endedAt: run.endedAt,
 		activity: run.activity
+	};
+}
+
+function toValidation(validation: Schemas['Validation'] | null | undefined): ValidationView | null {
+	if (!validation) return null;
+	return {
+		attempt: validation.attempt,
+		status: validation.status,
+		summary: validation.summary,
+		checks: validation.checks.map((check) => ({
+			name: check.name,
+			kind: check.kind,
+			status: check.status,
+			command: check.command,
+			exitCode: check.exitCode,
+			durationMs: check.durationMs
+		}))
+	};
+}
+
+function toReview(review: Schemas['Review'] | null | undefined): ReviewView | null {
+	if (!review) return null;
+	return {
+		verdict: review.verdict,
+		round: review.round,
+		summary: review.summary,
+		findings: review.findings.map((finding) => ({
+			id: finding.id,
+			number: finding.number,
+			title: finding.title,
+			severity: finding.severity,
+			blocking: finding.blocking,
+			finding: finding.finding,
+			evidence: finding.evidence,
+			location: finding.location,
+			suggestion: finding.suggestion
+		}))
+	};
+}
+
+/** One run's evidence: the summary fields, the latest validation, the review, the session file. */
+export function toRunDetail(run: Schemas['Run']): RunDetailView {
+	return {
+		...toRun(run),
+		validation: toValidation(run.validation),
+		review: toReview(run.review),
+		sessionFile: run.sessionFile ?? null
 	};
 }
 

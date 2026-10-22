@@ -2,12 +2,21 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 	import TicketInspector from './ticket-inspector.svelte';
-	import { toTicketDetail } from '$lib/factory/adapters';
+	import { toRunDetail, toTicketDetail } from '$lib/factory/adapters';
 	import type { components } from '$lib/factory/generated/factory-api';
-	import type { InspectorState, InspectorTab } from '$lib/factory/inspector';
+	import type {
+		InspectorState,
+		InspectorTab,
+		RunDetailSource,
+		RunDetailViewState
+	} from '$lib/factory/inspector';
 	import {
 		executionList,
+		runHistoryReviewChanges,
+		runHistoryWorkCrashed,
+		runHistoryWorkInitial,
 		runPage,
+		runPageHistory,
 		runPageFirstExecution,
 		runWrapupPrepared,
 		ticketDetailActiveInWork,
@@ -81,6 +90,32 @@
 
 	const panelText = (pane: HTMLElement) => within(pane).getByRole('tabpanel').textContent ?? '';
 
+	/**
+	 * A fetch-free run detail source: every history run loaded, except the ids
+	 * given an explicit state. `load` and `retry` are spies.
+	 */
+	const staticRuns = (overrides: Record<string, RunDetailViewState> = {}): RunDetailSource => {
+		const views = new Map<string, RunDetailViewState>(
+			runPageHistory.items.map((item) => [item.id, { kind: 'loaded', run: toRunDetail(item) }])
+		);
+		Object.entries(overrides).forEach(([id, value]) => views.set(id, value));
+		return {
+			view: (_execution, id) => views.get(id) ?? { kind: 'loading' },
+			load: fn(),
+			retry: fn()
+		};
+	};
+
+	const history = loaded(single(ticketDetailActiveInWork, runPageHistory.items));
+	const noRuns = loaded(single(ticketDetailActiveInWork, []));
+	const latestId = runPageHistory.items.reduce((a, b) => (b.sequence > a.sequence ? b : a)).id;
+	const withRuns = (
+		state: InspectorState,
+		tab: InspectorTab,
+		run: string | null = null,
+		source: RunDetailSource = staticRuns()
+	) => ({ ...base(state, tab), run, onrunchange: fn(), runDetail: source });
+
 	const { Story } = defineMeta({
 		title: 'Components/Factory/TicketInspector',
 		component: TicketInspector,
@@ -94,7 +129,7 @@
 			docs: {
 				description: {
 					component:
-						'The Inspector for one ticket execution, the same on the Flow board and on the ticket page. It shows the header and Source, open and answered attention requests, then the Tasks, Activity, Evidence and Usage tabs. Activity and Evidence are placeholders for now. The tab follows the `tab` prop, and choosing one calls `ontabchange`; the Inspector never navigates by itself. It also has loading, not-found and error states. `onclose` adds Close (board), `openHref` adds "Open ticket", and `onretry` adds Retry to a retryable error.'
+						'The Inspector for one ticket execution, the same on the Flow board and on the ticket page. It shows the header and Source, open and answered attention requests, then the Tasks, Activity, Evidence and Usage tabs. Activity shows the latest activity and the run timeline (with the selected run\'s evidence below it); Evidence shows the selected run, or the latest run. The selected run follows `run`, choosing one calls `onrunchange`, and run detail comes from `runDetail`, read only when Activity has a selection or Evidence is shown. A run read failure stays inside its panel. The tab follows the `tab` prop, and choosing one calls `ontabchange`; the Inspector never navigates by itself. It also has loading, not-found and error states. `onclose` adds Close (board), `openHref` adds "Open ticket", and `onretry` adds Retry to a retryable error.'
 				}
 			}
 		}
@@ -295,19 +330,192 @@
 	args={base(running, 'activity')}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expect(panelText(pane)).toContain('Activity is not available yet.');
+		await expect(panelText(pane)).not.toContain('not available yet');
+		await expect(pane.querySelector('[data-testid="latest-activity"]')).toHaveTextContent(
+			'Latest activity'
+		);
 		await expect(pane.querySelector('[data-testid="latest-activity"]')).toHaveTextContent(
 			'Running pnpm test…'
+		);
+		await expect(pane.querySelector('[data-slot="run-timeline"]')).not.toBeNull();
+	}}
+/>
+
+<Story
+	name="Activity, multi-task history"
+	args={withRuns(history, 'activity')}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const latest = pane.querySelector('[data-testid="latest-activity"]')!;
+		await expect(latest).toHaveTextContent('Latest activity');
+		await expect(latest).toHaveTextContent('work · run 9');
+		await expect(latest).toHaveTextContent('Running pnpm test…');
+		await expect(
+			[...pane.querySelectorAll('[data-run-group]')].map((g) => g.getAttribute('data-run-group'))
+		).toEqual(['ticket', '01', '02']);
+		// No selection: no evidence and no run read.
+		await expect(pane.querySelector('[data-slot="evidence-panel"]')).toBeNull();
+		await expect(args.runDetail!.load).not.toHaveBeenCalled();
+	}}
+/>
+
+<Story
+	name="Activity, run selected"
+	args={withRuns(history, 'activity', runHistoryReviewChanges.id)}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const row = pane.querySelector(`[data-run="${runHistoryReviewChanges.id}"]`)!;
+		await expect(row).toHaveAttribute('aria-pressed', 'true');
+		const panel = pane.querySelector('[data-slot="evidence-panel"]')!;
+		await expect(panel).toHaveAttribute('data-state', 'loaded');
+		await expect(panel.querySelectorAll('[data-finding]')).toHaveLength(3);
+		await expect(args.runDetail!.load).toHaveBeenCalledWith(
+			ticketDetailActiveInWork.execution,
+			runHistoryReviewChanges.id
 		);
 	}}
 />
 
 <Story
+	name="Activity, selecting a run reports it"
+	args={withRuns(history, 'activity')}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const row = pane.querySelector<HTMLButtonElement>(`[data-run="${runHistoryWorkInitial.id}"]`)!;
+		await userEvent.click(row);
+		await expect(args.onrunchange).toHaveBeenCalledOnce();
+		await expect(args.onrunchange).toHaveBeenCalledWith(runHistoryWorkInitial.id);
+		// A repeated press before `run` catches up reports nothing.
+		await userEvent.click(row);
+		await expect(args.onrunchange).toHaveBeenCalledOnce();
+	}}
+/>
+
+<Story
 	name="Evidence tab"
-	args={base(running, 'evidence')}
+	args={withRuns(history, 'evidence')}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(panelText(pane)).not.toContain('not available yet');
+		await expect(pane.querySelector('[data-testid="evidence-caption"]')).toHaveTextContent(
+			'Latest run'
+		);
+		await expect(args.runDetail!.load).toHaveBeenCalledWith(
+			ticketDetailActiveInWork.execution,
+			latestId
+		);
+	}}
+/>
+
+<Story
+	name="Evidence, validation failed"
+	args={withRuns(history, 'evidence', runHistoryWorkInitial.id)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expect(panelText(pane)).toContain('Evidence is not available yet.');
+		await expect(pane.querySelector('[data-testid="evidence-caption"]')).toBeNull();
+		const validation = pane.querySelector('[data-testid="evidence-validation"]')!;
+		await expect(validation).toHaveTextContent('Failed');
+		await expect(validation.querySelectorAll('[data-check]')).toHaveLength(4);
+		await expect(validation.querySelector('[data-check="test"]')).toHaveTextContent('pnpm test');
+	}}
+/>
+
+<Story
+	name="Evidence, review changes requested"
+	args={withRuns(history, 'evidence', runHistoryReviewChanges.id)}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const review = pane.querySelector('[data-testid="evidence-review"]')!;
+		await expect(review).toHaveTextContent('Changes requested');
+		const finding = review.querySelector('[data-finding="R1-01"]')!;
+		await expect(finding).toHaveTextContent('1. R1-01');
+		await expect(finding).toHaveTextContent('Critical');
+		await expect(finding.querySelector('[data-testid="finding-location"]')).toHaveTextContent(
+			'src/lib/server/factory/client.ts:12'
+		);
+		await expect(pane.querySelectorAll('[data-slot="evidence-panel"] a')).toHaveLength(0);
+	}}
+/>
+
+<Story
+	name="Evidence, run with no usage"
+	args={withRuns(history, 'evidence', runHistoryWorkCrashed.id)}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-testid="evidence-usage"]')).toHaveTextContent(
+			'Usage unavailable'
+		);
+		await expect(pane.querySelector('[data-slot="evidence-panel"]')).not.toHaveTextContent('$0.00');
+	}}
+/>
+
+<Story
+	name="Evidence, run detail error"
+	args={withRuns(
+		history,
+		'evidence',
+		runHistoryWorkInitial.id,
+		staticRuns({
+			[runHistoryWorkInitial.id]: {
+				kind: 'error',
+				title: 'The factory is unavailable',
+				retryable: true
+			}
+		})
+	)}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const panel = pane.querySelector('[data-slot="evidence-panel"]')!;
+		await expect(panel).toHaveAttribute('data-state', 'error');
+		// The header and tabs keep rendering around the failed panel.
+		await expect(pane.querySelector('[data-testid="ticket-inspector"]')).toHaveAttribute(
+			'data-state',
+			'loaded'
+		);
+		await expect(pane.querySelector('[data-slot="ticket-header"]')).not.toBeNull();
+		await expect(within(pane).getAllByRole('tab')).toHaveLength(4);
+		const retry = within(panel as HTMLElement).getByRole('button', { name: 'Retry' });
+		await expect(retry.className).toContain('bg-secondary');
+		await userEvent.click(retry);
+		await expect(args.runDetail!.retry).toHaveBeenCalledWith(
+			ticketDetailActiveInWork.execution,
+			runHistoryWorkInitial.id
+		);
+	}}
+/>
+
+<Story
+	name="Evidence, no runs"
+	args={withRuns(noRuns, 'evidence')}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-testid="evidence-empty"]')).toHaveTextContent(
+			'No runs yet for this execution.'
+		);
+		await expect(args.runDetail!.load).not.toHaveBeenCalled();
+	}}
+/>
+
+<Story
+	name="Evidence, run not in this execution"
+	args={withRuns(history, 'evidence', 'run_elsewhere')}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-testid="run-unknown"]')).toHaveTextContent(
+			'Run run_elsewhere is not in this execution'
+		);
+		await expect(pane.querySelector('[data-slot="evidence-panel"]')).toBeNull();
+		await expect(args.runDetail!.load).not.toHaveBeenCalled();
+	}}
+/>
+
+<Story
+	name="Usage tab reads no run"
+	args={withRuns(history, 'usage', runHistoryWorkInitial.id)}
+	play={async ({ args, canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-testid="usage-total"]')).not.toBeNull();
+		await expect(args.runDetail!.load).not.toHaveBeenCalled();
 	}}
 />
 
@@ -356,12 +564,16 @@
 		const pane = within(firstPane(canvasElement));
 		pane.getByRole('tab', { name: 'Tasks' }).focus();
 		await userEvent.keyboard('{ArrowRight}');
-		await waitFor(() =>
-			expect(pane.getByRole('tabpanel')).toHaveTextContent('Activity is not available yet.')
-		);
+		await waitFor(() => expect(pane.getByRole('tabpanel')).toHaveTextContent('Latest activity'));
 		await userEvent.keyboard('{ArrowRight}');
 		await waitFor(() =>
-			expect(pane.getByRole('tabpanel')).toHaveTextContent('Evidence is not available yet.')
+			expect(
+				pane
+					.getByRole('tabpanel')
+					.querySelector(
+						'[data-testid="evidence-empty"], [data-slot="evidence-panel"], [data-testid="run-unknown"]'
+					)
+			).not.toBeNull()
 		);
 	}}
 >
@@ -370,6 +582,7 @@
 			state={running}
 			tab={controlledTab}
 			ontabchange={(next) => (controlledTab = next)}
+			runDetail={staticRuns()}
 			hrefForExecution={(n) => `#execution-${n}`}
 		/>
 	{/snippet}

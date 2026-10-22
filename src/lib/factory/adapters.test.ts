@@ -6,8 +6,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	agentList,
 	executionList,
+	runHistoryWorkCrashed,
 	runPage,
 	runPlanPassed,
+	runReviewChangesRequested,
+	runWorkRunning,
 	runWorkValidationFailed,
 	ticketActiveInQa,
 	ticketActiveInWork,
@@ -29,6 +32,7 @@ import {
 	toCurrentTask,
 	toExecutions,
 	toRun,
+	toRunDetail,
 	toSource,
 	toTasks,
 	toTicketDetail,
@@ -220,14 +224,42 @@ describe('toRun', () => {
 			sequence: 1,
 			stage: 'plan',
 			task: null,
+			purpose: 'initial',
+			round: 1,
 			model: 'claude-opus-5-5',
+			thinking: 'high',
 			status: 'terminal',
+			terminalKind: 'subagent_done',
 			outcome: 'Planned 2 tasks',
+			validationStatus: 'passed',
+			review: null,
 			usage: runPlanPassed.usage,
 			costUsd: 0.84,
 			startedAt: '2026-10-13T09:01:00Z',
 			endedAt: '2026-10-13T09:12:30Z',
 			activity: 'Wrote plan.md and three task files.'
+		});
+	});
+
+	it('summarizes the review verdict and finding counts', () => {
+		expect(toRun(runReviewChangesRequested).review).toEqual({
+			verdict: 'changes_requested',
+			round: 1,
+			findings: { total: 3, blocking: 2 }
+		});
+		expect(toRun(runWorkValidationFailed)).toMatchObject({
+			validationStatus: 'failed',
+			review: null
+		});
+	});
+
+	it('keeps a lost run apart from a failed one', () => {
+		expect(toRun(runHistoryWorkCrashed)).toMatchObject({
+			terminalKind: 'crashed',
+			outcome: 'retrying',
+			validationStatus: null,
+			usage: null,
+			costUsd: null
 		});
 	});
 
@@ -244,6 +276,65 @@ describe('toRun', () => {
 		expect(views.filter((run) => run.costUsd !== null).map((run) => run.id)).toEqual([
 			'run_plan_passed'
 		]);
+	});
+});
+
+describe('toRunDetail', () => {
+	it('maps every validation check and keeps the summary fields', () => {
+		const detail = toRunDetail(runWorkValidationFailed);
+		expect(detail).toMatchObject({
+			id: 'run_work_failed',
+			stage: 'work',
+			task: '01',
+			purpose: 'initial',
+			startedAt: '2026-10-13T09:13:00Z',
+			endedAt: '2026-10-13T09:40:00Z',
+			usage: null,
+			costUsd: null,
+			review: null,
+			sessionFile: null
+		});
+		expect(detail.validation).toEqual({
+			attempt: 2,
+			status: 'failed',
+			summary: '1 of 4 checks failed.',
+			checks: runWorkValidationFailed.validation.checks.map((check) => ({
+				name: check.name,
+				kind: check.kind,
+				status: check.status,
+				command: check.command,
+				exitCode: check.exitCode,
+				durationMs: check.durationMs
+			}))
+		});
+	});
+
+	it('maps the review with every finding field', () => {
+		const detail = toRunDetail(runReviewChangesRequested);
+		expect(detail.validation).toBeNull();
+		expect(detail.review).toEqual({
+			verdict: 'changes_requested',
+			round: 1,
+			summary: 'One critical and one major finding.',
+			findings: runReviewChangesRequested.review.findings.map((finding) => ({
+				id: finding.id,
+				number: finding.number,
+				title: finding.title,
+				severity: finding.severity,
+				blocking: finding.blocking,
+				finding: finding.finding,
+				evidence: finding.evidence,
+				location: finding.location,
+				suggestion: finding.suggestion
+			}))
+		});
+	});
+
+	it('carries the session file as text and the activity', () => {
+		const detail = toRunDetail(runWorkRunning);
+		expect(detail.sessionFile).toBe('/home/agent/.pi/sessions/work-02.jsonl');
+		expect(detail.activity).toBe('Running pnpm test…');
+		expect(detail.validation).toEqual({ attempt: 1, status: 'running', summary: null, checks: [] });
 	});
 });
 
@@ -376,7 +467,7 @@ describe('toSource', () => {
 });
 
 describe('browser safety', () => {
-	it.each(['./models.ts', './adapters.ts'])(
+	it.each(['./models.ts', './adapters.ts', './run-groups.ts'])(
 		'%s has no runtime import from $lib/server or $env',
 		(file) => {
 			const source = readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');

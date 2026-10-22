@@ -1,6 +1,8 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect } from 'storybook/test';
 	import AgentMessage from './agent-message.svelte';
+	import { runHistoryInfrastructureRetry } from '$lib/factory/fixtures';
 
 	const longContent = [
 		'Task 02 is ready for review. I added a story for every baseline component and covered each state the component already supports.',
@@ -28,4 +30,18 @@
 <Story
 	name="Long content"
 	args={{ agentName: 'Last Message', content: longContent, createdAt: '2026-10-18 16:04:51' }}
+/>
+
+<Story
+	name="With label"
+	args={{
+		label: 'Latest activity',
+		agentName: `work · run ${runHistoryInfrastructureRetry.sequence}`,
+		content: runHistoryInfrastructureRetry.activity
+	}}
+	play={async ({ canvasElement }) => {
+		const label = canvasElement.querySelector('[data-slot="agent-message-label"]');
+		await expect(label).toHaveTextContent('Latest activity');
+		await expect(canvasElement).toHaveTextContent('work · run 9');
+	}}
 />
