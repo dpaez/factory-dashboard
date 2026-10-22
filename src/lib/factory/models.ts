@@ -144,20 +144,89 @@ export type ExecutionView = {
 	selected: boolean;
 };
 
+export type ValidationStatus = Open<Schemas['Validation']['status']>;
+export type CheckStatus = Open<Schemas['ValidationCheck']['status']>;
+export type ReviewVerdict = Open<Schemas['Review']['verdict']>;
+export type FindingSeverity = Open<Schemas['Review']['findings'][number]['severity']>;
+
+/** A run's review at a glance: the verdict and how many findings block. */
+export type RunReviewSummary = {
+	verdict: ReviewVerdict;
+	round: number;
+	findings: { total: number; blocking: number };
+};
+
 export type RunView = {
 	id: string;
 	sequence: number;
 	stage: RunStage;
 	task: string | null;
+	/** The factory's raw purpose, such as `initial`; `run-purpose.ts` labels it. */
+	purpose: string;
+	/** The task's round at this stage. */
+	round: number;
 	model: string;
+	thinking: string;
 	status: RunStatus;
+	/** How a terminal run ended, such as `subagent_done` or `crashed`; null before it ends. */
+	terminalKind: string | null;
 	outcome: string;
+	/** The latest validation attempt's status; null when the run has none. */
+	validationStatus: ValidationStatus | null;
+	/** Null when the run has no review. */
+	review: RunReviewSummary | null;
 	/** Null when the factory recorded no usage for the run. */
 	usage: Usage | null;
 	costUsd: number | null;
 	startedAt: string | null;
 	endedAt: string | null;
 	activity: string | null;
+};
+
+export type ValidationCheckView = {
+	name: string;
+	kind: string;
+	status: CheckStatus;
+	command: string | null;
+	/** Null when the check ran no command or did not finish. */
+	exitCode: number | null;
+	durationMs: number | null;
+};
+
+export type ValidationView = {
+	attempt: number;
+	status: ValidationStatus;
+	summary: string | null;
+	checks: ValidationCheckView[];
+};
+
+export type FindingView = {
+	id: string;
+	number: number;
+	title: string;
+	severity: FindingSeverity;
+	blocking: boolean;
+	finding: string;
+	/** Text, never a link. */
+	evidence: string;
+	/** A path as text, never a link; null when the finding names none. */
+	location: string | null;
+	suggestion: string | null;
+};
+
+export type ReviewView = {
+	verdict: ReviewVerdict;
+	round: number;
+	summary: string;
+	findings: FindingView[];
+};
+
+/** One run's evidence, as `GET /api/factory/runs/<id>` answers it. */
+export type RunDetailView = Omit<RunView, 'review'> & {
+	validation: ValidationView | null;
+	review: ReviewView | null;
+	/** The Pi session file path, as text; never a link. */
+	sessionFile: string | null;
 };
 
 export type TicketDetailView = {

@@ -103,7 +103,7 @@ test('AC1: every listed Inspector state renders in a light and a dark pane', asy
 	await expect(inspector(loading.first())).toHaveAttribute('aria-busy', 'true');
 });
 
-test('AC2: the tabs read Tasks, Activity, Evidence, Usage; Activity and Evidence show a placeholder', async ({
+test('AC2: the tabs read Tasks, Activity, Evidence, Usage; Activity and Evidence show runs', async ({
 	page
 }) => {
 	let pane = (await open(page, 'running')).first();
@@ -114,16 +114,21 @@ test('AC2: the tabs read Tasks, Activity, Evidence, Usage; Activity and Evidence
 		'aria-selected',
 		'true'
 	);
-	await expect(pane.getByRole('tabpanel')).toContainText('Activity is not available yet.');
-	await shot(page, 'ac2-activity-placeholder');
+	await expect(pane.getByRole('tabpanel').getByTestId('latest-activity')).toContainText(
+		'Latest activity'
+	);
+	await expect(pane.getByRole('tabpanel').locator('[data-slot="run-timeline"]')).toBeVisible();
+	await expect(pane.getByRole('tabpanel')).not.toContainText('not available yet');
+	await shot(page, 'ac2-activity-tab');
 
 	pane = (await open(page, 'evidence-tab')).first();
 	await expect(pane.getByRole('tab', { name: 'Evidence' })).toHaveAttribute(
 		'aria-selected',
 		'true'
 	);
-	await expect(pane.getByRole('tabpanel')).toContainText('Evidence is not available yet.');
-	await shot(page, 'ac2-evidence-placeholder');
+	await expect(pane.getByRole('tabpanel').getByTestId('evidence-caption')).toHaveText('Latest run');
+	await expect(pane.getByRole('tabpanel')).not.toContainText('not available yet');
+	await shot(page, 'ac2-evidence-tab');
 });
 
 test('AC3: clicking or arrowing reports the tab, and the panel follows the tab prop', async ({
@@ -138,9 +143,13 @@ test('AC3: clicking or arrowing reports the tab, and the panel follows the tab p
 	await expect(pane.getByRole('tabpanel').getByTestId('tasks-progress')).toBeVisible();
 	await page.keyboard.press('ArrowRight');
 	await expect(pane.getByRole('tab', { name: 'Activity' })).toBeFocused();
-	await expect(pane.getByRole('tabpanel')).toContainText('Activity is not available yet.');
+	await expect(pane.getByRole('tabpanel')).toContainText('Latest activity');
 	await page.keyboard.press('ArrowRight');
-	await expect(pane.getByRole('tabpanel')).toContainText('Evidence is not available yet.');
+	await expect(pane.getByRole('tab', { name: 'Evidence' })).toHaveAttribute(
+		'aria-selected',
+		'true'
+	);
+	await expect(pane.getByRole('tabpanel').locator('[data-slot="evidence-panel"]')).toBeVisible();
 	await shot(page, 'ac3-panel-follows-tab');
 
 	// Uncontrolled story: `tab` stays 'tasks', so choosing another tab does not change the panel.
@@ -164,7 +173,7 @@ test('AC3: clicking or arrowing reports the tab, and the panel follows the tab p
 	expect((await calls(page, 'ontabchange')).slice(mid)).toEqual([['activity']]);
 	await expect(pane.getByRole('tab', { name: 'Tasks' })).toHaveAttribute('aria-selected', 'true');
 	await expect(pane.getByRole('tabpanel').getByTestId('tasks-progress')).toBeVisible();
-	await expect(pane.getByRole('tabpanel')).not.toContainText('Evidence is not available yet.');
+	await expect(pane.getByRole('tabpanel').locator('[data-slot="evidence-panel"]')).toHaveCount(0);
 });
 
 test('AC4: Close renders only with onclose and calls it', async ({ page }) => {

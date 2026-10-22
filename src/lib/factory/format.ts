@@ -28,6 +28,15 @@ export function formatCount(count: number | null | undefined): string {
 	return count.toLocaleString('en-US');
 }
 
+/** `4 ms`, `18.3 s`, `2 m 5 s`, or "—" when the check has no duration. */
+export function formatDuration(ms: number | null | undefined): string {
+	if (ms == null || !Number.isFinite(ms)) return UNAVAILABLE;
+	if (ms < 1_000) return `${Math.round(ms)} ms`;
+	if (ms < 60_000) return `${(ms / 1_000).toFixed(1)} s`;
+	const seconds = Math.round(ms / 1_000);
+	return `${Math.floor(seconds / 60)} m ${seconds % 60} s`;
+}
+
 /** Enum values as words: `changes_requested` → `changes requested`. */
 export function words(value: string): string {
 	return value.replaceAll('_', ' ');

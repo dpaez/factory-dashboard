@@ -4,6 +4,7 @@ import {
 	actorText,
 	formatCost,
 	formatCount,
+	formatDuration,
 	formatTimestamp,
 	stageLabel,
 	summaryText
@@ -63,5 +64,17 @@ describe('actorText', () => {
 		expect(actorText({ client: 'dashboard', onBehalfOf: 'Diego' })).toBe('dashboard (Diego)');
 		expect(actorText({ client: 'cli', onBehalfOf: null })).toBe('cli');
 		expect(actorText(null)).toBe('—');
+	});
+});
+
+describe('formatDuration', () => {
+	it('shows milliseconds, seconds and minutes, or "—"', () => {
+		expect(formatDuration(4)).toBe('4 ms');
+		expect(formatDuration(2_100)).toBe('2.1 s');
+		expect(formatDuration(18_250)).toBe('18.3 s');
+		expect(formatDuration(125_000)).toBe('2 m 5 s');
+		expect(formatDuration(0)).toBe('0 ms');
+		expect(formatDuration(null)).toBe('—');
+		expect(formatDuration(Number.NaN)).toBe('—');
 	});
 });

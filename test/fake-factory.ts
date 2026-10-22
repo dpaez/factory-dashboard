@@ -16,7 +16,8 @@ import {
 	agentList,
 	executionList,
 	runPage,
-	runPageFirstExecution
+	runPageFirstExecution,
+	runPageHistory
 } from '../src/lib/factory/fixtures/runs.ts';
 import {
 	ticketDetailActiveInQa,
@@ -115,6 +116,27 @@ const pastExecutions = new Map<
 	]
 ]);
 
+/** Current-execution run pages by ticket key; every other key serves `runPage`. */
+const runPagesByKey = new Map<string, Schemas['RunPage']>([
+	[ticketDetailActiveInWork.key, runPageHistory]
+]);
+
+/** The current execution's runs for a ticket key. */
+export function runPageFor(key: string): Schemas['RunPage'] {
+	return runPagesByKey.get(key) ?? runPage;
+}
+
+/** Every run the fake serves, by id, for `GET /v1/runs/{id}`. */
+const runsById = new Map<string, Schemas['Run']>(
+	[
+		runPage,
+		...runPagesByKey.values(),
+		...[...pastExecutions.values()].flatMap((byGeneration) =>
+			[...byGeneration.values()].map((past) => past.runs)
+		)
+	].flatMap((page) => page.items.map((run): [string, Schemas['Run']] => [run.id, run]))
+);
+
 /** A ticket's executions: the fixture list for the multi-execution ticket, else its current one. */
 export function executionsFor(key: string): Schemas['ExecutionList'] {
 	if (key === ticketDetailMultiExecution.key) return executionList;
@@ -147,6 +169,8 @@ export type FakeFactoryOptions = {
 	failAttention?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}/runs`. */
 	failRuns?: Problem;
+	/** Answer this problem for `GET /v1/runs/{id}`. */
+	failRun?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}/executions`. */
 	failExecutions?: Problem;
 	/** Tickets `GET /v1/tickets?status=all` lists (default: every fixture). */
@@ -250,6 +274,22 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 			} satisfies Schemas['BacklogPage']);
 		}
 
+		const runMatch = path.match(/^\/v1\/runs\/([^/]+)$/);
+		if (runMatch) {
+			if (options.failRun) return problem(options.failRun);
+			const id = decodeURIComponent(runMatch[1] ?? '');
+			const run = runsById.get(id);
+			if (!run) {
+				return problem({
+					status: 404,
+					title: 'Not found',
+					type: 'not_found',
+					detail: `No run has the id ${id}.`
+				});
+			}
+			return json(run);
+		}
+
 		const match = path.match(/^\/v1\/tickets\/([^/]+)(\/executions|\/runs)?$/);
 		if (match) {
 			const key = decodeURIComponent(match[1] ?? '');
@@ -270,7 +310,7 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 			const executionParam = url.searchParams.get('execution');
 			let shown: { detail: Schemas['TicketDetail']; runs: Schemas['RunPage'] } = {
 				detail,
-				runs: runPage
+				runs: runPageFor(key)
 			};
 			if (executionParam !== null && Number(executionParam) !== detail.execution) {
 				const past = pastExecutions.get(key)?.get(Number(executionParam));

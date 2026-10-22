@@ -1,14 +1,23 @@
 <script lang="ts">
 	import { X as CloseIcon } from '@lucide/svelte';
+	import { untrack } from 'svelte';
+	import AgentMessage from '$lib/components/agent-message.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import TicketAttention from '$lib/components/ticket-attention.svelte';
 	import TicketHeader from './ticket-header.svelte';
 	import TaskList from './task-list.svelte';
 	import UsagePanel from './usage-panel.svelte';
+	import RunTimeline from './run-timeline.svelte';
+	import EvidencePanel from './evidence-panel.svelte';
 	import { formatTimestamp, stageLabel } from '$lib/factory/format';
-	import { parseTab, type InspectorState, type InspectorTab } from '$lib/factory/inspector';
-	import type { ExecutionView } from '$lib/factory/models';
+	import {
+		parseTab,
+		type InspectorState,
+		type InspectorTab,
+		type RunDetailSource
+	} from '$lib/factory/inspector';
+	import type { ExecutionView, RunView } from '$lib/factory/models';
 
 	/**
 	 * The Inspector: one ticket execution's header and Source, its attention
@@ -17,6 +26,13 @@
 	 * choosing one reports it through `ontabchange`. Links come from
 	 * `hrefForExecution`, so the same Inspector works on the board and on the
 	 * ticket page. `onclose` adds Close; `openHref` adds an "Open ticket" link.
+	 *
+	 * Activity shows the run timeline and the latest activity; Evidence shows
+	 * one run's evidence. The selected run follows `run`, and choosing one
+	 * reports it through `onrunchange`. Run detail comes from `runDetail`: the
+	 * Inspector asks it to load a run only when Activity has a selection or
+	 * Evidence is shown, so Tasks and Usage never read a run. A run read that
+	 * fails stays inside its panel.
 	 */
 	const uid = $props.id();
 
@@ -28,6 +44,9 @@
 		onclose,
 		openHref,
 		onretry,
+		run = null,
+		onrunchange,
+		runDetail,
 		headingId = `${uid}-heading`
 	}: {
 		state: InspectorState;
@@ -43,6 +62,12 @@
 		openHref?: string;
 		/** Retries a failed read; no Retry control without it. */
 		onretry?: () => void;
+		/** The selected run id, from the URL; null for no selection. */
+		run?: string | null;
+		/** Called with the run the operator chose; the caller updates `run`. */
+		onrunchange?: (id: string | null) => void;
+		/** Where run detail comes from: the placement's cache, or a static source in stories. */
+		runDetail?: RunDetailSource;
 		/** The title's id, so the page can focus it. */
 		headingId?: string;
 	} = $props();
@@ -81,13 +106,53 @@
 
 	const hrefFor = (execution: ExecutionView) => hrefForExecution(execution.generation);
 
-	const latestRun = $derived(
-		detail
-			? [...detail.runs]
-					.filter((run) => run.activity !== null && run.activity !== '')
-					.sort((a, b) => b.sequence - a.sequence)[0]
-			: undefined
+	const runs: RunView[] = $derived(detail?.runs ?? []);
+	const execution = $derived(detail?.header.execution ?? 0);
+	/** The URL's run when it is one of the shown execution's runs; else nothing is selected. */
+	const selectedRun = $derived(run === null ? undefined : runs.find((item) => item.id === run));
+	/** A `run` that names no run of this execution: noted inline, never read. */
+	const unknownRun = $derived(run !== null && selectedRun === undefined ? run : null);
+	const newestRun = $derived(
+		runs.length === 0 ? undefined : runs.reduce((a, b) => (b.sequence > a.sequence ? b : a))
 	);
+	const hasActivity = (item: RunView | undefined) =>
+		item !== undefined && item.activity !== null && item.activity !== '';
+	const activityRun = $derived(
+		hasActivity(selectedRun)
+			? selectedRun
+			: runs
+					.filter(hasActivity)
+					.reduce<RunView | undefined>((a, b) => (a && a.sequence > b.sequence ? a : b), undefined)
+	);
+	/** Evidence shows the selected run, or the newest one when the URL names none. */
+	const evidenceRun = $derived(selectedRun ?? (run === null ? newestRun : undefined));
+
+	/** The run this tab needs read: Activity's selection, or Evidence's run. */
+	const runToLoad = $derived(
+		tab === 'activity' ? selectedRun?.id : tab === 'evidence' ? evidenceRun?.id : undefined
+	);
+	$effect(() => {
+		const id = runToLoad;
+		const source = runDetail;
+		const shown = execution;
+		if (id === undefined || !source || detail === null) return;
+		untrack(() => void source.load(shown, id));
+	});
+
+	// One report per choice, as for tabs: a repeated press before `run`
+	// catches up reports nothing.
+	let lastRunReported: string | null | undefined = undefined;
+	$effect.pre(() => {
+		void run;
+		lastRunReported = undefined;
+	});
+	function chooseRun(id: string | null) {
+		if (!onrunchange) return;
+		if (id === (lastRunReported === undefined ? (selectedRun?.id ?? null) : lastRunReported))
+			return;
+		lastRunReported = id;
+		onrunchange(id);
+	}
 
 	const LINK =
 		'font-mono underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring/30';
@@ -102,8 +167,20 @@
 	{/if}
 {/snippet}
 
-{#snippet placeholder(text: string)}
-	<p class="font-mono text-foreground/75" data-slot="tab-placeholder">{text}</p>
+{#snippet runEvidence(item: RunView, caption?: string)}
+	{#if runDetail}
+		<EvidencePanel
+			state={runDetail.view(execution, item.id)}
+			onretry={() => void runDetail?.retry(execution, item.id)}
+			{caption}
+		/>
+	{/if}
+{/snippet}
+
+{#snippet unknownRunNote(id: string)}
+	<p class="font-mono break-all text-foreground/75" data-testid="run-unknown">
+		Run {id} is not in this execution.
+	</p>
 {/snippet}
 
 <section
@@ -151,21 +228,45 @@
 				</p>
 				<TaskList tasks={loaded.tasks} stage={loaded.header.stage} />
 			</Tabs.Content>
+			<!-- Activity and Evidence render only while shown: a hidden panel holds no run. -->
 			<Tabs.Content value="activity" class={PANEL}>
-				{@render placeholder('Activity is not available yet.')}
-				{#if latestRun}
-					<div class="flex flex-col gap-1 bg-card p-3 font-mono" data-testid="latest-activity">
-						<p class="text-foreground/75 tabular-nums">
-							Latest activity · run {latestRun.sequence} · {stageLabel(latestRun.stage)} · {formatTimestamp(
-								latestRun.endedAt ?? latestRun.startedAt
-							)}
-						</p>
-						<p class="font-sans whitespace-pre-wrap">{latestRun.activity}</p>
-					</div>
+				{#if tab === 'activity'}
+					{#if activityRun}
+						<div data-testid="latest-activity">
+							<AgentMessage
+								label="Latest activity"
+								agentName={`${stageLabel(activityRun.stage)} · run ${activityRun.sequence}`}
+								content={activityRun.activity ?? ''}
+								createdAt={formatTimestamp(activityRun.endedAt ?? activityRun.startedAt)}
+							/>
+						</div>
+					{/if}
+					{#if unknownRun !== null}
+						{@render unknownRunNote(unknownRun)}
+					{/if}
+					<RunTimeline
+						{runs}
+						runsComplete={view.runsComplete}
+						selected={selectedRun?.id ?? null}
+						onselect={chooseRun}
+					/>
+					{#if selectedRun}
+						{@render runEvidence(selectedRun)}
+					{/if}
 				{/if}
 			</Tabs.Content>
 			<Tabs.Content value="evidence" class={PANEL}>
-				{@render placeholder('Evidence is not available yet.')}
+				{#if tab === 'evidence'}
+					{#if unknownRun !== null}
+						{@render unknownRunNote(unknownRun)}
+					{:else if evidenceRun === undefined}
+						<p class="font-mono text-foreground/75" data-testid="evidence-empty">
+							No runs yet for this execution.
+						</p>
+					{:else}
+						{@render runEvidence(evidenceRun, selectedRun ? undefined : 'Latest run')}
+					{/if}
+				{/if}
 			</Tabs.Content>
 			<Tabs.Content value="usage" class={PANEL}>
 				<UsagePanel

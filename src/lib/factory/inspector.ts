@@ -7,8 +7,10 @@
  * - `execution` is absent for the current execution, else a positive whole number.
  * - `tab` is absent for the default tab (`tasks`). An unknown tab reads as
  *   `tasks`: the tab is presentation, never an error.
+ * - `run` selects one run of the shown execution; an empty value is no run.
+ *   Changing `ticket` or `execution` should clear it; changing `tab` keeps it.
  */
-import type { TicketDetailView } from './models';
+import type { RunDetailView, TicketDetailView } from './models';
 
 export const INSPECTOR_TABS = ['tasks', 'activity', 'evidence', 'usage'] as const;
 export type InspectorTab = (typeof INSPECTOR_TABS)[number];
@@ -34,15 +36,21 @@ export function parseExecution(raw: string | null | undefined): ExecutionParam {
 	return { valid: true, execution: Number(raw) };
 }
 
+/** A `?run=` value: a non-empty run id, else no run selected. The id stays opaque. */
+export function parseRun(raw: string | null | undefined): string | null {
+	return raw === null || raw === undefined || raw === '' ? null : raw;
+}
+
 /** A parameter to set, or `null` to clear it. `undefined` keeps it as is. */
 export type InspectorParams = {
 	ticket?: string | null;
 	execution?: number | null;
 	tab?: InspectorTab | null;
+	run?: string | null;
 };
 
 /**
- * The href for the same path with `ticket`, `execution` and `tab` set or
+ * The href for the same path with `ticket`, `execution`, `tab` and `run` set or
  * cleared, keeping every other parameter. The default tab is cleared, not
  * written. Values are URL-encoded.
  */
@@ -64,18 +72,20 @@ export function inspectorHref(url: URL, params: InspectorParams): string {
 		'tab',
 		params.tab === undefined ? undefined : params.tab === DEFAULT_INSPECTOR_TAB ? null : params.tab
 	);
+	apply('run', params.run === '' ? null : params.run);
 	const query = search.toString();
 	return `${url.pathname}${query ? `?${query}` : ''}`;
 }
 
-/** The ticket page's href for a key, an execution (omit for current) and a tab. */
+/** The ticket page's href for a key, an execution (omit for current), a tab and a run. */
 export function ticketPageHref(
 	key: string,
-	options: { execution?: number | null; tab?: InspectorTab | null } = {}
+	options: { execution?: number | null; tab?: InspectorTab | null; run?: string | null } = {}
 ): string {
 	const search = new URLSearchParams();
 	if (options.execution != null) search.set('execution', String(options.execution));
 	if (options.tab != null && options.tab !== DEFAULT_INSPECTOR_TAB) search.set('tab', options.tab);
+	if (options.run != null && options.run !== '') search.set('run', options.run);
 	const query = search.toString();
 	return `/tickets/${encodeURIComponent(key)}${query ? `?${query}` : ''}`;
 }
@@ -102,3 +112,23 @@ export type InspectorState =
 export type TicketResult =
 	| { ok: true; detail: TicketDetailView; runsComplete: boolean }
 	| { ok: false; failure: TicketFailure };
+
+/**
+ * Where the Inspector gets run detail: `RunDetailState` in the app, a static
+ * map in stories. `load` reads a run once; `retry` reads it again.
+ */
+export type RunDetailSource = {
+	view(execution: number, id: string): RunDetailViewState;
+	load(execution: number, id: string): unknown;
+	retry(execution: number, id: string): unknown;
+};
+
+/** One run's state in the evidence panel. */
+export type RunDetailViewState =
+	| { kind: 'loading' }
+	| { kind: 'loaded'; run: RunDetailView }
+	| { kind: 'not_found'; id: string }
+	| { kind: 'error'; title: string; retryable: boolean };
+
+/** One run detail read, as `GET /api/factory/runs/<id>` answers it. */
+export type RunResult = { ok: true; run: RunDetailView } | { ok: false; failure: TicketFailure };

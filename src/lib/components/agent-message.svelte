@@ -6,21 +6,26 @@
 		agentName: string;
 		content: string;
 		createdAt?: string;
+		/** Shown above the message, such as "Latest activity". */
+		label?: string;
 	};
 
-	const { agentName, content, createdAt }: AgentMessageProps = $props();
+	const { agentName, content, createdAt, label }: AgentMessageProps = $props();
 </script>
 
 <div class="flex w-full flex-col font-mono">
+	{#if label}
+		<p class="mb-1 text-xs text-foreground/75" data-slot="agent-message-label">{label}</p>
+	{/if}
 	<Message.Root>
 		<Message.Content>
-			<Message.Header>{agentName}</Message.Header>
+			<Message.Header class="text-foreground/75">{agentName}</Message.Header>
 			<Bubble.Root variant="tinted" class="w-full! max-w-full!">
 				<Bubble.Content class="w-full font-sans">{content}</Bubble.Content>
 			</Bubble.Root>
 			<Message.Footer class="justify-end">
 				<div>
-					<span class="text-xs tabular-nums">{createdAt || ''}</span>
+					<span class="text-xs text-foreground/75 tabular-nums">{createdAt || ''}</span>
 				</div>
 			</Message.Footer>
 		</Message.Content>

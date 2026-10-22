@@ -4,6 +4,7 @@ import {
 	INSPECTOR_TABS,
 	inspectorHref,
 	parseExecution,
+	parseRun,
 	parseTab,
 	ticketPageHref
 } from './inspector';
@@ -106,7 +107,67 @@ describe('inspectorHref', () => {
 	});
 });
 
+describe('parseRun', () => {
+	it('is the id, opaque, when non-empty', () => {
+		expect(parseRun('run_hist_01_work_initial')).toBe('run_hist_01_work_initial');
+		expect(parseRun('a b/#1')).toBe('a b/#1');
+	});
+
+	it.each([[null], [undefined], ['']])('%s is no run', (raw) => {
+		expect(parseRun(raw)).toBeNull();
+	});
+});
+
+describe('inspectorHref with run', () => {
+	const selected = new URL(
+		'http://dashboard.test/?issue=7&ticket=old&execution=2&tab=evidence&run=run_a'
+	);
+
+	it('sets run, encoding it', () => {
+		const href = inspectorHref(new URL('http://dashboard.test/?ticket=k'), { run: 'r/1 #2' });
+		expect(new URL(href, 'http://dashboard.test').searchParams.get('run')).toBe('r/1 #2');
+	});
+
+	it('changing the tab keeps run', () => {
+		expect(inspectorHref(selected, { tab: 'activity' })).toBe(
+			'/?issue=7&ticket=old&execution=2&tab=activity&run=run_a'
+		);
+	});
+
+	it('changing the execution lets the caller clear run', () => {
+		expect(inspectorHref(selected, { execution: 1, run: null })).toBe(
+			'/?issue=7&ticket=old&execution=1&tab=evidence'
+		);
+	});
+
+	it('changing the ticket lets the caller clear run', () => {
+		expect(inspectorHref(selected, { ticket: 'new', execution: null, run: null })).toBe(
+			'/?issue=7&ticket=new&tab=evidence'
+		);
+	});
+
+	it('an empty run clears it', () => {
+		expect(new URL(inspectorHref(selected, { run: '' }), 'http://x').searchParams.has('run')).toBe(
+			false
+		);
+	});
+
+	it('closing clears run with the other parameters', () => {
+		expect(inspectorHref(selected, { ticket: null, execution: null, tab: null, run: null })).toBe(
+			'/?issue=7'
+		);
+	});
+});
+
 describe('ticketPageHref', () => {
+	it('carries run, encoded', () => {
+		expect(ticketPageHref('k', { tab: 'evidence', run: 'run a/1' })).toBe(
+			'/tickets/k?tab=evidence&run=run+a%2F1'
+		);
+		expect(ticketPageHref('k', { run: null })).toBe('/tickets/k');
+		expect(ticketPageHref('k', { run: '' })).toBe('/tickets/k');
+	});
+
 	it('is the current execution on the default tab by default', () => {
 		expect(ticketPageHref('k-1')).toBe('/tickets/k-1');
 	});

@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	runPage,
+	runPageHistory,
 	ticketDetailActiveInQa,
+	ticketDetailActiveInWork,
 	ticketDetailComplete,
 	ticketDetailMultiExecution,
 	ticketDetailMultiExecutionFirst
@@ -94,6 +96,50 @@ describe('GET /api/factory/tickets/[key]', () => {
 		expect(detail.usage).toEqual(ticketDetails.get(ticketDetailActiveInQa.key)?.usage);
 		expect(runsComplete).toBe(true);
 		expect(requests.every((r) => r.method === 'GET')).toBe(true);
+		expectSafe(text);
+	});
+
+	it('lists the multi-task history with purpose, round, terminal kind, validation and review', async () => {
+		const { status, body, text } = await get(ticketDetailActiveInWork.key);
+		expect(status).toBe(200);
+		const { detail } = detailOf(body);
+		expect(detail.runs.map((r) => r.id)).toEqual(runPageHistory.items.map((r) => r.id));
+		const byId = new Map(detail.runs.map((r) => [r.id, r]));
+		expect(byId.get('run_hist_01_work_initial')).toMatchObject({
+			purpose: 'initial',
+			round: 1,
+			terminalKind: 'subagent_done',
+			validationStatus: 'failed',
+			review: null
+		});
+		expect(byId.get('run_hist_01_work_correction')).toMatchObject({
+			purpose: 'validation_correction',
+			validationStatus: 'passed'
+		});
+		expect(byId.get('run_hist_01_review_changes')?.review).toEqual({
+			verdict: 'changes_requested',
+			round: 1,
+			findings: { total: 3, blocking: 2 }
+		});
+		expect(byId.get('run_hist_01_work_return')).toMatchObject({
+			purpose: 'return_to_work',
+			round: 2
+		});
+		expect(byId.get('run_hist_01_review_reentry')).toMatchObject({
+			purpose: 'reentry',
+			review: { verdict: 'approve', round: 2, findings: { total: 0, blocking: 0 } }
+		});
+		expect(byId.get('run_hist_02_work_crashed')).toMatchObject({
+			terminalKind: 'crashed',
+			outcome: 'retrying',
+			usage: null
+		});
+		expect(byId.get('run_hist_02_work_retry')).toMatchObject({
+			purpose: 'infrastructure_retry',
+			status: 'running',
+			validationStatus: 'running'
+		});
+		expect(byId.get('run_hist_nudge')?.purpose).toBe('operator_nudge');
 		expectSafe(text);
 	});
 

@@ -142,3 +142,57 @@ export const BACKLOG_AVAILABILITY_SIGNALS = {
 export function backlogAvailabilitySignal(availability: BacklogAvailability): StatusSignal {
 	return BACKLOG_AVAILABILITY_SIGNALS[availability];
 }
+
+export type ValidationStatus = components['schemas']['Validation']['status'];
+export type CheckStatus = components['schemas']['ValidationCheck']['status'];
+export type ReviewVerdict = components['schemas']['Review']['verdict'];
+export type FindingSeverity = components['schemas']['Review']['findings'][number]['severity'];
+
+/** The latest validation attempt: passed is Clear, failed and error Fault, in flight Wait or Run. */
+export const VALIDATION_STATUS_SIGNALS = {
+	passed: { signal: 'clear', label: 'Passed' },
+	failed: { signal: 'fault', label: 'Failed' },
+	error: { signal: 'fault', label: 'Error' },
+	pending: { signal: 'wait', label: 'Pending' },
+	running: { signal: 'run', label: 'Running' }
+} as const satisfies Record<ValidationStatus, StatusSignal>;
+
+/** One validation check. A skipped check said nothing, so it is Standby. */
+export const CHECK_STATUS_SIGNALS = {
+	passed: { signal: 'clear', label: 'Passed' },
+	failed: { signal: 'fault', label: 'Failed' },
+	error: { signal: 'fault', label: 'Error' },
+	skipped: { signal: 'standby', label: 'Skipped' }
+} as const satisfies Record<CheckStatus, StatusSignal>;
+
+export const REVIEW_VERDICT_SIGNALS = {
+	approve: { signal: 'clear', label: 'Approved' },
+	changes_requested: { signal: 'wait', label: 'Changes requested' },
+	blocked: { signal: 'fault', label: 'Blocked' }
+} as const satisfies Record<ReviewVerdict, StatusSignal>;
+
+export const FINDING_SEVERITY_SIGNALS = {
+	critical: { signal: 'fault', label: 'Critical' },
+	major: { signal: 'wait', label: 'Major' },
+	minor: { signal: 'standby', label: 'Minor' }
+} as const satisfies Record<FindingSeverity, StatusSignal>;
+
+/** Accepts any string so runtime drift from the API still renders, as standby. */
+export function validationStatusSignal(status: ValidationStatus | (string & {})): StatusSignal {
+	return lookup<StatusSignal>(VALIDATION_STATUS_SIGNALS, status) ?? unknown(status);
+}
+
+/** Accepts any string so runtime drift from the API still renders, as standby. */
+export function checkStatusSignal(status: CheckStatus | (string & {})): StatusSignal {
+	return lookup<StatusSignal>(CHECK_STATUS_SIGNALS, status) ?? unknown(status);
+}
+
+/** Accepts any string so runtime drift from the API still renders, as standby. */
+export function reviewVerdictSignal(verdict: ReviewVerdict | (string & {})): StatusSignal {
+	return lookup<StatusSignal>(REVIEW_VERDICT_SIGNALS, verdict) ?? unknown(verdict);
+}
+
+/** Accepts any string so runtime drift from the API still renders, as standby. */
+export function findingSeveritySignal(severity: FindingSeverity | (string & {})): StatusSignal {
+	return lookup<StatusSignal>(FINDING_SEVERITY_SIGNALS, severity) ?? unknown(severity);
+}

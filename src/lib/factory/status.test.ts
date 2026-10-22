@@ -3,16 +3,23 @@ import { describe, expect, it } from 'vitest';
 import {
 	ATTENTION_REASON_SIGNALS,
 	BACKLOG_AVAILABILITY_SIGNALS,
+	CHECK_STATUS_SIGNALS,
 	EXECUTION_STATUS_SIGNALS,
+	REVIEW_VERDICT_SIGNALS,
 	RUN_STATUS_SIGNALS,
 	TASK_STAGE_LABELS,
 	TASK_STATUS_SIGNALS,
+	VALIDATION_STATUS_SIGNALS,
 	attentionReasonSignal,
 	backlogAvailabilitySignal,
+	checkStatusSignal,
 	executionStatusSignal,
+	findingSeveritySignal,
 	handoffStatusSignal,
+	reviewVerdictSignal,
 	runStatusSignal,
 	taskStatusSignal,
+	validationStatusSignal,
 	type Signal
 } from './status';
 
@@ -210,6 +217,67 @@ describe('attentionReasonSignal', () => {
 		for (const value of Object.values(ATTENTION_REASON_SIGNALS)) {
 			expect(SIGNALS).toContain(value.signal);
 			expect(value.signal).not.toBe('clear');
+		}
+	});
+});
+
+describe('evidence signals', () => {
+	it.each(enumValues('Validation', 'status'))('maps validation status %s explicitly', (status) => {
+		expect(Object.hasOwn(VALIDATION_STATUS_SIGNALS, status)).toBe(true);
+	});
+
+	it.each(enumValues('ValidationCheck', 'status'))('maps check status %s explicitly', (status) => {
+		expect(Object.hasOwn(CHECK_STATUS_SIGNALS, status)).toBe(true);
+	});
+
+	it.each(enumValues('Review', 'verdict'))('maps review verdict %s explicitly', (verdict) => {
+		expect(Object.hasOwn(REVIEW_VERDICT_SIGNALS, verdict)).toBe(true);
+	});
+
+	it.each([
+		['passed', 'clear'],
+		['failed', 'fault'],
+		['error', 'fault'],
+		['pending', 'wait'],
+		['running', 'run']
+	])('validation %s is %s', (status, signal) => {
+		expect(validationStatusSignal(status).signal).toBe(signal);
+	});
+
+	it.each([
+		['passed', 'clear'],
+		['failed', 'fault'],
+		['error', 'fault'],
+		['skipped', 'standby']
+	])('check %s is %s', (status, signal) => {
+		expect(checkStatusSignal(status).signal).toBe(signal);
+	});
+
+	it.each([
+		['approve', 'clear', 'Approved'],
+		['changes_requested', 'wait', 'Changes requested'],
+		['blocked', 'fault', 'Blocked']
+	])('verdict %s is %s', (verdict, signal, label) => {
+		expect(reviewVerdictSignal(verdict)).toEqual({ signal, label });
+	});
+
+	it.each([
+		['critical', 'fault'],
+		['major', 'wait'],
+		['minor', 'standby']
+	])('severity %s is %s', (severity, signal) => {
+		expect(findingSeveritySignal(severity).signal).toBe(signal);
+	});
+
+	it('maps unknown values to standby with the raw value', () => {
+		for (const map of [
+			validationStatusSignal,
+			checkStatusSignal,
+			reviewVerdictSignal,
+			findingSeveritySignal
+		]) {
+			expect(map('exploded')).toEqual({ signal: 'standby', label: 'exploded' });
+			expect(map('toString')).toEqual({ signal: 'standby', label: 'toString' });
 		}
 	});
 });
