@@ -201,7 +201,7 @@ test('AC6: backlog and ticket cards share the selection region by click, Enter a
 }) => {
 	await page.goto('/', { waitUntil: 'networkidle' });
 	const preview = page.getByRole('region', { name: 'Selected issue' });
-	const selectedTicket = page.getByRole('region', { name: 'Selected ticket' });
+	const selectedTicket = page.getByTestId('ticket-inspector');
 
 	await issueButton(page, backlogIssueWithDetails.title).click();
 	await expect(page).toHaveURL(`/?issue=${encodeURIComponent(backlogIssueWithDetails.id)}`);
@@ -217,7 +217,7 @@ test('AC6: backlog and ticket cards share the selection region by click, Enter a
 	);
 	await shot(page, 'ac6-issue-preview');
 
-	const ticket = page.locator(`[data-ticket-key="${onBoard[0]!.key}"]`);
+	const ticket = page.locator(`[data-slot="ticket-card"][data-ticket-key="${onBoard[0]!.key}"]`);
 	await ticket.click();
 	await expect(page).toHaveURL(`/?ticket=${encodeURIComponent(onBoard[0]!.key)}`);
 	await expect(selectedTicket).toContainText(onBoard[0]!.title);

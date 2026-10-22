@@ -11,8 +11,12 @@ import {
 	runWorkValidationFailed,
 	ticketActiveInQa,
 	ticketActiveInWork,
+	ticketDetailActiveInQa,
 	ticketDetailActiveInWork,
 	ticketDetailAgentQuestion,
+	ticketDetailCancelled,
+	ticketDetailFailed,
+	ticketDetailPaused,
 	ticketDetailManualApproval,
 	ticketDetailMultiExecution,
 	ticketDetailQueued,
@@ -22,8 +26,10 @@ import type { components } from '$lib/factory/generated/factory-api';
 
 import {
 	toAttention,
+	toCurrentTask,
 	toExecutions,
 	toRun,
+	toSource,
 	toTasks,
 	toTicketDetail,
 	toTicketList,
@@ -282,7 +288,7 @@ describe('toTicketDetail', () => {
 			executions: { items: [] },
 			runs: []
 		});
-		expect(view.usage.costUsd).toBe(0);
+		expect(view.usage?.costUsd).toBe(0);
 	});
 
 	it('maps the active-in-work fixture tasks and attention', () => {
@@ -293,7 +299,79 @@ describe('toTicketDetail', () => {
 		});
 		expect(view.tasks).toHaveLength(5);
 		expect(view.attention).toEqual([]);
-		expect(view.usage.costUsd).toBe(3.42);
+		expect(view.usage?.costUsd).toBe(3.42);
+	});
+});
+
+describe('toCurrentTask', () => {
+	it('is the progress label with the active task round at its current stage', () => {
+		// Task 02 is active at review, with a review summary in round 1.
+		expect(
+			toCurrentTask(ticketDetailActiveInWork.progress, ticketDetailActiveInWork.tasks)
+		).toEqual({ label: 'Typed read operations and API fixtures', round: 1 });
+		const paused = {
+			...ticketDetailPaused.progress,
+			current: { label: 'Home and End', step: '02/02' }
+		};
+		expect(toCurrentTask(paused, ticketDetailPaused.tasks)).toEqual({
+			label: 'Home and End',
+			round: 2
+		});
+	});
+
+	it('shows no round when the active task has no summary for its stage', () => {
+		// Task 02 is active at qa but has only a review summary.
+		expect(toCurrentTask(ticketDetailActiveInQa.progress, ticketDetailActiveInQa.tasks)).toEqual({
+			label: 'Event stream proxy',
+			round: null
+		});
+		const noStage = ticketDetailActiveInWork.tasks.map((task) => ({ ...task, stage: null }));
+		expect(toCurrentTask(ticketDetailActiveInWork.progress, noStage)?.round).toBeNull();
+		expect(toCurrentTask(ticketDetailActiveInWork.progress, [])?.round).toBeNull();
+	});
+
+	it('is null without a current task label', () => {
+		expect(toCurrentTask(ticketDetailPaused.progress, ticketDetailPaused.tasks)).toBeNull();
+	});
+
+	it('reaches the detail header', () => {
+		const view = toTicketDetail({
+			detail: ticketDetailActiveInWork,
+			executions: { items: [] },
+			runs: []
+		});
+		expect(view.header.currentTask).toEqual({
+			label: 'Typed read operations and API fixtures',
+			round: 1
+		});
+	});
+});
+
+describe('toSource', () => {
+	it('links an http(s) source', () => {
+		expect(toSource('https://github.com/dpaez/factory-dashboard/issues/26')).toEqual({
+			ref: 'https://github.com/dpaez/factory-dashboard/issues/26',
+			href: 'https://github.com/dpaez/factory-dashboard/issues/26'
+		});
+		expect(toSource('http://tracker.local/T-1').href).toBe('http://tracker.local/T-1');
+	});
+
+	it.each([['KAI-12'], ['notes/ticket.md'], ['javascript:alert(1)'], ['file:///etc/passwd'], ['']])(
+		'shows %s as text, with no href',
+		(ref) => {
+			expect(toSource(ref)).toEqual({ ref, href: null });
+		}
+	);
+
+	it('reaches the detail header', () => {
+		const view = (detail: typeof ticketDetailFailed | typeof ticketDetailCancelled) =>
+			toTicketDetail({ detail, executions: { items: [] }, runs: [] }).header.source;
+		expect(view(ticketDetailFailed)).toEqual({ ref: 'KAI-12', href: null });
+		expect(view(ticketDetailCancelled)).toEqual({ ref: 'notes/ticket.md', href: null });
+		expect(
+			toTicketDetail({ detail: ticketDetailQueued, executions: { items: [] }, runs: [] }).header
+				.source.href
+		).toBe(ticketDetailQueued.sourceRef);
 	});
 });
 

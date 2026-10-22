@@ -32,8 +32,11 @@ test('home: nav, the Flow board from the factory, and a selected-ticket link by 
 	);
 
 	const first = onBoard[0]!;
-	await page.locator(`[data-ticket-key="${first.key}"]`).click();
+	await page.locator(`[data-slot="ticket-card"][data-ticket-key="${first.key}"]`).click();
 	await expect(page).toHaveURL(`/?ticket=${encodeURIComponent(first.key)}`);
+	await expect(page.getByTestId('ticket-inspector').getByRole('heading', { level: 2 })).toHaveText(
+		first.title
+	);
 	await expect(page.getByRole('link', { name: 'Open ticket' })).toHaveAttribute(
 		'href',
 		`/tickets/${encodeURIComponent(first.key)}`

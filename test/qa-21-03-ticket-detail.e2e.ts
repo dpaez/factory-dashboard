@@ -68,9 +68,12 @@ test('AC1: the detail page shows tasks, summaries, attention with replies, usage
 	const attention = page.getByTestId('attention');
 	await expect.soft(attention).toContainText('Approved as written.');
 	await expect.soft(attention).toContainText('dashboard (Diego)');
+	await expect.soft(page.getByTestId('executions')).toContainText('Execution 1');
+	// Usage and runs live in the Inspector's Usage tab.
+	await page.getByRole('tab', { name: 'Usage' }).click();
+	await expect(page).toHaveURL(`${detail(ticketDetailActiveInQa.key)}?tab=usage`);
 	await expect.soft(page.getByTestId('usage-total')).toContainText('$');
 	await expect.soft(page.getByTestId('runs-table')).toBeVisible();
-	await expect.soft(page.getByTestId('executions')).toContainText('Execution 1');
 	await shot(page, 'ac1-ticket-detail');
 });
 
@@ -89,7 +92,7 @@ test('AC2: a qa-stage ticket renders without errors and the timeline shows QA', 
 });
 
 test('AC3: a run with null usage shows — for cost, not $0.00', async ({ page }) => {
-	await page.goto(detail(ticketDetailActiveInQa.key));
+	await page.goto(`${detail(ticketDetailActiveInQa.key)}?tab=usage`);
 	const run = page.locator(`[data-run="${runWrapupPrepared.id}"]`);
 	await expect(run.getByTestId('run-cost')).toHaveText('—');
 	await expect(page.getByTestId('runs-table')).not.toContainText('$0.00');
@@ -156,7 +159,7 @@ test.describe('AC6: the factory answers 403', () => {
 });
 
 const STORIES: [string, string[]][] = [
-	['components-ticketdetail-tasks', ['qa-ticket-with-summaries', 'every-task-status', 'no-tasks']],
+	['components-factory-tasklist', ['blockers', 'every-task-status', 'no-tasks-after-plan']],
 	[
 		'components-ticketdetail-attention',
 		['open-and-resolved-with-a-table-question', 'many-replies', 'no-attention']
@@ -197,8 +200,8 @@ test('AC9: the null-usage runs story shows — and the empty stories say so, in 
 	await expect(page.getByText('—').first()).toBeVisible();
 	await expect(page.getByText('$0.00')).toHaveCount(0);
 	await shot(page, 'ac9-usage-list-null-usage-dark');
-	await page.goto(story('components-ticketdetail-tasks--no-tasks', 'dark'));
-	await expect(page.getByText('No tasks yet.')).toBeVisible();
+	await page.goto(story('components-factory-tasklist--no-tasks-after-plan', 'dark'));
+	await expect(page.getByText('No tasks recorded for this execution.')).toBeVisible();
 	await page.goto(story('components-usagelist--no-runs', 'light'));
 	await expect(page.locator('#storybook-root')).not.toBeEmpty();
 	await shot(page, 'ac9-usage-list-empty-light');

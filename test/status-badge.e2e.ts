@@ -70,7 +70,13 @@ test('AC4: badge colors come from --signal-* tokens with Two-Ink text, in light 
 }) => {
 	for (const theme of ['light', 'dark'] as const) {
 		await page.goto(story(`${BADGE}--all-signals`, theme));
+		// The Storybook dev server can reload the iframe while it optimizes deps, and
+		// the decorator applies the theme in an effect: measure once both settle.
+		await page.waitForLoadState('networkidle');
 		await expect(badges(page).first()).toBeVisible();
+		await expect(page.locator('html')).toHaveClass(
+			theme === 'dark' ? /\bdark\b/ : /^(?!.*\bdark\b)/
+		);
 		const rows = await badges(page).evaluateAll((els) =>
 			els.map((el) => {
 				const signal = el.getAttribute('data-signal')!;

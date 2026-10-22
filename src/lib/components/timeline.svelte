@@ -8,8 +8,10 @@
 		steps: string[];
 		currentStep: number;
 		totalSteps: number;
+		/** The progress bar's accessible name. */
+		label?: string;
 	};
-	const { steps, currentStep, totalSteps }: TimelineProps = $props();
+	const { steps, currentStep, totalSteps, label }: TimelineProps = $props();
 	const tween = new Tween(0, { duration: 800, easing: cubicInOut });
 	const value = $derived((currentStep / totalSteps) * 100);
 	$effect(() => {
@@ -20,6 +22,7 @@
 <div class="flex w-full flex-col gap-2">
 	<Progress
 		class="overflow-hidden **:data-[slot=progress-indicator]:transition-none"
+		aria-label={label}
 		value={Math.round(tween.current)}
 		max={100}
 	/>
@@ -39,7 +42,7 @@
 				style="left: {t * 100}%; transform: translateX({isFirst ? '0' : isLast ? '-100%' : '-50%'})"
 			>
 				<div class={cn('size-4 rounded-full', reached ? 'bg-primary' : 'bg-muted')}></div>
-				<p class="not-prose mt-1 text-xs text-muted-foreground capitalize">{step}</p>
+				<p class="not-prose mt-1 text-xs text-foreground/75 capitalize">{step}</p>
 			</div>
 		{/each}
 	</div>

@@ -22,10 +22,17 @@ import {
 	ticketDetailActiveInQa,
 	ticketDetailActiveInWork,
 	ticketDetailAgentQuestion,
+	ticketDetailCancelled,
+	ticketDetailComplete,
+	ticketDetailFailed,
 	ticketDetailManualApproval,
 	ticketDetailMultiExecution,
 	ticketDetailMultiExecutionFirst,
+	ticketDetailPaused,
+	ticketDetailPlanning,
 	ticketDetailPolicyLimit,
+	ticketDetailReadyForHandoff,
+	ticketDetailTrackerWarnings,
 	ticketSummaries
 } from '../src/lib/factory/fixtures/tickets.ts';
 
@@ -68,9 +75,16 @@ const fixtureDetails = new Map<string, Schemas['TicketDetail']>(
 		ticketDetailActiveInQa,
 		ticketDetailActiveInWork,
 		ticketDetailAgentQuestion,
+		ticketDetailCancelled,
+		ticketDetailComplete,
+		ticketDetailFailed,
 		ticketDetailManualApproval,
 		ticketDetailMultiExecution,
-		ticketDetailPolicyLimit
+		ticketDetailPaused,
+		ticketDetailPlanning,
+		ticketDetailPolicyLimit,
+		ticketDetailReadyForHandoff,
+		ticketDetailTrackerWarnings
 	]
 		.map((detail): Schemas['TicketDetail'] => detail)
 		.map((detail) => [detail.key, detail])

@@ -78,7 +78,13 @@ test('a qa-stage ticket renders tasks, summaries, attention, usage, runs and exe
 	await expect(resolved.locator('li[data-reply-current="true"]')).toContainText('cli');
 	await expect(resolved.locator('li').first()).toContainText('dashboard (Diego)');
 
-	// Usage: the execution total from the ticket, never summed from runs.
+	await expect(page.getByTestId('executions')).toContainText('Execution 1');
+	await expect(page.getByTestId('past-execution')).toHaveCount(0);
+
+	// Usage: in the Usage tab; the execution total from the ticket, never summed from runs.
+	await page.getByRole('tab', { name: 'Usage' }).click();
+	await expect(page).toHaveURL(`${detailPath(ticketDetailActiveInQa.key)}?tab=usage`);
+	await expect(page.getByTestId('usage-total')).toBeVisible();
 	const usage = ticketDetails.get(ticketDetailActiveInQa.key)!.usage;
 	await expect(page.getByTestId('usage-total')).toContainText(`$${usage.costUsd.toFixed(2)}`);
 
@@ -86,9 +92,6 @@ test('a qa-stage ticket renders tasks, summaries, attention, usage, runs and exe
 	const wrapup = page.locator(`[data-run="${runWrapupPrepared.id}"]`);
 	await expect(wrapup.getByTestId('run-cost')).toHaveText('—');
 	await expect(page.getByTestId('runs-table')).not.toContainText('$0.00');
-
-	await expect(page.getByTestId('executions')).toContainText('Execution 1');
-	await expect(page.getByTestId('past-execution')).toHaveCount(0);
 	await shot(page, 'ticket-detail-qa');
 
 	expect(errors).toEqual([]);
@@ -113,15 +116,19 @@ test('?execution=1 shows the past execution read-only with a link to the current
 	await expect(page.getByTestId('tasks')).toContainText(
 		ticketDetailMultiExecutionFirst.tasks[0]!.title
 	);
+	await page.getByRole('tab', { name: 'Usage' }).click();
+	await expect(page).toHaveURL(`${detailPath(key)}?execution=1&tab=usage`);
 	await expect(page.locator('[data-run]')).toHaveCount(runPageFirstExecution.items.length);
+	await expect(page.getByTestId('usage-total')).toBeVisible();
 	await expect(page.getByTestId('usage-total')).toContainText(
 		`$${ticketDetailMultiExecutionFirst.usage.costUsd.toFixed(2)}`
 	);
 	await expect(executions.locator('[data-execution="1"]')).toHaveAttribute('data-selected', 'true');
 	await shot(page, 'ticket-detail-past-execution');
 
+	// The current-execution link keeps the tab.
 	await banner.getByRole('link', { name: 'Go to the current execution' }).click();
-	await expect(page).toHaveURL(detailPath(key));
+	await expect(page).toHaveURL(`${detailPath(key)}?tab=usage`);
 	await expect(page.getByTestId('past-execution')).toHaveCount(0);
 });
 

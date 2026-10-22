@@ -317,6 +317,20 @@ describe('/ load', () => {
 		}
 	});
 
+	it('ignores the Inspector selection: the load never reads the URL', async () => {
+		const fake = createFakeFactory();
+		const selected = new URL('http://localhost/?ticket=any-key&execution=1&tab=usage');
+		const url = new Proxy(selected, {
+			get() {
+				throw new Error('the root load read the URL');
+			}
+		});
+		const event = { fetch: fake.handle, url } as unknown as Parameters<typeof load>[0];
+		const data = (await load(event)) as { board: Board };
+		expect(cards(data.board).length).toBeGreaterThan(0);
+		expect(fake.requests.some((r) => r.path.includes('any-key'))).toBe(false);
+	});
+
 	it('serialized page data has no token, factory URL or host', async () => {
 		const { data } = await run();
 		const serialized = JSON.stringify(data);

@@ -32,7 +32,7 @@ const modelFor = (tickets: typeof openTickets) => {
 
 const strip = (page: Page) => page.locator('[data-slot="attention-strip"]');
 const openNext = (page: Page) => strip(page).getByRole('button', { name: /^Open next/ });
-const selected = (page: Page) => page.getByTestId('selected-ticket');
+const selected = (page: Page) => page.getByTestId('ticket-inspector');
 const allCards = (page: Page) => page.locator('[data-slot="ticket-card"]');
 const lanes = (page: Page) => page.getByRole('region', { name: 'Flow board lanes' });
 
@@ -75,7 +75,7 @@ function scenario(fakePort: number, appPort: number, options: FakeFactoryOptions
 }
 
 test.describe('the default fixtures', () => {
-	const fake = scenario(7841, 4241, {});
+	const fake = scenario(7881, 4281, {});
 	const model = modelFor(openTickets);
 
 	test('AC1, AC2: the strip sits above the lanes with the headline and reason groups; the load asks needsUser=true', async ({
@@ -147,13 +147,13 @@ test.describe('the default fixtures', () => {
 		const data = await (await page.request.get(`${fake.base}/__data.json`)).text();
 		for (const text of [html, data]) {
 			expect(text).not.toContain(FAKE_FACTORY_TOKEN);
-			expect(text).not.toContain('127.0.0.1:7841');
+			expect(text).not.toContain('127.0.0.1:7881');
 		}
 	});
 });
 
 test.describe('nothing needs attention', () => {
-	const fake = scenario(7842, 4242, { tickets: openTickets.filter((t) => !t.needsUser) });
+	const fake = scenario(7882, 4282, { tickets: openTickets.filter((t) => !t.needsUser) });
 
 	test('AC5: the strip reads "No attention needed." with no Open next button', async ({ page }) => {
 		await page.goto(`${fake.base}/`);
@@ -166,7 +166,7 @@ test.describe('nothing needs attention', () => {
 
 test.describe('the attention read fails', () => {
 	const upstream = 'qa-25-03-upstream-body';
-	const fake = scenario(7843, 4243, {
+	const fake = scenario(7883, 4283, {
 		failAttention: {
 			status: 500,
 			title: 'Internal error',
