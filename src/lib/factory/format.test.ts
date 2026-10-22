@@ -5,6 +5,7 @@ import {
 	formatCost,
 	formatCount,
 	formatDuration,
+	formatElapsed,
 	formatTimestamp,
 	stageLabel,
 	summaryText
@@ -76,5 +77,29 @@ describe('formatDuration', () => {
 		expect(formatDuration(0)).toBe('0 ms');
 		expect(formatDuration(null)).toBe('—');
 		expect(formatDuration(Number.NaN)).toBe('—');
+	});
+});
+
+describe('formatElapsed', () => {
+	const at = (seconds: number) =>
+		new Date(Date.UTC(2026, 9, 13, 9) + seconds * 1_000).toISOString();
+	const start = at(0);
+
+	it('picks seconds, minutes or hours by length', () => {
+		expect(formatElapsed(start, at(0.2))).toBe('<1 s');
+		expect(formatElapsed(start, at(42))).toBe('42 s');
+		expect(formatElapsed(start, at(60))).toBe('1 m');
+		expect(formatElapsed(start, at(690))).toBe('11 m 30 s');
+		expect(formatElapsed(start, at(3_600))).toBe('1 h');
+		expect(formatElapsed(start, at(7_500))).toBe('2 h 5 m');
+		expect(formatElapsed(start, at(90_000))).toBe('25 h');
+	});
+
+	it('is unavailable, never 0, without both ends or with bad times', () => {
+		expect(formatElapsed(null, at(10))).toBe('—');
+		expect(formatElapsed(start, null)).toBe('—');
+		expect(formatElapsed(undefined, undefined)).toBe('—');
+		expect(formatElapsed('not a date', at(10))).toBe('—');
+		expect(formatElapsed(at(10), start)).toBe('—');
 	});
 });

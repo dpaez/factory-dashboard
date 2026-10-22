@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
 	import StatusBadge from '$lib/components/factory/status-badge.svelte';
-	import { formatCost, formatCount, formatTimestamp, stageLabel, words } from '$lib/factory/format';
+	import {
+		formatCost,
+		formatCount,
+		formatElapsed,
+		formatTimestamp,
+		stageLabel,
+		words
+	} from '$lib/factory/format';
 	import type { RunView } from '$lib/factory/models';
 	import { groupRuns } from '$lib/factory/run-groups';
 	import { runPurposeLabel } from '$lib/factory/run-purpose';
@@ -130,10 +137,15 @@
 										<span
 											class="flex flex-wrap gap-x-3 gap-y-1 font-mono text-foreground/75 tabular-nums"
 										>
+											<span class="flex flex-wrap items-baseline gap-x-2">
+												<span class="text-foreground" data-testid="run-duration"
+													>{formatElapsed(run.startedAt, run.endedAt)}</span
+												>
+												<span class="text-[0.625rem] text-foreground/60" data-testid="run-times"
+													>{formatTimestamp(run.startedAt)} → {formatTimestamp(run.endedAt)}</span
+												>
+											</span>
 											<span data-testid="run-model">{run.model} · {run.thinking}</span>
-											<span data-testid="run-times"
-												>{formatTimestamp(run.startedAt)} → {formatTimestamp(run.endedAt)}</span
-											>
 											<span data-testid="run-usage"
 												>{#if run.usage}{formatCount(run.usage.tokensTotal)} tokens · {formatCost(
 														run.costUsd

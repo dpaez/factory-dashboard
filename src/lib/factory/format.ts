@@ -37,6 +37,30 @@ export function formatDuration(ms: number | null | undefined): string {
 	return `${Math.floor(seconds / 60)} m ${seconds % 60} s`;
 }
 
+/**
+ * How long a run took, in the largest units that read well: `42 s`,
+ * `11 m 30 s`, `2 h 5 m`, `<1 s`. "—" until both ends are known and valid.
+ */
+export function formatElapsed(
+	startedAt: string | null | undefined,
+	endedAt: string | null | undefined
+): string {
+	if (startedAt == null || endedAt == null) return UNAVAILABLE;
+	const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+	if (!Number.isFinite(ms) || ms < 0) return UNAVAILABLE;
+	const seconds = Math.round(ms / 1_000);
+	if (seconds < 1) return '<1 s';
+	if (seconds < 60) return `${seconds} s`;
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) {
+		const rest = seconds % 60;
+		return rest === 0 ? `${minutes} m` : `${minutes} m ${rest} s`;
+	}
+	const hours = Math.floor(minutes / 60);
+	const restMinutes = minutes % 60;
+	return restMinutes === 0 ? `${hours} h` : `${hours} h ${restMinutes} m`;
+}
+
 /** Enum values as words: `changes_requested` → `changes requested`. */
 export function words(value: string): string {
 	return value.replaceAll('_', ' ');
