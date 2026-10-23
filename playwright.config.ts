@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-// The fake factory (test/fake-factory.ts) serves typed fixtures over GET only.
+// The fake factory (test/fake-factory.ts) serves typed fixtures over GET and accepts commands.
 const FAKE_FACTORY_PORT = 7799;
 const FAKE_FACTORY_TOKEN = 'fake-factory-token-e2e';
 
