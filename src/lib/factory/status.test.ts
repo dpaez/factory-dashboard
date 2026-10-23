@@ -14,6 +14,7 @@ import {
 	CONNECTION_STATE_SIGNALS,
 	backlogAvailabilitySignal,
 	checkStatusSignal,
+	commandPhaseSignal,
 	connectionStateSignal,
 	executionStatusSignal,
 	findingSeveritySignal,
@@ -299,5 +300,17 @@ describe('connection state signals', () => {
 		const labels = Object.values(CONNECTION_STATE_SIGNALS).map((s) => s.label);
 		expect(Object.keys(CONNECTION_STATE_SIGNALS)).toHaveLength(5);
 		expect(new Set(labels).size).toBe(labels.length);
+	});
+});
+
+describe('command phase signals', () => {
+	it.each([
+		['submitting', 'standby', 'Sending'],
+		['accepted', 'run', 'Accepted'],
+		['confirmed', 'clear', 'Confirmed'],
+		['rejected', 'fault', 'Rejected'],
+		['unconfirmed', 'fault', 'Unconfirmed']
+	] as const)('%s is %s, labelled %s', (phase, signal, label) => {
+		expect(commandPhaseSignal(phase)).toEqual({ signal, label });
 	});
 });

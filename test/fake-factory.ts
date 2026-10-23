@@ -1,8 +1,10 @@
 /**
  * A fake factory server for e2e and load tests. It serves the typed fixtures
- * for the GET routes the dashboard reads, checks the bearer token, and
- * answers 405 to anything but GET. Only the test probes change state: they
- * append events to the `/v1/events` stream and can add a ticket with them.
+ * for the GET routes the dashboard reads and the seven command routes, checks
+ * the bearer token, and answers 405 to any other verb. A command answers 202
+ * with the next revision and appends an event; a repeated `idempotency-key`
+ * replays the first 202. The test probes append events to the `/v1/events`
+ * stream and can add a ticket with them.
  *
  * Run it with `node test/fake-factory.ts` (Node strips the types). Env:
  * `FAKE_FACTORY_PORT` (default 7799) and `FAKE_FACTORY_TOKEN`.
@@ -193,6 +195,26 @@ export type FakeFactoryOptions = {
 	eventRevision?: number;
 	/** Interval of the `: heartbeat` comment on open streams (default 15 s). */
 	heartbeatMs?: number;
+	/** `false`: the token lacks the `act` scope, so every command is 403 `insufficient_scope`. */
+	canAct?: boolean;
+	/** Answer this problem for these commands (every command when `commands` is omitted). */
+	failCommand?: { commands?: FakeCommand[]; problem: Problem };
+	/** Answer this 202 body to every command instead of a `CommandAccepted`. */
+	commandBody?: unknown;
+};
+
+/** The factory command an upstream `POST` route names. */
+export type FakeCommand = 'start' | 'reply' | 'retry' | 'complete' | 'cancel' | 'rerun' | 'stop';
+
+/** One command the fake received, with what it saw of the headers that matter. */
+export type FakeCommandRequest = {
+	method: string;
+	path: string;
+	command: FakeCommand;
+	body: unknown;
+	idempotencyKey: string | null;
+	onBehalfOf: string | null;
+	authorization: boolean;
 };
 
 /** One event held by the fake, as `/v1/events` frames it. */
@@ -234,8 +256,49 @@ const methodNotAllowed: Problem = {
 	status: 405,
 	title: 'Method not allowed',
 	type: 'method_not_allowed',
-	detail: 'The fake factory serves GET only.'
+	detail: 'The fake factory serves GET, and POST on command routes only.'
 };
+const insufficientScope: Problem = {
+	status: 403,
+	title: 'Insufficient scope',
+	type: 'insufficient_scope',
+	detail: 'The token lacks the act scope.'
+};
+
+const TICKET_COMMANDS: Record<string, FakeCommand> = {
+	replies: 'reply',
+	retries: 'retry',
+	complete: 'complete',
+	cancel: 'cancel',
+	reruns: 'rerun'
+};
+
+/** The command a `POST` path names, and its target, or null for any other path. */
+function commandRoute(
+	path: string
+): { command: FakeCommand; ticket?: string; run?: string } | null {
+	if (path === '/v1/tickets') return { command: 'start' };
+	const ticket = path.match(/^\/v1\/tickets\/([^/]+)\/(replies|retries|complete|cancel|reruns)$/);
+	if (ticket) {
+		return {
+			command: TICKET_COMMANDS[ticket[2] ?? ''] as FakeCommand,
+			ticket: decodeURIComponent(ticket[1] ?? '')
+		};
+	}
+	const run = path.match(/^\/v1\/runs\/([^/]+)\/stop$/);
+	if (run) return { command: 'stop', run: decodeURIComponent(run[1] ?? '') };
+	return null;
+}
+
+async function bodyOf(request: Request): Promise<unknown> {
+	const text = await request.text();
+	if (text === '') return undefined;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return text;
+	}
+}
 
 /** A fetch-shaped handler: usable as a fake `fetch` in tests, or behind the HTTP server. */
 export function createFakeFactory(options: FakeFactoryOptions = {}) {
@@ -243,6 +306,10 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	const listed = [...(options.tickets ?? allTickets)];
 	let backlog = options.backlog ?? backlogIssues;
 	const requests: { method: string; path: string }[] = [];
+	const commands: FakeCommandRequest[] = [];
+	/** The first 202 body per `idempotency-key`. */
+	const replays = new Map<string, unknown>();
+	let started = 0;
 
 	// The event stream: held events, open streams, and what each connection sent.
 	const events: FakeEvent[] = [];
@@ -325,10 +392,89 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		});
 	}
 
+	/** A `POST` to a command route: check, record, replay or accept, and emit its event. */
+	async function handleCommand(
+		request: Request,
+		url: URL,
+		route: NonNullable<ReturnType<typeof commandRoute>>
+	): Promise<Response> {
+		const idempotencyKey = request.headers.get('idempotency-key');
+		const onBehalfOf = request.headers.get('x-factory-on-behalf-of');
+		const authorized = request.headers.get('authorization') === `Bearer ${token}`;
+		commands.push({
+			method: request.method,
+			path: url.pathname,
+			command: route.command,
+			body: await bodyOf(request),
+			idempotencyKey,
+			onBehalfOf,
+			authorization: request.headers.has('authorization')
+		});
+		if (!authorized) return problem(unauthorized);
+		if (options.canAct === false) return problem(insufficientScope);
+		const failure = options.failCommand;
+		if (failure && (!failure.commands || failure.commands.includes(route.command))) {
+			return problem(failure.problem);
+		}
+		if (idempotencyKey !== null && replays.has(idempotencyKey)) {
+			return json(replays.get(idempotencyKey), 202);
+		}
+
+		let ticket: string;
+		if (route.command === 'start') {
+			ticket = `fake-started-${String(++started).padStart(8, '0')}`;
+		} else if (route.run !== undefined) {
+			const run = runsById.get(route.run);
+			if (!run) {
+				return problem({
+					status: 404,
+					title: 'Not found',
+					type: 'not_found',
+					detail: `No run has the id ${route.run}.`
+				});
+			}
+			ticket = run.ticket;
+		} else {
+			ticket = route.ticket ?? '';
+			if (!detailOf(ticket)) {
+				return problem({
+					status: 404,
+					title: 'Ticket not found',
+					type: 'ticket_not_found',
+					detail: `No ticket has the key ${ticket}.`
+				});
+			}
+		}
+
+		const event = emit({
+			kind: route.command,
+			payload: {
+				actor: { client: 'dashboard', onBehalfOf },
+				card: null,
+				run: route.run ?? null,
+				task: null,
+				ticket
+			}
+		});
+		const body =
+			options.commandBody ??
+			({
+				message: `Fake factory accepted ${route.command}.`,
+				revision: event.revision,
+				ticket
+			} satisfies Schemas['CommandAccepted']);
+		if (idempotencyKey !== null) replays.set(idempotencyKey, body);
+		return json(body, 202);
+	}
+
 	async function handle(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		requests.push({ method: request.method, path: `${url.pathname}${url.search}` });
 
+		if (request.method === 'POST') {
+			const route = commandRoute(url.pathname);
+			if (route) return handleCommand(request, url, route);
+		}
 		if (request.method !== 'GET') return problem(methodNotAllowed);
 		if (request.headers.get('authorization') !== `Bearer ${token}`) return problem(unauthorized);
 
@@ -454,6 +600,8 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	return {
 		handle,
 		requests,
+		/** Every command received, in order, replays and refusals included. */
+		commands,
 		emit,
 		dropStreams,
 		connections,
@@ -484,6 +632,7 @@ export async function startFakeFactory(
 		// Test-only probes, not factory routes: what the dashboard sent so far, and
 		// the event stream's controls.
 		if (incoming.url === '/__fake/requests') return sendJson(outgoing, fake.requests);
+		if (incoming.url === '/__fake/commands') return sendJson(outgoing, fake.commands);
 		if (incoming.url === '/__fake/events/connections') return sendJson(outgoing, fake.connections);
 		if (incoming.method === 'POST' && incoming.url === '/__fake/events/drop') {
 			fake.dropStreams();
@@ -498,12 +647,19 @@ export async function startFakeFactory(
 			if (typeof value === 'string') headers.set(name, value);
 		}
 		// The client going away aborts the request, and with it any stream.
+		let body: string | undefined;
+		if (incoming.method !== 'GET' && incoming.method !== 'HEAD') {
+			const chunks: Buffer[] = [];
+			for await (const chunk of incoming) chunks.push(chunk as Buffer);
+			body = Buffer.concat(chunks).toString('utf8');
+		}
 		const abort = new AbortController();
 		outgoing.once('close', () => abort.abort());
 		const response = await fake.handle(
 			new Request(`http://127.0.0.1:${port}${incoming.url ?? '/'}`, {
 				method: incoming.method,
 				headers,
+				body,
 				signal: abort.signal
 			})
 		);

@@ -15,7 +15,13 @@
 
 	import Logo from '$lib/components/logo.svelte';
 	import ConnectionStatus from '$lib/components/factory/connection-status.svelte';
+	import CommandFeedback from '$lib/components/factory/command-feedback.svelte';
 	import { LiveController, setLiveContext } from '$lib/factory/live.svelte';
+	import {
+		CommandCoordinator,
+		setCommandContext,
+		toCommandFeedbackItem
+	} from '$lib/factory/commands.svelte';
 
 	let { children } = $props();
 	let companyName = 'Chan';
@@ -31,9 +37,24 @@
 		await invalidate(predicate);
 	}
 	const live = setLiveContext(new LiveController({ invalidate: invalidateAfterNavigation }));
+	// One coordinator per layout: command intents survive client navigation.
+	const commands = setCommandContext(
+		new CommandCoordinator({
+			live,
+			invalidate: (keys) => {
+				const wanted = new Set(keys);
+				return invalidateAfterNavigation(
+					(url) => url.protocol === 'factory:' && wanted.has(url.href)
+				);
+			}
+		})
+	);
 	onMount(() => {
 		live.start();
-		return () => live.stop();
+		return () => {
+			commands.stop();
+			live.stop();
+		};
 	});
 
 	const NAV = [
@@ -72,6 +93,13 @@
 				<ToggleMode />
 			</div>
 		</header>
+		<CommandFeedback
+			class="px-8 data-[empty=false]:py-2"
+			intents={commands.intents.map(toCommandFeedbackItem)}
+			notice={commands.notice}
+			onretry={(id) => commands.retryDelivery(id)}
+			ondismiss={(id) => commands.dismiss(id)}
+		/>
 		<nav aria-label="Primary" class="flex items-center justify-start gap-2 px-8 py-4">
 			{#each NAV as item (item.href)}
 				{@const current = isCurrent(item.href, page.url.pathname)}

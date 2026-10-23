@@ -213,3 +213,23 @@ export const CONNECTION_STATE_SIGNALS = {
 export function connectionStateSignal(state: ConnectionState): StatusSignal {
 	return CONNECTION_STATE_SIGNALS[state];
 }
+
+export type CommandPhaseSignalKey =
+	'submitting' | 'accepted' | 'confirmed' | 'rejected' | 'unconfirmed';
+
+/**
+ * A command intent's phase. Accepted is Run, not Clear: accepted is not done.
+ * Only a confirmed command (its reads reread) is Clear. Rejected and
+ * Unconfirmed are Fault and differ in label and explanation.
+ */
+export const COMMAND_PHASE_SIGNALS = {
+	submitting: { signal: 'standby', label: 'Sending' },
+	accepted: { signal: 'run', label: 'Accepted' },
+	confirmed: { signal: 'clear', label: 'Confirmed' },
+	rejected: { signal: 'fault', label: 'Rejected' },
+	unconfirmed: { signal: 'fault', label: 'Unconfirmed' }
+} as const satisfies Record<CommandPhaseSignalKey, StatusSignal>;
+
+export function commandPhaseSignal(phase: CommandPhaseSignalKey): StatusSignal {
+	return COMMAND_PHASE_SIGNALS[phase];
+}

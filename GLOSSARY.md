@@ -122,6 +122,10 @@ _Avoid_: action (in prose), mutation
 A command the factory has recorded but whose effect has not yet been observed. Accepted is not done: a start can be accepted and its agent launch still fail.
 _Avoid_: success, completed
 
+**Unconfirmed command**:
+A command that was sent but whose answer from the factory was lost, so it may or may not have been applied. It is retried only with the same intent, so the factory applies it at most once.
+_Avoid_: failed command, lost command
+
 **Event**:
 A revision-ordered notice that something on the factory changed. It names what changed, never the new state; the dashboard rereads what it names.
 _Avoid_: update, message, push
