@@ -45,6 +45,7 @@ export class RunDetailState implements RunDetailSource {
 	#views: Map<string, RunDetailViewState> = $state.raw(new Map());
 	#fetch: Fetch;
 	#generations = new Map<string, number>();
+	#stale = new Set<string>();
 
 	constructor(fetch: Fetch = (input, init) => globalThis.fetch(input, init)) {
 		this.#fetch = fetch;
@@ -57,7 +58,9 @@ export class RunDetailState implements RunDetailSource {
 
 	/** Read the run once per `(execution, id)`; a key already read or in flight is not read again. */
 	load(execution: number, id: string): Promise<void> {
-		if (this.#generations.has(runDetailKey(execution, id))) return Promise.resolve();
+		const key = runDetailKey(execution, id);
+		if (this.#stale.has(key)) return this.#read(execution, id, true);
+		if (this.#generations.has(key)) return Promise.resolve();
 		return this.#read(execution, id);
 	}
 
@@ -66,11 +69,23 @@ export class RunDetailState implements RunDetailSource {
 		return this.#read(execution, id);
 	}
 
-	async #read(execution: number, id: string): Promise<void> {
+	/**
+	 * After an event named the shown ticket's runs: every cached run is stale.
+	 * Its view stays; the next `load()` of it rereads quietly, keeping the view
+	 * when the reread fails. The Inspector calls `load()` again when its ticket
+	 * detail is reread, which the same event triggers (it names both keys).
+	 */
+	markStale(): void {
+		for (const key of this.#generations.keys()) this.#stale.add(key);
+	}
+
+	async #read(execution: number, id: string, quiet = false): Promise<void> {
 		const key = runDetailKey(execution, id);
 		const generation = (this.#generations.get(key) ?? 0) + 1;
 		this.#generations.set(key, generation);
-		this.#set(key, LOADING);
+		this.#stale.delete(key);
+		const previous = this.#views.get(key);
+		if (!quiet || previous === undefined) this.#set(key, LOADING);
 		let next: RunDetailViewState;
 		try {
 			const response = await this.#fetch(runEndpoint(id), {
@@ -85,6 +100,8 @@ export class RunDetailState implements RunDetailSource {
 			next = UNREADABLE;
 		}
 		if (this.#generations.get(key) !== generation) return;
+		// A quiet reread replaces a shown run only with a newer view of it.
+		if (quiet && previous?.kind === 'loaded' && next.kind !== 'loaded') return;
 		this.#set(key, next);
 	}
 

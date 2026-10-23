@@ -76,12 +76,18 @@ export class TicketInspectorState {
 		this.view = { kind: 'loading' };
 	}
 
-	// TODO(#22): refetch the selected ticket on its `factory:ticket:<key>` event.
+	/**
+	 * Reread the selection quietly, after an event named it: the current view
+	 * stays until the answer arrives, and a failed reread keeps it.
+	 */
+	refresh(): Promise<void> {
+		return this.#selected === null ? Promise.resolve() : this.#read(true);
+	}
 
-	async #read(): Promise<void> {
+	async #read(quiet = false): Promise<void> {
 		const { key, execution } = this.#selected!;
 		const generation = ++this.#generation;
-		this.view = { kind: 'loading', key };
+		if (!quiet) this.view = { kind: 'loading', key };
 		let next: InspectorState;
 		try {
 			const response = await this.#fetch(ticketEndpoint(key, execution), {
@@ -97,6 +103,8 @@ export class TicketInspectorState {
 			next = UNREADABLE;
 		}
 		if (generation !== this.#generation) return;
+		// A quiet reread replaces a shown ticket only with a newer view of it.
+		if (quiet && this.view.kind === 'loaded' && next.kind !== 'loaded') return;
 		this.view = next;
 	}
 }

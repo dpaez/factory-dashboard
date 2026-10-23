@@ -12,6 +12,7 @@
 	import IssuePreview from '$lib/components/factory/issue-preview.svelte';
 	import TicketInspector from '$lib/components/factory/ticket-inspector.svelte';
 	import { BacklogState } from '$lib/factory/backlog-state.svelte';
+	import { runsKey, ticketKey } from '$lib/factory/events';
 	import {
 		inspectorHref,
 		parseExecution,
@@ -23,6 +24,7 @@
 	} from '$lib/factory/inspector';
 	import { TicketInspectorState } from '$lib/factory/inspector-state.svelte';
 	import { RunDetailState } from '$lib/factory/run-detail-state.svelte';
+	import { getLiveContext, invalidates } from '$lib/factory/live.svelte';
 
 	let { data }: PageProps = $props();
 	let board = $derived(data.board);
@@ -73,6 +75,19 @@
 	$effect(() => {
 		if (selectedKey === null) inspector.clear();
 		else if (executionParam.valid) void inspector.select(selectedKey, selectedExecution);
+	});
+	// The Inspector reads through its own endpoint, not the load: an event naming
+	// the selected ticket rereads it quietly, and one naming its runs makes the
+	// cached run detail stale. The backlog is reseeded by the load rerun above.
+	const live = getLiveContext();
+	$effect(() => {
+		if (!live) return;
+		return live.onInvalidate((invalidation) => {
+			const key = selectedKey;
+			if (key === null) return;
+			if (invalidates(invalidation, runsKey(key))) runDetail.markStale();
+			if (invalidates(invalidation, ticketKey(key))) void inspector.refresh();
+		});
 	});
 	let inspectorView: InspectorState = $derived(
 		executionParam.valid

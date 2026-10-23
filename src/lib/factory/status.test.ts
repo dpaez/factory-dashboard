@@ -11,8 +11,10 @@ import {
 	TASK_STATUS_SIGNALS,
 	VALIDATION_STATUS_SIGNALS,
 	attentionReasonSignal,
+	CONNECTION_STATE_SIGNALS,
 	backlogAvailabilitySignal,
 	checkStatusSignal,
+	connectionStateSignal,
 	executionStatusSignal,
 	findingSeveritySignal,
 	handoffStatusSignal,
@@ -279,5 +281,23 @@ describe('evidence signals', () => {
 			expect(map('exploded')).toEqual({ signal: 'standby', label: 'exploded' });
 			expect(map('toString')).toEqual({ signal: 'standby', label: 'toString' });
 		}
+	});
+});
+
+describe('connection state signals', () => {
+	it.each([
+		['connecting', 'standby', 'Connecting'],
+		['live', 'run', 'Live'],
+		['reconnecting', 'standby', 'Reconnecting'],
+		['disconnected', 'fault', 'Disconnected'],
+		['auth_failed', 'fault', 'Authentication failed']
+	] as const)('%s is %s, labelled %s', (state, signal, label) => {
+		expect(connectionStateSignal(state)).toEqual({ signal, label });
+	});
+
+	it('covers every connection state with a distinct label', () => {
+		const labels = Object.values(CONNECTION_STATE_SIGNALS).map((s) => s.label);
+		expect(Object.keys(CONNECTION_STATE_SIGNALS)).toHaveLength(5);
+		expect(new Set(labels).size).toBe(labels.length);
 	});
 });

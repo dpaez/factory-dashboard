@@ -136,4 +136,50 @@ describe('TicketInspectorState', () => {
 		state.clear();
 		expect(state.view.kind).toBe('loading');
 	});
+
+	it('refresh() rereads the selection quietly: no loading, a newer view replaces it', async () => {
+		const { fetch, urls, pending } = heldFetch();
+		const state = new TicketInspectorState(fetch);
+		const read = state.select(KEY, 1);
+		pending[0]!(ok(first));
+		await read;
+		const shown = state.view;
+		const again = state.refresh();
+		expect(state.view).toBe(shown);
+		pending[1]!(ok(current));
+		await again;
+		expect(urls[1]).toBe(urls[0]);
+		expect(state.view.kind).toBe('loaded');
+		if (state.view.kind === 'loaded') expect(state.view.detail).toEqual(current);
+	});
+
+	it('a failed refresh() keeps the previous view', async () => {
+		const { fetch, pending } = heldFetch();
+		const state = new TicketInspectorState(fetch);
+		const read = state.select(KEY);
+		pending[0]!(ok());
+		await read;
+		const shown = state.view;
+		const again = state.refresh();
+		pending[1]!(failed('internal_error', 'Boom'));
+		await again;
+		expect(state.view).toBe(shown);
+	});
+
+	it('a refresh() superseded by a new selection is dropped; with no selection it reads nothing', async () => {
+		const { fetch, urls, pending } = heldFetch();
+		const state = new TicketInspectorState(fetch);
+		await state.refresh();
+		expect(urls).toHaveLength(0);
+		const read = state.select(KEY);
+		pending[0]!(ok());
+		await read;
+		const stale = state.refresh();
+		const other = state.select('other-key');
+		pending[2]!(failed('ticket_not_found', 'Not found'));
+		await other;
+		pending[1]!(ok());
+		await stale;
+		expect(state.view).toEqual({ kind: 'not_found', key: 'other-key', execution: undefined });
+	});
 });

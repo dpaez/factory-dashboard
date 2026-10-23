@@ -3,6 +3,7 @@
  * with type-only imports from the generated contract.
  */
 export * from './backlog';
+export * from './events';
 export * from './me';
 export * from './problems';
 export * from './runs';

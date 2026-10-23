@@ -1,6 +1,8 @@
 <script lang="ts">
 	import './layout.css';
 	import { ModeWatcher } from 'mode-watcher';
+	import { onMount } from 'svelte';
+	import { invalidate } from '$app/navigation';
 
 	import favicon from '$lib/assets/favicon.svg';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
@@ -9,12 +11,30 @@
 	import { Factory as FactoryIcon } from '@lucide/svelte';
 	import { LayoutList as LayoutListIcon } from '@lucide/svelte';
 	import { ChartColumn as ChartColumnIcon } from '@lucide/svelte';
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 
 	import Logo from '$lib/components/logo.svelte';
+	import ConnectionStatus from '$lib/components/factory/connection-status.svelte';
+	import { LiveController, setLiveContext } from '$lib/factory/live.svelte';
 
 	let { children } = $props();
 	let companyName = 'Chan';
+
+	// One stream for the whole session: it survives navigation, and never runs during SSR.
+	// An invalidation started during a navigation would cancel it (SvelteKit lets
+	// the later one win), so a refetch waits for the operator's navigation first.
+	// A navigation started during a refetch wins, and loads fresh data anyway.
+	async function invalidateAfterNavigation(predicate: (url: URL) => boolean) {
+		for (let i = 0; i < 5 && navigating.complete; i++) {
+			await navigating.complete.catch(() => {});
+		}
+		await invalidate(predicate);
+	}
+	const live = setLiveContext(new LiveController({ invalidate: invalidateAfterNavigation }));
+	onMount(() => {
+		live.start();
+		return () => live.stop();
+	});
 
 	const NAV = [
 		{ href: '/', label: 'Flow board', icon: FactoryIcon },
@@ -43,7 +63,14 @@
 				<Separator orientation="vertical" />
 				<h3 class="text-2xl font-light">{companyName}</h3>
 			</div>
-			<ToggleMode />
+			<div class="flex items-center gap-4">
+				<ConnectionStatus
+					state={live.connectionState}
+					lastRefreshAt={live.lastRefreshAt}
+					onretry={() => live.retry()}
+				/>
+				<ToggleMode />
+			</div>
 		</header>
 		<nav aria-label="Primary" class="flex items-center justify-start gap-2 px-8 py-4">
 			{#each NAV as item (item.href)}

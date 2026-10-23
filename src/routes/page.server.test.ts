@@ -55,13 +55,15 @@ afterEach(() => {
 async function run(options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
 	// No `url`: the load must not read the search params, so selection never refetches.
-	const event = { fetch: fake.handle } as unknown as Parameters<typeof load>[0];
+	const dependencies: string[] = [];
+	const depends = (...keys: string[]) => void dependencies.push(...keys);
+	const event = { depends, fetch: fake.handle } as unknown as Parameters<typeof load>[0];
 	const data = (await load(event)) as {
 		board: Board;
 		backlog: Promise<BacklogResult>;
 		attention: AttentionResult;
 	};
-	return { data, requests: fake.requests };
+	return { data, requests: fake.requests, dependencies };
 }
 
 async function pageError(options: FakeFactoryOptions = {}) {
@@ -84,6 +86,11 @@ const onBoard = openTickets.filter(
 );
 
 describe('/ load', () => {
+	it('depends on the tickets, agents and backlog keys events invalidate', async () => {
+		const { dependencies } = await run();
+		expect(dependencies.sort()).toEqual(['factory:agents', 'factory:backlog', 'factory:tickets']);
+	});
+
 	it('reads open tickets, agents and each open ticket, and builds the board', async () => {
 		const { data, requests } = await run();
 		const { board } = data;
@@ -325,7 +332,9 @@ describe('/ load', () => {
 				throw new Error('the root load read the URL');
 			}
 		});
-		const event = { fetch: fake.handle, url } as unknown as Parameters<typeof load>[0];
+		const event = { depends: () => {}, fetch: fake.handle, url } as unknown as Parameters<
+			typeof load
+		>[0];
 		const data = (await load(event)) as { board: Board };
 		expect(cards(data.board).length).toBeGreaterThan(0);
 		expect(fake.requests.some((r) => r.path.includes('any-key'))).toBe(false);

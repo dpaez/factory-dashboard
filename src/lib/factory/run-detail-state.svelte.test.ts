@@ -140,4 +140,30 @@ describe('RunDetailState', () => {
 		await garbled.load(2, RUN);
 		expect(garbled.view(2, RUN).kind).toBe('error');
 	});
+
+	it('markStale(): the next load() rereads quietly; a failed reread keeps the shown run', async () => {
+		const { fetch, urls, pending } = heldFetch();
+		const state = new RunDetailState(fetch);
+		const read = state.load(2, RUN);
+		pending[0]!(ok());
+		await read;
+		const shown = state.view(2, RUN);
+		state.markStale();
+		expect(state.view(2, RUN)).toBe(shown);
+		const reread = state.load(2, RUN);
+		expect(state.view(2, RUN)).toBe(shown);
+		pending[1]!(failed('internal_error', 'Boom'));
+		await reread;
+		expect(state.view(2, RUN)).toBe(shown);
+		expect(urls).toHaveLength(2);
+
+		state.markStale();
+		const fresh = state.load(2, RUN);
+		pending[2]!(ok(runHistoryReviewChanges));
+		await fresh;
+		const view = state.view(2, RUN);
+		expect(view.kind === 'loaded' && view.run.id).toBe(runHistoryReviewChanges.id);
+		await state.load(2, RUN); // fresh again: not read
+		expect(urls).toHaveLength(3);
+	});
 });

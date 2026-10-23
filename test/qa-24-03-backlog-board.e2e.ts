@@ -16,6 +16,7 @@ import {
 	startFakeFactory,
 	type FakeFactoryOptions
 } from './fake-factory';
+import { gotoLive } from './live';
 
 // QA for ticket #24, task 03: the Backlog lane on /, Refresh/Retry, and the shared selection region.
 const SHOTS = process.env.QA_SCREENSHOTS;
@@ -108,7 +109,7 @@ test.describe('AC2: Refresh', () => {
 	test('AC2: Refresh re-reads with refresh=true and updates the timestamp without a reload', async ({
 		page
 	}) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		await expect(updated(page)).toHaveText('Updated 2026-10-13 11:00 UTC');
 		let navigations = 0;
 		page.on('framenavigated', (frame) => {
@@ -130,7 +131,7 @@ test.describe('AC3: the backlog read fails', () => {
 	test('AC3: stage lanes and counts render; the lane shows the failure with Retry', async ({
 		page
 	}) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		const alert = backlog(page).getByRole('alert');
 		await expect(alert).toContainText('Backlog unavailable.');
 		await expect(alert.getByRole('button', { name: 'Retry' })).toBeVisible();
@@ -178,7 +179,7 @@ test.describe('AC4: a refresh fails after a successful read', () => {
 	const base = scenario(7853, 4253, { failBacklogOnRefresh: problemTrackerUnavailable });
 
 	test('AC4: previous issues stay with their timestamp, and Retry re-reads', async ({ page }) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		await expect(issueButtons(page)).toHaveCount(backlogIssues.length);
 		await backlog(page).getByRole('button', { name: 'Refresh' }).click();
 		const alert = backlog(page).getByRole('alert');
@@ -199,7 +200,7 @@ test.describe('AC4: a refresh fails after a successful read', () => {
 test('AC6: backlog and ticket cards share the selection region by click, Enter and Space', async ({
 	page
 }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	const preview = page.getByRole('region', { name: 'Selected issue' });
 	const selectedTicket = page.getByTestId('ticket-inspector');
 
@@ -245,7 +246,7 @@ test('AC7: /?issue= opens the preview directly; an unknown id is not in the back
 });
 
 test('AC8: choosing a label filters the Backlog lane', async ({ page }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	const withUi = backlogIssues.filter((issue) => issue.labels.includes('ui'));
 	await backlog(page).getByLabel('Filter by label').selectOption('ui');
 	await expect(issueButtons(page)).toHaveCount(withUi.length);
@@ -277,7 +278,7 @@ test('AC9: the page and /api/factory/backlog carry no factory token, URL or upst
 			/* redirects and the like have no body */
 		}
 	});
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	await backlog(page).getByRole('button', { name: 'Refresh' }).click();
 	await expect(backlog(page).getByRole('button', { name: 'Refresh' })).toBeEnabled();
 	await expect(issueButtons(page)).toHaveCount(backlogIssues.length);
