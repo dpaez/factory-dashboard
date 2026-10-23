@@ -9,6 +9,7 @@ import {
 } from '../src/lib/factory/fixtures/tickets.ts';
 import { backlogIssues } from '../src/lib/factory/fixtures/backlog.ts';
 import { agentList, openTickets } from './fake-factory';
+import { gotoLive } from './live';
 
 // Ticket #23, task 03: / is the Flow board, with `?ticket=` selection and the nav.
 const SHOTS = process.env.QA_SCREENSHOTS;
@@ -73,7 +74,7 @@ test('AC4: Tab reaches cards; Enter and Space select into ?ticket= without refet
 	page
 }) => {
 	// Wait for hydration: a key pressed before the click handlers attach does nothing.
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	const dataRequests: string[] = [];
 	page.on('request', (request) => {
 		if (request.url().includes('__data.json')) dataRequests.push(request.url());

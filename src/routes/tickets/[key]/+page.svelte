@@ -13,6 +13,8 @@
 		type InspectorTab
 	} from '$lib/factory/inspector';
 	import { RunDetailState } from '$lib/factory/run-detail-state.svelte';
+	import { runsKey } from '$lib/factory/events';
+	import { getLiveContext, invalidates } from '$lib/factory/live.svelte';
 
 	// The load reads `?execution` only; the tab and the run are presentation and live in the URL.
 	const { data }: PageProps = $props();
@@ -31,6 +33,15 @@
 	const shownExecution = $derived(header.current ? null : header.execution);
 	// Run detail, read lazily by the Inspector and cached per (execution, run).
 	const runDetail = new RunDetailState();
+	// The load reruns on this ticket's events; the run cache is the page's own,
+	// so an event naming the runs makes it stale and the shown run rereads.
+	const live = getLiveContext();
+	$effect(() => {
+		if (!live) return;
+		return live.onInvalidate((invalidation) => {
+			if (invalidates(invalidation, runsKey(header.key))) runDetail.markStale();
+		});
+	});
 	const STAY = { keepFocus: true, noScroll: true, replaceState: false } as const;
 
 	function chooseTab(next: InspectorTab) {

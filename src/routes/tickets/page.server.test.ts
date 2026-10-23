@@ -44,9 +44,11 @@ afterEach(() => {
 
 async function run(options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
-	const event = { fetch: fake.handle } as unknown as Parameters<typeof load>[0];
+	const dependencies: string[] = [];
+	const depends = (...keys: string[]) => void dependencies.push(...keys);
+	const event = { depends, fetch: fake.handle } as unknown as Parameters<typeof load>[0];
 	const data = (await load(event)) as { tickets: TicketList };
-	return { data, requests: fake.requests };
+	return { data, requests: fake.requests, dependencies };
 }
 
 async function pageError(options: FakeFactoryOptions = {}) {
@@ -60,6 +62,11 @@ async function pageError(options: FakeFactoryOptions = {}) {
 }
 
 describe('/tickets load', () => {
+	it('depends on the tickets key events invalidate', async () => {
+		const { dependencies } = await run();
+		expect(dependencies).toEqual(['factory:tickets']);
+	});
+
 	it('follows nextCursor over every page of status=all', async () => {
 		const { data, requests } = await run();
 		const pages = Math.ceil(allTickets.length / FAKE_PAGE_SIZE);

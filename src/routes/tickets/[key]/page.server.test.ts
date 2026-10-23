@@ -51,13 +51,15 @@ type Data = { detail: TicketDetailView; runsComplete: boolean };
 
 async function run(key: string, search = '', options: FakeFactoryOptions = {}) {
 	const fake = createFakeFactory(options);
+	const dependencies: string[] = [];
 	const event = {
+		depends: (...keys: string[]) => void dependencies.push(...keys),
 		fetch: fake.handle,
 		params: { key },
 		url: new URL(`http://dashboard.local/tickets/${encodeURIComponent(key)}${search}`)
 	} as unknown as Parameters<typeof load>[0];
 	const data = (await load(event)) as Data;
-	return { data, requests: fake.requests };
+	return { data, requests: fake.requests, dependencies };
 }
 
 async function pageError(key: string, search = '', options: FakeFactoryOptions = {}) {
@@ -71,6 +73,14 @@ async function pageError(key: string, search = '', options: FakeFactoryOptions =
 }
 
 describe('/tickets/[key] load', () => {
+	it("depends on this ticket's detail and runs keys, encoded", async () => {
+		const { dependencies } = await run(MULTI);
+		expect(dependencies).toEqual([
+			`factory:ticket:${encodeURIComponent(MULTI)}`,
+			`factory:runs:${encodeURIComponent(MULTI)}`
+		]);
+	});
+
 	it('reads the ticket, its executions and every run page, and maps them', async () => {
 		const { data, requests } = await run(MULTI);
 		const { detail } = data;
@@ -121,6 +131,7 @@ describe('/tickets/[key] load', () => {
 		async (value) => {
 			const fake = createFakeFactory();
 			const event = {
+				depends: () => {},
 				fetch: fake.handle,
 				params: { key: MULTI },
 				url: new URL(`http://dashboard.local/tickets/${MULTI}?execution=${value}`)

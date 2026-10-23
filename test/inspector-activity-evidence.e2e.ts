@@ -183,7 +183,9 @@ test('no token, URL or host in page data or run reads; the factory sees only GET
 }) => {
 	const reads: string[] = [];
 	page.on('response', async (response) => {
-		if (new URL(response.url()).pathname.startsWith('/api/factory/')) {
+		const path = new URL(response.url()).pathname;
+		// The event stream never ends; its frames carry no state (test/live-updates.e2e.ts).
+		if (path.startsWith('/api/factory/') && path !== '/api/factory/events') {
 			reads.push(await response.text());
 		}
 	});

@@ -1,5 +1,6 @@
 import { toAttention, type AttentionModel } from '$lib/factory/attention';
 import { toBoard } from '$lib/factory/board';
+import { AGENTS_KEY, BACKLOG_KEY, TICKETS_KEY } from '$lib/factory/events';
 import { readBacklog } from '$lib/server/factory/backlog';
 import { factoryClientFromEnv, type FactoryClient } from '$lib/server/factory/client';
 import { isConfigurationFailure, listAllTickets, throwPageError } from '$lib/server/factory/pages';
@@ -36,7 +37,9 @@ function secondary<T>(result: FactoryResult<T>): T | null {
  * there is no extra detail fetch. A failure stays in `attention`, except a
  * configuration or auth failure, which is the page error.
  */
-export const load: PageServerLoad = async ({ fetch }) => {
+export const load: PageServerLoad = async ({ depends, fetch }) => {
+	// Events invalidate these keys; the live controller reruns this load.
+	depends(TICKETS_KEY, AGENTS_KEY, BACKLOG_KEY);
 	let client: FactoryClient;
 	try {
 		client = factoryClientFromEnv(fetch);

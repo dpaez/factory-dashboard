@@ -19,6 +19,7 @@ import {
 	startFakeFactory,
 	type FakeFactoryOptions
 } from './fake-factory';
+import { gotoLive } from './live';
 
 // Ticket #24, task 03: the Backlog lane on /, Refresh/Retry, and the shared selection region.
 const SHOTS = process.env.QA_SCREENSHOTS;
@@ -98,7 +99,7 @@ test('the Backlog lane is the first lane and lists every backlog page', async ({
 });
 
 test('Refresh asks the tracker with refresh=true without reloading the page', async ({ page }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	await page.evaluate(() => ((window as unknown as { __marker: number }).__marker = 1));
 	const before = (await fakeRequests()).length;
 	await backlogLane(page).getByRole('button', { name: 'Refresh' }).click();
@@ -117,7 +118,7 @@ test('Refresh asks the tracker with refresh=true without reloading the page', as
 });
 
 test('by keyboard, backlog and ticket cards share one selection region', async ({ page }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	const issue = issueCard(page, backlogBlockedIssue.id);
 	await issue.focus();
 	await page.keyboard.press('Enter');
@@ -164,7 +165,7 @@ test('/?issue= loads the preview directly; an unknown id is not in the backlog',
 });
 
 test('choosing a label narrows the Backlog lane', async ({ page }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	const withLabel = backlogIssues.filter((issue) => issue.labels.includes('ui'));
 	await backlogLane(page).getByLabel('Filter by label').selectOption('ui');
 	await expect(backlogLane(page).locator('[data-slot="backlog-card-button"]')).toHaveCount(
@@ -186,7 +187,7 @@ test('the dashboard API answers only GET and never leaks the factory', async ({ 
 });
 
 test('no request other than GET reaches the fake', async ({ page }) => {
-	await page.goto('/', { waitUntil: 'networkidle' });
+	await gotoLive(page, '/');
 	await backlogLane(page).getByRole('button', { name: 'Refresh' }).click();
 	await expect(backlogLane(page).getByRole('button', { name: 'Refresh' })).toBeEnabled();
 	const requests = await fakeRequests();
@@ -200,7 +201,7 @@ test.describe('the backlog read fails', () => {
 	test('the lane shows the failure with Retry; the stage lanes and counts render', async ({
 		page
 	}) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		const failure = backlogLane(page).locator('[data-slot="backlog-failure"]');
 		await expect(failure).toContainText('Backlog unavailable.');
 		await expect(failure).toContainText(problemTrackerUnavailable.title);
@@ -230,7 +231,7 @@ test.describe('a refresh fails after a successful read', () => {
 	const base = scenario(7842, 4242, { failBacklogOnRefresh: problemTrackerUnavailable });
 
 	test('the previous issues stay with their timestamp, and Retry re-reads', async ({ page }) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		const cards = backlogLane(page).locator('[data-slot="backlog-card-button"]');
 		await expect(cards).toHaveCount(backlogIssues.length);
 		await backlogLane(page).getByRole('button', { name: 'Refresh' }).click();
@@ -257,7 +258,7 @@ test.describe('a refresh updates the timestamp', () => {
 	const base = scenario(7843, 4243, { backlogRefreshedAt: '2026-10-14T08:30:00Z' });
 
 	test('the lane shows the new fetchedAt', async ({ page }) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		const fetched = backlogLane(page).locator('[data-slot="backlog-fetched-at"]');
 		await expect(fetched).toHaveText('Updated 2026-10-13 11:00 UTC');
 		await backlogLane(page).getByRole('button', { name: 'Refresh' }).click();
@@ -269,7 +270,7 @@ test.describe('a refresh drops the selected label', () => {
 	const base = scenario(7844, 4244, { backlogOnRefresh: [backlogIssuePlain, backlogIssueBare] });
 
 	test('the filter resets to All labels and the refreshed issues show', async ({ page }) => {
-		await page.goto(`${base.app}/`, { waitUntil: 'networkidle' });
+		await gotoLive(page, `${base.app}/`);
 		const filter = backlogLane(page).getByLabel('Filter by label');
 		const cards = backlogLane(page).locator('[data-slot="backlog-card-button"]');
 		await filter.selectOption('ui');

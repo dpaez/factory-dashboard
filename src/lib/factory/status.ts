@@ -5,6 +5,7 @@
  * Browser-safe: only type imports from the generated API.
  */
 import type { components } from '$lib/factory/generated/factory-api';
+import type { ConnectionState } from '$lib/factory/live';
 
 export type Signal = 'run' | 'wait' | 'standby' | 'fault' | 'clear';
 
@@ -195,4 +196,20 @@ export function reviewVerdictSignal(verdict: ReviewVerdict | (string & {})): Sta
 /** Accepts any string so runtime drift from the API still renders, as standby. */
 export function findingSeveritySignal(severity: FindingSeverity | (string & {})): StatusSignal {
 	return lookup<StatusSignal>(FINDING_SEVERITY_SIGNALS, severity) ?? unknown(severity);
+}
+
+/**
+ * The dashboard's connection to the factory event stream. Live is Run (never
+ * Beacon Yellow); trying to connect is Standby; given up or refused is Fault.
+ */
+export const CONNECTION_STATE_SIGNALS = {
+	connecting: { signal: 'standby', label: 'Connecting' },
+	live: { signal: 'run', label: 'Live' },
+	reconnecting: { signal: 'standby', label: 'Reconnecting' },
+	disconnected: { signal: 'fault', label: 'Disconnected' },
+	auth_failed: { signal: 'fault', label: 'Authentication failed' }
+} as const satisfies Record<ConnectionState, StatusSignal>;
+
+export function connectionStateSignal(state: ConnectionState): StatusSignal {
+	return CONNECTION_STATE_SIGNALS[state];
 }
