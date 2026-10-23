@@ -156,6 +156,7 @@ describe('toAttention', () => {
 				kind: 'agent_question',
 				status: 'open',
 				question: 'Should the reply composer submit on Enter or on Cmd+Enter?',
+				runId: 'run_review_changes',
 				replies: []
 			},
 			{
@@ -163,6 +164,7 @@ describe('toAttention', () => {
 				kind: 'agent_question',
 				status: 'resolved',
 				question: 'Is the composer allowed to use a modal?',
+				runId: 'run_plan_passed',
 				replies: [
 					{
 						actor: { client: 'dashboard', onBehalfOf: 'Diego' },
@@ -177,7 +179,11 @@ describe('toAttention', () => {
 
 	it('maps a manual approval with a reply without actor', () => {
 		const [request] = toAttention(ticketDetailManualApproval.attention);
-		expect(request).toMatchObject({ kind: 'manual_approval', status: 'open' });
+		expect(request).toMatchObject({
+			kind: 'manual_approval',
+			status: 'open',
+			runId: 'run_wrapup_prepared'
+		});
 		expect(request?.replies).toEqual([
 			{ actor: null, answer: 'Not yet.', current: false, createdAt: '2026-10-13T07:00:00Z' }
 		]);

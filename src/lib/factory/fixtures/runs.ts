@@ -280,6 +280,9 @@ export const runs = [
 	runWrapupPrepared
 ] satisfies Schemas['Run'][];
 
+/** Two agents running at once in one execution: Stop must ask which. */
+export const runsTwoActive = [runQaStarting, runWorkRunning] satisfies Schemas['Run'][];
+
 export const runPage = {
 	items: runs,
 	nextCursor: null

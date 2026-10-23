@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { X as CloseIcon } from '@lucide/svelte';
-	import { untrack } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import AgentMessage from '$lib/components/agent-message.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Tabs from '$lib/components/ui/tabs';
@@ -17,7 +17,7 @@
 		type InspectorTab,
 		type RunDetailSource
 	} from '$lib/factory/inspector';
-	import type { ExecutionView, RunView } from '$lib/factory/models';
+	import type { ExecutionView, RunView, TicketDetailView } from '$lib/factory/models';
 
 	/**
 	 * The Inspector: one ticket execution's header and Source, its attention
@@ -33,6 +33,10 @@
 	 * Inspector asks it to load a run only when Activity has a selection or
 	 * Evidence is shown, so Tasks and Usage never read a run. A run read that
 	 * fails stays inside its panel.
+	 *
+	 * `commands` renders the current execution's command controls after the
+	 * header and attention requests, before the tabs; a past execution never
+	 * renders it.
 	 */
 	const uid = $props.id();
 
@@ -47,6 +51,7 @@
 		run = null,
 		onrunchange,
 		runDetail,
+		commands,
 		headingId = `${uid}-heading`
 	}: {
 		state: InspectorState;
@@ -68,6 +73,8 @@
 		onrunchange?: (id: string | null) => void;
 		/** Where run detail comes from: the placement's cache, or a static source in stories. */
 		runDetail?: RunDetailSource;
+		/** The current execution's command controls; none without it. */
+		commands?: Snippet<[TicketDetailView]>;
 		/** The title's id, so the page can focus it. */
 		headingId?: string;
 	} = $props();
@@ -213,6 +220,10 @@
 				<h3 class="text-[0.625rem] font-medium text-foreground/75">Attention requests</h3>
 				<TicketAttention attention={loaded.attention} />
 			</div>
+		{/if}
+
+		{#if commands && loaded.header.current}
+			{@render commands(loaded)}
 		{/if}
 
 		<Tabs.Root bind:value={() => tab, choose} data-testid="inspector-tabs">

@@ -94,6 +94,7 @@ export function toAttention(attention: Schemas['Attention'][]): AttentionView[] 
 		kind: request.kind,
 		status: request.status,
 		question: request.question,
+		runId: request.runId,
 		replies: request.replies.map((reply) => ({
 			actor: reply.actor,
 			answer: reply.answer,

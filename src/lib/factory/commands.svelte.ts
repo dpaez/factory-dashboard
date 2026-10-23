@@ -18,27 +18,25 @@ import { createContext } from 'svelte';
 import {
 	classifyCommandFailure,
 	commandPath,
+	commandTarget,
 	keysForCommand,
 	parseCommandAccepted,
 	type CommandAccepted,
+	type CommandAccess,
 	type CommandFailure,
-	type CommandFields,
+	type CommandInput,
 	type CommandName,
+	type CommandPhase,
 	type CommandRejection,
 	type CommandRequest
 } from './commands';
+
+// The target and phase vocabulary lives in `./commands` so pure modules share it.
+export { commandTarget, type CommandAccess, type CommandInput, type CommandPhase };
 import type { LiveController } from './live.svelte';
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 type Timer = ReturnType<typeof setTimeout>;
-
-/** One command as a control asks for it: everything but the intent id. */
-export type CommandInput = {
-	[C in CommandName]: { command: C } & CommandFields[C];
-}[CommandName];
-
-export type CommandPhase =
-	'idle' | 'submitting' | 'accepted' | 'confirmed' | 'rejected' | 'unconfirmed';
 
 /** Why a rejected intent was rejected. */
 export type CommandOutcome = Extract<CommandRejection, { outcome: 'rejected' }>['reason'];
@@ -107,18 +105,6 @@ export const EXPLANATIONS = {
 	validation: 'Fix the highlighted fields.',
 	unconfirmed: "The factory's answer was lost; the command may have been applied."
 } as const;
-
-/** What a command acts on: the command plus its ticket key, run id or start ref/id. */
-export function commandTarget(input: CommandInput): string {
-	switch (input.command) {
-		case 'start':
-			return 'ref' in input ? `start:ref:${input.ref}` : `start:id:${input.id}`;
-		case 'stop':
-			return `stop:${input.run}`;
-		default:
-			return `${input.command}:${input.ticket}`;
-	}
-}
 
 const hex = (byte: number) => byte.toString(16).padStart(2, '0');
 
@@ -214,6 +200,12 @@ export class CommandCoordinator {
 	intents: CommandIntent[] = $state([]);
 	/** The latest transition as text, for a polite announcement; cleared after a while. */
 	notice: string | null = $state(null);
+	/**
+	 * What this session knows of its action access. `/v1/me` names no scopes,
+	 * so read-only is learned from the first `insufficient_scope` rejection
+	 * and kept for the session.
+	 */
+	access: CommandAccess = $state('unknown');
 
 	#live: CommandCoordinatorOptions['live'];
 	#invalidate: CommandCoordinatorOptions['invalidate'];
@@ -228,6 +220,8 @@ export class CommandCoordinator {
 	#noticeMs: number;
 
 	#abort = new AbortController();
+	/** Per-intent confirmation callbacks; they outlive the control that submitted. */
+	#onConfirmed = new Map<string, () => void>();
 	#noticeTimer: Timer | null = null;
 	#lingerTimers = new Map<string, Timer>();
 
@@ -248,8 +242,16 @@ export class CommandCoordinator {
 	/**
 	 * Send one user action. While an intent for the same target is submitting
 	 * or accepted, that intent is returned and nothing is sent.
+	 *
+	 * `onconfirmed` runs once if this intent confirms, even after the control
+	 * that submitted it is gone (the coordinator outlives navigation). It is
+	 * dropped when the intent is rejected or removed, and kept while it is
+	 * unconfirmed, since a resend may still confirm it.
 	 */
-	submit(input: CommandInput, { label }: { label?: string } = {}): CommandIntent {
+	submit(
+		input: CommandInput,
+		{ label, onconfirmed }: { label?: string; onconfirmed?: () => void } = {}
+	): CommandIntent {
 		const target = commandTarget(input);
 		const pending = this.#pendingFor(target);
 		if (pending) return pending;
@@ -270,6 +272,7 @@ export class CommandCoordinator {
 			updatedAt: this.#now().toISOString()
 		});
 		const intent = this.#find(id)!;
+		if (onconfirmed) this.#onConfirmed.set(id, onconfirmed);
 		this.#announce(intent);
 		void this.#deliver(id);
 		return intent;
@@ -331,6 +334,7 @@ export class CommandCoordinator {
 	}
 
 	#remove(id: string): void {
+		this.#onConfirmed.delete(id);
 		const timer = this.#lingerTimers.get(id);
 		if (timer !== undefined) this.#clearTimeout(timer);
 		this.#lingerTimers.delete(id);
@@ -430,6 +434,13 @@ export class CommandCoordinator {
 			if (signal.aborted) return;
 		}
 		this.#update(id, { phase: 'confirmed', explanation: EXPLANATIONS.confirmed });
+		const confirmed = this.#onConfirmed.get(id);
+		this.#onConfirmed.delete(id);
+		try {
+			confirmed?.();
+		} catch {
+			// A caller's cleanup failing does not undo the confirmation.
+		}
 		this.#lingerTimers.set(
 			id,
 			this.#setTimeout(() => {
@@ -445,6 +456,7 @@ export class CommandCoordinator {
 		failure: CommandFailure,
 		signal: AbortSignal
 	): Promise<void> {
+		if (failure.type === 'insufficient_scope') this.access = 'read_only';
 		const rejection = classifyCommandFailure(failure);
 		const explanation = explain(rejection, failure);
 		if (rejection.outcome === 'unconfirmed') {
@@ -455,6 +467,7 @@ export class CommandCoordinator {
 			await this.#reread(keysForCommand(request));
 			if (signal.aborted) return;
 		}
+		this.#onConfirmed.delete(id);
 		this.#update(id, {
 			phase: 'rejected',
 			failure,
