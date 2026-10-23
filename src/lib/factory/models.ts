@@ -129,6 +129,8 @@ export type AttentionView = {
 	kind: AttentionKind;
 	status: AttentionStatus;
 	question: string;
+	/** The run waiting for the answer; null when no agent is waiting (a reply is refused). */
+	runId: string | null;
 	replies: AttentionReplyView[];
 };
 

@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
+	import TicketCommands from '$lib/components/factory/ticket-commands.svelte';
 	import TicketInspector from '$lib/components/factory/ticket-inspector.svelte';
 	import {
 		parseRun,
@@ -72,6 +73,10 @@
 			onrunchange={chooseRun}
 			{runDetail}
 			{hrefForExecution}
-		/>
+		>
+			{#snippet commands(detail)}
+				<TicketCommands {detail} />
+			{/snippet}
+		</TicketInspector>
 	</section>
 </main>

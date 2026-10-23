@@ -648,6 +648,14 @@ export const ticketDetailPaused = {
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
 
+/** Relaunching after a pause: no open attention request. */
+export const ticketDetailResuming = {
+	...ticketResuming,
+	attention: [],
+	tasks: [],
+	usage: usageInWork
+} satisfies Schemas['TicketDetail'];
+
 /** Failed in planning, with no open attention request. */
 export const ticketDetailFailed = {
 	...ticketFailed,

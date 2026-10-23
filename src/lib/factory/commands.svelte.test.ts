@@ -242,6 +242,33 @@ describe('acceptance', () => {
 		expect(t.coordinator.intents).toEqual([]);
 	});
 
+	it('runs onconfirmed once when its intent confirms', async () => {
+		const t = setup();
+		const confirmed: string[] = [];
+		t.coordinator.submit(REPLY, { onconfirmed: () => confirmed.push('reply') });
+		// A repeat while pending returns the same intent and registers nothing.
+		t.coordinator.submit(REPLY, { onconfirmed: () => confirmed.push('again') });
+		await settle();
+		expect(confirmed).toEqual([]);
+		t.waits[0]!.resolve('reached');
+		await settle();
+		expect(confirmed).toEqual(['reply']);
+	});
+
+	it('drops onconfirmed when its intent is rejected', async () => {
+		const t = setup();
+		t.answers.push({ status: 409, body: failureBody('invalid_state') });
+		const confirmed: string[] = [];
+		const first = t.coordinator.submit(REPLY, { onconfirmed: () => confirmed.push('first') });
+		await settle();
+		expect(first.phase).toBe('rejected');
+		t.coordinator.submit(REPLY, { onconfirmed: () => confirmed.push('second') });
+		await settle();
+		t.waits[0]!.resolve('reached');
+		await settle();
+		expect(confirmed).toEqual(['second']);
+	});
+
 	it('treats a malformed 202 as unconfirmed', async () => {
 		const t = setup();
 		t.answers.push({ status: 202, body: { ok: true, accepted: { ticket: KEY } } });
@@ -381,6 +408,35 @@ describe('failures', () => {
 		expect(intent.phase).toBe('rejected');
 		expect(intent.outcome).toBe('access');
 		expect(intent.explanation).toBe('Action access required');
+	});
+
+	it('remembers read-only access after an insufficient_scope rejection', async () => {
+		const t = setup();
+		expect(t.coordinator.access).toBe('unknown');
+		t.answers.push({ status: 403, body: failureBody('insufficient_scope') });
+		t.coordinator.submit(RETRY);
+		await settle();
+		expect(t.coordinator.access).toBe('read_only');
+
+		// A later success does not clear it within the session.
+		t.coordinator.submit(REPLY);
+		await settle();
+		expect(t.coordinator.access).toBe('read_only');
+	});
+
+	it.each([
+		['unauthorized', 401],
+		['configuration_error', 503],
+		['invalid_state', 409],
+		['validation_error', 400],
+		['ticket_not_found', 404]
+	])('leaves access unknown after a %s rejection', async (type, status) => {
+		const t = setup();
+		t.answers.push({ status, body: failureBody(type) });
+		const intent = t.coordinator.submit(RETRY);
+		await settle();
+		expect(intent.phase).toBe('rejected');
+		expect(t.coordinator.access).toBe('unknown');
 	});
 
 	it('another failure is rejected with its title and detail', async () => {

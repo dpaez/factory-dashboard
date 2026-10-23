@@ -43,6 +43,30 @@ export type CommandRequest = {
 	[C in CommandName]: { command: C; intent: string } & CommandFields[C];
 }[CommandName];
 
+/** One command as a control asks for it: everything but the intent id. */
+export type CommandInput = {
+	[C in CommandName]: { command: C } & CommandFields[C];
+}[CommandName];
+
+/** Where one target's latest intent stands; `idle` when it has none. */
+export type CommandPhase =
+	'idle' | 'submitting' | 'accepted' | 'confirmed' | 'rejected' | 'unconfirmed';
+
+/** What the session knows of its action access: `read_only` once a command was refused for scope. */
+export type CommandAccess = 'unknown' | 'read_only';
+
+/** What a command acts on: the command plus its ticket key, run id or start ref/id. */
+export function commandTarget(input: CommandInput): string {
+	switch (input.command) {
+		case 'start':
+			return 'ref' in input ? `start:ref:${input.ref}` : `start:id:${input.id}`;
+		case 'stop':
+			return `stop:${input.run}`;
+		default:
+			return `${input.command}:${input.ticket}`;
+	}
+}
+
 /** The JSON body for one command: everything but the name, which is the URL. */
 export type CommandBody<C extends CommandName = CommandName> = {
 	intent: string;

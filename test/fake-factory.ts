@@ -201,6 +201,13 @@ export type FakeFactoryOptions = {
 	failCommand?: { commands?: FakeCommand[]; problem: Problem };
 	/** Answer this 202 body to every command instead of a `CommandAccepted`. */
 	commandBody?: unknown;
+	/**
+	 * Fields an accepted command sets on its ticket's detail before its event,
+	 * so the dashboard's reread after the command shows the change.
+	 */
+	commandEffects?: Partial<Record<FakeCommand, Partial<Schemas['TicketDetail']>>>;
+	/** Wait this long before answering an accepted command, so it stays pending. */
+	commandDelayMs?: number;
 };
 
 /** The factory command an upstream `POST` route names. */
@@ -318,7 +325,10 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	const connections: FakeEventConnection[] = [];
 	const addedDetails = new Map<string, Schemas['TicketDetail']>();
 	const encoder = new TextEncoder();
-	const detailOf = (key: string) => addedDetails.get(key) ?? ticketDetails.get(key);
+	/** Details changed by `commandEffects`, by ticket key. */
+	const changedDetails = new Map<string, Schemas['TicketDetail']>();
+	const detailOf = (key: string) =>
+		changedDetails.get(key) ?? addedDetails.get(key) ?? ticketDetails.get(key);
 
 	/** Append an event, add its ticket if any, and send it to every open stream. */
 	function emit(input: FakeEventInput): FakeEvent {
@@ -445,6 +455,13 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				});
 			}
 		}
+
+		if (options.commandDelayMs) {
+			await new Promise((resolve) => setTimeout(resolve, options.commandDelayMs));
+		}
+		const effect = options.commandEffects?.[route.command];
+		const current = detailOf(ticket);
+		if (effect && current) changedDetails.set(ticket, { ...current, ...effect });
 
 		const event = emit({
 			kind: route.command,

@@ -10,6 +10,7 @@
 	import BoardSummary from '$lib/components/factory/board-summary.svelte';
 	import FlowBoard from '$lib/components/factory/flow-board.svelte';
 	import IssuePreview from '$lib/components/factory/issue-preview.svelte';
+	import TicketCommands from '$lib/components/factory/ticket-commands.svelte';
 	import TicketInspector from '$lib/components/factory/ticket-inspector.svelte';
 	import { BacklogState } from '$lib/factory/backlog-state.svelte';
 	import { runsKey, ticketKey } from '$lib/factory/events';
@@ -253,7 +254,11 @@
 						})}
 						onretry={() => inspector.retry()}
 						headingId={INSPECTOR_HEADING}
-					/>
+					>
+						{#snippet commands(detail)}
+							<TicketCommands {detail} onreread={() => void inspector.refresh()} />
+						{/snippet}
+					</TicketInspector>
 				</div>
 			</section>
 		{/if}
