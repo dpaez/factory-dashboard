@@ -175,14 +175,25 @@ If the response is neither the documented success media type nor a parseable Pro
 
 ## SSE integration
 
-Native browser `EventSource` cannot attach the factory bearer header, so expose a same-origin SvelteKit proxy at `/api/factory/events`:
+The browser cannot hold the factory bearer, so expose a same-origin SvelteKit proxy at `/api/factory/events`:
 
 ```text
-Browser EventSource
-  → GET /api/factory/events (same origin)
+Browser fetch() + ReadableStream reader
+  → GET /api/factory/events (same origin, Last-Event-ID set by the dashboard)
   → SvelteKit adds Authorization
   → GET {FACTORY_API_URL}/v1/events
 ```
+
+The browser reads the stream with `fetch()` and a `ReadableStream` reader, not a native `EventSource` (decided in #22). An `EventSource` cannot read the HTTP status and cannot send a custom cursor on its first connection. The dashboard needs both:
+
+- **Status classification.** The live controller (`$lib/factory/live.svelte.ts`) classifies by the proxy's status:
+  - 401 or 403 is an authentication failure, not retried automatically.
+  - A network error, a 5xx or a dropped stream means reconnecting, with backoff.
+  - After a bounded number of failed attempts, or on a non-retryable failure such as `configuration_error`, it is disconnected.
+- **Cursor.** The controller tracks the last revision it parsed and sends it as `Last-Event-ID` on every reconnect.
+- **Cancellation.** Reconnects and teardown go through an `AbortController`.
+
+Bytes are decoded with one streaming `TextDecoder` and fed to the incremental parser in `$lib/factory/events.ts`, so the parser is the production path, not only a test artifact.
 
 The proxy forwards the upstream body as a stream rather than buffering it. Forward the browser's `Last-Event-ID` header and the supported initial cursor/query parameter, preserve `text/event-stream`, disable intermediary buffering where the deployment supports it, and abort the upstream request when the browser disconnects. Never expose the upstream token or URL in the response.
 
