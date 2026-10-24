@@ -36,7 +36,9 @@ const issueButton = (page: Page, title: string) =>
 const issueButtons = (page: Page) =>
 	backlog(page)
 		.getByRole('button')
-		.filter({ hasNotText: /^\s*(Refresh|Refreshing…|Retry)\s*$/ });
+		.filter({
+			hasNotText: /^\s*(Refresh|Refreshing…|Retry|Start|Starting…|Start accepted|Resend)\s*$/
+		});
 const summary = (page: Page) => page.getByRole('list', { name: 'Board summary' });
 const readyItem = (page: Page) =>
 	summary(page).getByRole('listitem').filter({ hasText: 'ready to start' });

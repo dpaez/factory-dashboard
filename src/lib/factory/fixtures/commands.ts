@@ -13,6 +13,13 @@ export const acceptedStart = {
 	ticket: ticketActiveInPlan.key
 } satisfies Schemas['CommandAccepted'];
 
+/** A ticket started from a written brief; its key comes from the brief's ID. */
+export const acceptedStartFromBrief = {
+	message: 'Started the ticket.',
+	revision: 44,
+	ticket: 'dark-mode-audit-0a1b2c3d'
+} satisfies Schemas['CommandAccepted'];
+
 /** A retry of the failed step. */
 export const acceptedRetry = {
 	message: 'Retrying the work step.',

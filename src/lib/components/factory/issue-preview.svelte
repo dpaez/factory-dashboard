@@ -5,23 +5,38 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import IssueLink from './issue-link.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import StartControl, { type StartState } from './start-control.svelte';
 
 	/**
 	 * The Issue preview: a read-only summary of one backlog issue, shown in
 	 * the region below the board. Facts the tracker did not supply read
 	 * "Unavailable". Given only an id (`issue` null), it says the issue is not
-	 * in the loaded backlog, or that the backlog is still loading.
+	 * in the loaded backlog, or that the backlog is still loading. Given
+	 * `start`, the header offers Start and shows its command state; a rejected
+	 * start keeps the preview and shows the reason.
 	 */
 	let {
 		issue,
 		id,
-		loading = false
+		loading = false,
+		start,
+		phase = 'idle',
+		explanation = null,
+		onstart,
+		onresend
 	}: {
 		issue: BacklogCardModel | null;
 		/** The selected id; shown when the issue is not in the loaded backlog. */
 		id: string;
 		/** The backlog has not loaded yet. */
 		loading?: boolean;
+		/** Start availability from `startAvailability`; no Start control without it. */
+		start?: StartState['start'];
+		phase?: StartState['phase'];
+		explanation?: StartState['explanation'];
+		onstart?: (issue: BacklogCardModel) => void;
+		/** Resend an unconfirmed start under the same intent id. */
+		onresend?: (issue: BacklogCardModel) => void;
 	} = $props();
 
 	/** Markdown typography: visible heading hierarchy, list markers and indentation. */
@@ -90,6 +105,16 @@
 					>(opens in a new tab)</span
 				>
 			</a>
+			{#if start}
+				<StartControl
+					class="pt-2"
+					{start}
+					{phase}
+					{explanation}
+					onstart={() => onstart?.(issue)}
+					onresend={() => onresend?.(issue)}
+				/>
+			{/if}
 		</header>
 
 		<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">

@@ -61,6 +61,41 @@ export const problemInternalError = {
 	type: 'internal_error'
 } satisfies Problem;
 
+/** A start of an umbrella issue: start one of its sub-issues instead. */
+export const problemUmbrellaIssue = {
+	status: 422,
+	title: 'Umbrella issue',
+	type: 'umbrella_issue',
+	detail: 'dpaez/factory-dashboard#16 has sub-issues; start one of them.'
+} satisfies Problem;
+
+/** A start whose issue reference the factory cannot resolve. */
+export const problemStartRefValidation = {
+	status: 400,
+	title: 'Invalid request',
+	type: 'validation_error',
+	errors: [{ path: 'body.ref', message: 'Not an issue reference the tracker knows.' }]
+} satisfies Problem;
+
+/** A written brief with an empty ID and text. */
+export const problemStartBriefValidation = {
+	status: 400,
+	title: 'Invalid request',
+	type: 'validation_error',
+	errors: [
+		{ path: 'body.id', message: 'Must not be empty.' },
+		{ path: 'body.text', message: 'Must not be empty.' }
+	]
+} satisfies Problem;
+
+/** A start the factory's state rejects: the conflict case (there is no `conflict` type). */
+export const problemStartConflict = {
+	status: 409,
+	title: 'Invalid state',
+	type: 'invalid_state',
+	detail: 'The start does not fit the ticket in its current state.'
+} satisfies Problem;
+
 /** A reply with an empty answer. */
 export const problemReplyValidationError = {
 	status: 400,

@@ -149,7 +149,9 @@ test('AC5: nothing on / is draggable', async ({ page }) => {
 	await expect(page.locator('[draggable="true"]')).toHaveCount(0);
 });
 
-test('AC6: the nav marks the current page and has no New ticket button', async ({ page }) => {
+test('AC6: the nav marks the current page; New ticket (#30) is a link to /new', async ({
+	page
+}) => {
 	const nav = page.getByRole('navigation');
 	const link = (name: string) => nav.getByRole('link', { name, exact: true });
 	const current = nav.locator('[aria-current="page"]');
@@ -166,7 +168,7 @@ test('AC6: the nav marks the current page and has no New ticket button', async (
 		await expect(current, path).toHaveCount(1);
 		await expect(current, path).toHaveText(name);
 		await expect(page.getByRole('button', { name: /new ticket/i })).toHaveCount(0);
-		await expect(page.getByRole('link', { name: /new ticket/i })).toHaveCount(0);
+		await expect(link('New ticket')).toHaveAttribute('href', '/new');
 	}
 	await shot(page, 'nav-tickets-current');
 });

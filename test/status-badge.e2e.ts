@@ -69,9 +69,14 @@ test('AC4: badge colors come from --signal-* tokens with Two-Ink text, in light 
 	page
 }) => {
 	for (const theme of ['light', 'dark'] as const) {
-		await page.goto(story(`${BADGE}--all-signals`, theme));
-		// The Storybook dev server can reload the iframe while it optimizes deps, and
-		// the decorator applies the theme in an effect: measure once both settle.
+		// The Storybook dev server can reload the iframe while it optimizes deps, which
+		// aborts a navigation in flight (net::ERR_ABORTED): go again once it settles.
+		// The decorator applies the theme in an effect: measure once both settle.
+		await page.goto(story(`${BADGE}--all-signals`, theme)).catch(async (error: Error) => {
+			if (!/ERR_ABORTED/.test(error.message)) throw error;
+			await page.waitForLoadState('load');
+			await page.goto(story(`${BADGE}--all-signals`, theme));
+		});
 		await page.waitForLoadState('networkidle');
 		await expect(badges(page).first()).toBeVisible();
 		await expect(page.locator('html')).toHaveClass(

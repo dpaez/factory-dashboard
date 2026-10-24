@@ -11,6 +11,7 @@
 	import { Factory as FactoryIcon } from '@lucide/svelte';
 	import { LayoutList as LayoutListIcon } from '@lucide/svelte';
 	import { ChartColumn as ChartColumnIcon } from '@lucide/svelte';
+	import { Plus as PlusIcon } from '@lucide/svelte';
 	import { navigating, page } from '$app/state';
 
 	import Logo from '$lib/components/logo.svelte';
@@ -56,6 +57,8 @@
 			live.stop();
 		};
 	});
+
+	const newCurrent = $derived(page.url.pathname === '/new');
 
 	const NAV = [
 		{ href: '/', label: 'Flow board', icon: FactoryIcon },
@@ -114,7 +117,18 @@
 					{item.label}
 				</Button>
 			{/each}
-			<!-- TODO(#30): the New ticket button goes here once the composer exists. -->
+			<!-- A separate action, not Beacon Yellow: the composer's Start planning is the primary one. -->
+			<Button
+				variant={newCurrent ? 'secondary' : 'outline'}
+				href="/new"
+				aria-current={newCurrent ? 'page' : undefined}
+				data-testid="nav-new-ticket"
+				class="ml-auto flex items-center p-4"
+				size="lg"
+			>
+				<PlusIcon class="mr-2 -ml-1 size-4" />
+				New ticket
+			</Button>
 		</nav>
 		<Separator />
 		<div class="flex flex-col overflow-y-auto scroll-smooth px-8 py-4">

@@ -4,22 +4,36 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import IssueLink from './issue-link.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import StartControl, { type StartState } from './start-control.svelte';
 
 	/**
 	 * One backlog issue on the Flow board. The selection control is a single
 	 * native button holding the reference, title, labels and availability, so
 	 * Tab, Enter and Space work like a ticket card. An umbrella issue's
 	 * sub-issue links follow the button as siblings, never nested in it.
-	 * Read-only: there is no Start control here (#30).
+	 * Given `start`, Start and its command state follow as another sibling
+	 * (`start-control.svelte`); it emits `onstart(card)` or `onresend(card)`.
 	 */
 	let {
 		card,
 		selected = false,
-		onselect
+		start,
+		phase = 'idle',
+		explanation = null,
+		onselect,
+		onstart,
+		onresend
 	}: {
 		card: BacklogCardModel;
 		selected?: boolean;
+		/** Start availability from `startAvailability`; no Start control without it. */
+		start?: StartState['start'];
+		phase?: StartState['phase'];
+		explanation?: StartState['explanation'];
 		onselect?: (id: string) => void;
+		onstart?: (card: BacklogCardModel) => void;
+		/** Resend an unconfirmed start under the same intent id. */
+		onresend?: (card: BacklogCardModel) => void;
 	} = $props();
 
 	const umbrella = $derived(card.availability.kind === 'umbrella');
@@ -85,5 +99,16 @@
 				<span class="text-foreground/75">Sub-issues unavailable. See the tracker.</span>
 			{/if}
 		</div>
+	{/if}
+
+	{#if start}
+		<StartControl
+			class="border-t border-border p-3"
+			{start}
+			{phase}
+			{explanation}
+			onstart={() => onstart?.(card)}
+			onresend={() => onresend?.(card)}
+		/>
 	{/if}
 </div>
