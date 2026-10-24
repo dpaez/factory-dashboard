@@ -1,15 +1,23 @@
 import { isHttpError } from '@sveltejs/kit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { statsCompleteSummary } from '$lib/factory/fixtures';
+import {
+	statsConfigurations,
+	statsTicketMultiExecutionRow,
+	statsTicketsComplete,
+	statsTicketsNoHandoffs,
+	statsCompleteSummary
+} from '$lib/factory/fixtures';
 import type { Cohort, StageGroup, SummaryMetrics, TokensByStage } from '$lib/factory/stats';
+import { NO_HANDOFFS, type ConfigurationComparison } from '$lib/factory/stats-tickets';
 
 import {
 	FAKE_FACTORY_TOKEN,
+	FAKE_STATS_TICKETS_PAGE_SIZE,
 	createFakeFactory,
 	type FakeFactoryOptions
 } from '../../../test/fake-factory';
-import { load, type StatsPanelResult } from './+page.server';
+import { load, type StatsPanelResult, type TicketFacts } from './+page.server';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
@@ -45,6 +53,8 @@ type StatsData = {
 	summary: StatsPanelResult<SummaryMetrics>;
 	stages: StatsPanelResult<StageGroup[]>;
 	tokens: StatsPanelResult<TokensByStage>;
+	tickets: StatsPanelResult<TicketFacts>;
+	configurations: StatsPanelResult<ConfigurationComparison>;
 };
 
 async function run(options: FakeFactoryOptions = {}, search = '') {
@@ -86,7 +96,9 @@ describe('/stats load', () => {
 
 	it('reads summary and stages with the identical default window', async () => {
 		const { data, requests, query } = await run();
-		expect(requests).toHaveLength(2);
+		const pages = Math.ceil(statsTicketsComplete.items.length / FAKE_STATS_TICKETS_PAGE_SIZE);
+		// Summary, stages, configurations and every tickets page.
+		expect(requests).toHaveLength(3 + pages);
 		expect(requests.every((r) => r.method === 'GET')).toBe(true);
 		const summary = query('/v1/stats/summary');
 		const stages = query('/v1/stats/stages');
@@ -105,7 +117,12 @@ describe('/stats load', () => {
 		const { data, query } = await run({}, '?from=2026-09-01&to=2026-09-30');
 		expect(data.cohort.window.from).toBe('2026-09-01T00:00:00Z');
 		expect(data.cohort.window.to).toBe('2026-10-01T00:00:00Z');
-		for (const path of ['/v1/stats/summary', '/v1/stats/stages']) {
+		for (const path of [
+			'/v1/stats/summary',
+			'/v1/stats/stages',
+			'/v1/stats/tickets',
+			'/v1/stats/configurations'
+		]) {
 			expect(query(path)?.get('from')).toBe('2026-09-01T00:00:00Z');
 			expect(query(path)?.get('to')).toBe('2026-10-01T00:00:00Z');
 		}
@@ -167,9 +184,20 @@ describe('/stats load', () => {
 		expect(JSON.stringify(data)).not.toContain(SECRET_DETAIL);
 	});
 
-	it('both reads failing still shows the window', async () => {
-		const { data } = await run({ failStatsSummary: internal, failStatsStages: internal });
-		expect(data.summary.ok || data.stages.ok || data.tokens.ok).toBe(false);
+	it('every read failing still shows the window', async () => {
+		const { data } = await run({
+			failStatsSummary: internal,
+			failStatsStages: internal,
+			failStatsTickets: internal,
+			failStatsConfigurations: internal
+		});
+		expect(
+			data.summary.ok ||
+				data.stages.ok ||
+				data.tokens.ok ||
+				data.tickets.ok ||
+				data.configurations.ok
+		).toBe(false);
 		expect(data.cohort.factoryId).toBeNull();
 		expect(data.cohort.window.from).toMatch(/Z$/);
 	});
@@ -265,5 +293,115 @@ describe('/stats load', () => {
 		expect(serialized).not.toContain(FAKE_FACTORY_TOKEN);
 		expect(serialized).not.toContain(FACTORY_URL);
 		expect(serialized).not.toContain(FACTORY_HOST);
+	});
+
+	it('reads every tickets page and the configurations with the summary window', async () => {
+		const { data, requests, query } = await run();
+		const from = query('/v1/stats/summary')?.get('from');
+		const to = query('/v1/stats/summary')?.get('to');
+		expect(query('/v1/stats/configurations')?.get('from')).toBe(from);
+		expect(query('/v1/stats/configurations')?.get('to')).toBe(to);
+		const pages = requests
+			.filter((r) => r.path.startsWith('/v1/stats/tickets?'))
+			.map((r) => new URL(r.path, FACTORY_URL).searchParams);
+		expect(pages.map((p) => p.get('cursor'))).toEqual([null, '5', '10']);
+		for (const page of pages) {
+			expect(page.get('from')).toBe(from);
+			expect(page.get('to')).toBe(to);
+		}
+		expect(data.tickets.ok).toBe(true);
+		if (!data.tickets.ok) return;
+		// Twelve rows over three pages: the time sample counts all ten that reached handoff.
+		expect(data.tickets.model.complete).toBe(true);
+		expect(data.tickets.model.time.sampleSize).toBe(10);
+		expect(data.tickets.model.time.excludedCount).toBe(2);
+		expect(data.tickets.model.time.executions.value).toBe(statsTicketsComplete.items.length);
+		expect(data.tickets.model.time.startToHandoff.p90.availability).toBe('complete');
+		expect(data.tickets.model.quality.neededAPerson.denominator).toBe(12);
+		expect(data.configurations.ok && data.configurations.model.rows).toHaveLength(
+			statsConfigurations.items.length
+		);
+		expect(data.cohort.mismatch).toBe(false);
+	});
+
+	it('contributors list the exact executions, linked through the resolver', async () => {
+		const { data } = await run();
+		if (!data.tickets.ok) throw new Error('tickets panel failed');
+		const needed = data.tickets.model.contributors.neededAPerson.rows;
+		expect(needed.map((row) => row.displayRef)).toEqual([
+			'dpaez/factory-dashboard#9',
+			'dpaez/factory-dashboard#14',
+			'dpaez/factory-dashboard#17',
+			'KAI-21',
+			'KAI-23',
+			'dpaez/factory-dashboard#20'
+		]);
+		expect(needed[0]?.href).toBe(
+			`/stats/execution?${new URLSearchParams({
+				key: statsTicketMultiExecutionRow.key,
+				startedAt: statsTicketMultiExecutionRow.startedAt
+			})}`
+		);
+	});
+
+	it.each([
+		['every page', internal],
+		['the second page', { atCursor: 5, problem: internal }]
+	] as const)(
+		'a tickets failure on %s blanks only the ticket panels',
+		async (_, failStatsTickets) => {
+			const { data } = await run({ failStatsTickets });
+			expect(data.tickets).toEqual({
+				ok: false,
+				failure: { title: 'Internal error', retryable: true }
+			});
+			expect(data.summary.ok).toBe(true);
+			expect(data.stages.ok).toBe(true);
+			expect(data.configurations.ok).toBe(true);
+			expect(JSON.stringify(data)).not.toContain(SECRET_DETAIL);
+		}
+	);
+
+	it('a configurations failure blanks only the configuration comparison', async () => {
+		const { data } = await run({ failStatsConfigurations: internal });
+		expect(data.configurations).toEqual({
+			ok: false,
+			failure: { title: 'Internal error', retryable: true }
+		});
+		expect(data.tickets.ok && data.summary.ok && data.stages.ok).toBe(true);
+		expect(JSON.stringify(data)).not.toContain(SECRET_DETAIL);
+	});
+
+	it.each([
+		['tickets', 'failStatsTickets'],
+		['configurations', 'failStatsConfigurations']
+	] as const)('a %s 401 is the page configuration error', async (_, option) => {
+		const error = await pageError({
+			[option]: { status: 401, title: 'Unauthorized', type: 'unauthorized', detail: SECRET_DETAIL }
+		});
+		expect(error.status).toBe(503);
+		expect(error.body.kind).toBe('configuration');
+		expect(JSON.stringify(error.body)).not.toContain(SECRET_DETAIL);
+	});
+
+	it('the no-handoffs cohort has Unavailable time figures with the excluded count, never 0', async () => {
+		const { data } = await run({ statsTicketsCohort: 'noHandoffs' });
+		if (!data.tickets.ok) throw new Error('tickets panel failed');
+		const time = data.tickets.model.time;
+		expect(time.sampleSize).toBe(0);
+		expect(time.excludedCount).toBe(statsTicketsNoHandoffs.items.length);
+		expect(time.startToHandoff.mean).toMatchObject({
+			value: null,
+			availability: 'unavailable',
+			unavailableReason: NO_HANDOFFS
+		});
+	});
+
+	it('ticket quality reconciles with the summary only when the envelopes match', async () => {
+		const matched = (await run()).data;
+		// The fixture summary describes a larger cohort: the rows do not reconcile.
+		expect(matched.tickets.ok && matched.tickets.model.quality.reconciled).toBe(false);
+		const noSummary = (await run({ failStatsSummary: internal })).data;
+		expect(noSummary.tickets.ok && noSummary.tickets.model.quality.reconciled).toBeNull();
 	});
 });

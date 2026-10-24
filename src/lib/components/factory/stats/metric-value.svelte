@@ -14,8 +14,15 @@
 	 */
 	let {
 		metric,
-		percent = false
-	}: { metric: Metric; /** Show a ratio as a percent. */ percent?: boolean } = $props();
+		percent = false,
+		fractional = false
+	}: {
+		metric: Metric;
+		/** Show a ratio as a percent. */
+		percent?: boolean;
+		/** A count that can be fractional, such as a median (1.5): up to two decimals, not rounded to whole. */
+		fractional?: boolean;
+	} = $props();
 
 	function format(value: number, unit: Metric['unit']): string {
 		if (percent) return formatPercent(value);
@@ -27,7 +34,9 @@
 			case 'ratio':
 				return (Math.round(value * 100) / 100).toLocaleString('en-US');
 			default:
-				return formatCount(Math.round(value));
+				return fractional
+					? (Math.round(value * 100) / 100).toLocaleString('en-US')
+					: formatCount(Math.round(value));
 		}
 	}
 </script>
