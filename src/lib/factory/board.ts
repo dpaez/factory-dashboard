@@ -34,6 +34,8 @@ const OFF_BOARD_STAGES: readonly string[] = ['done'];
 
 export type BoardCard = {
 	key: TicketKey;
+	/** `TicketSummary.id`: for a tracked ticket, its issue's id, so the backlog deduplicates on it. */
+	id: string;
 	displayRef: string;
 	title: string;
 	/** The lane label for a known stage, or the raw stage string for an unknown one. */
@@ -116,6 +118,7 @@ function toCard(ticket: Schemas['TicketSummary'], usage: Schemas['Usage'] | null
 	const current = ticket.progress.current?.label ?? null;
 	return {
 		key: ticket.key,
+		id: ticket.id,
 		displayRef: ticket.displayRef,
 		title: ticket.title,
 		stage: lane?.label ?? ticket.stage,

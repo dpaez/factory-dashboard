@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { expect } from 'storybook/test';
+	import { expect, fn, userEvent } from 'storybook/test';
 	import IssuePreview from './issue-preview.svelte';
 	import { toBacklogCard } from '$lib/factory/backlog';
 	import {
@@ -10,6 +10,30 @@
 		backlogUmbrellaIssue,
 		backlogUmbrellaNoChildren
 	} from '$lib/factory/fixtures';
+	import { START_FAILURES, START_REASONS, blockedReason } from '$lib/factory/start';
+	import { START_PROBLEMS, startState } from './start-story-states';
+
+	const ready = toBacklogCard(backlogIssueWithDetails);
+	const blocked = toBacklogCard(backlogBlockedIssue);
+	const umbrella = toBacklogCard(backlogUmbrellaIssue);
+	const startButton = (canvasElement: HTMLElement) =>
+		firstPane(canvasElement).querySelector<HTMLButtonElement>('[data-slot="start-button"]');
+	const failureText = (canvasElement: HTMLElement) =>
+		firstPane(canvasElement).querySelector('[data-slot="start-failure"]');
+	/** Start sits in the header, and the preview keeps its issue. */
+	const expectInHeader = async (canvasElement: HTMLElement, title: string) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('header [data-slot="start-control"]')).not.toBeNull();
+		await expect(pane.querySelector('h2')).toHaveTextContent(title);
+	};
+	const expectDescribedReason = async (canvasElement: HTMLElement, reason: string) => {
+		const button = startButton(canvasElement)!;
+		await expect(button).toBeDisabled();
+		await expect(
+			firstPane(canvasElement).querySelector('[data-slot="start-reason"]')
+		).toHaveTextContent(reason);
+		await expect(button).toHaveAccessibleDescription(reason);
+	};
 
 	// Stories render twice (light and dark panes); queries use the first pane.
 	const firstPane = (canvasElement: HTMLElement) =>
@@ -20,12 +44,13 @@
 	const { Story } = defineMeta({
 		title: 'Components/Factory/IssuePreview',
 		component: IssuePreview,
+		args: { onstart: fn(), onresend: fn() },
 		parameters: {
 			a11y: { test: 'error' },
 			docs: {
 				description: {
 					component:
-						'A read-only summary of one backlog issue: title, display reference, labels, availability, "Open in tracker", blockers and sub-issues as links, author, created and updated time, and the description as sanitized markdown. Facts the tracker did not supply read "Unavailable".'
+						'A read-only summary of one backlog issue: title, display reference, labels, availability, "Open in tracker", blockers and sub-issues as links, author, created and updated time, and the description as sanitized markdown. Facts the tracker did not supply read "Unavailable". Given `start`, the header offers Start with the same command states as the BacklogCard.'
 				}
 			}
 		}
@@ -135,5 +160,167 @@
 	args={{ issue: null, id: 'issue_31', loading: true }}
 	play={async ({ canvasElement }) => {
 		await expect(firstPane(canvasElement)).toHaveTextContent('Loading the backlog');
+	}}
+/>
+
+<Story
+	name="Start: Eligible"
+	args={{ issue: ready, id: ready.id, ...startState(ready) }}
+	play={async ({ canvasElement, args }) => {
+		await expectInHeader(canvasElement, ready.title);
+		const start = startButton(canvasElement)!;
+		await expect(start).toHaveTextContent('Start');
+		await expect(start).toHaveClass('bg-primary');
+		await userEvent.click(start);
+		await expect(args.onstart).toHaveBeenCalledTimes(1);
+		await expect(args.onstart).toHaveBeenLastCalledWith(ready);
+	}}
+/>
+
+<Story
+	name="Start: Blocked"
+	args={{ issue: blocked, id: blocked.id, ...startState(blocked) }}
+	play={async ({ canvasElement }) => {
+		await expectDescribedReason(canvasElement, blockedReason(blocked.blockers));
+	}}
+/>
+
+<Story
+	name="Start: Umbrella"
+	args={{ issue: umbrella, id: umbrella.id, ...startState(umbrella) }}
+	play={async ({ canvasElement }) => {
+		await expect(
+			firstPane(canvasElement).querySelectorAll('[data-slot="preview-sub-issues"] a')
+		).toHaveLength(2);
+		await expectDescribedReason(canvasElement, START_REASONS.umbrella);
+	}}
+/>
+
+<Story
+	name="Start: Submitting"
+	args={{ issue: ready, id: ready.id, ...startState(ready, { phase: 'submitting' }) }}
+	play={async ({ canvasElement, args }) => {
+		const start = startButton(canvasElement)!;
+		await expect(start).toHaveTextContent('Starting…');
+		await expect(start).toHaveAttribute('aria-busy', 'true');
+		await userEvent.dblClick(start);
+		start.focus();
+		await userEvent.keyboard('{Enter}{Enter}');
+		await expect(args.onstart).toHaveBeenCalledTimes(0);
+	}}
+/>
+
+<Story
+	name="Start: Accepted"
+	args={{ issue: ready, id: ready.id, ...startState(ready, { phase: 'accepted' }) }}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expectInHeader(canvasElement, ready.title);
+		await expect(startButton(canvasElement)).toHaveTextContent('Start accepted');
+		await expect(pane.querySelectorAll('[data-slot="status-badge"]')).toHaveLength(1);
+		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Ready');
+	}}
+/>
+
+<Story
+	name="Start: Rejected (umbrella_issue)"
+	args={{
+		issue: ready,
+		id: ready.id,
+		...startState(ready, { phase: 'rejected', problem: START_PROBLEMS.umbrella })
+	}}
+	play={async ({ canvasElement }) => {
+		await expectInHeader(canvasElement, ready.title);
+		await expect(failureText(canvasElement)).toHaveTextContent(START_FAILURES.umbrella);
+		await expect(startButton(canvasElement)).toBeEnabled();
+	}}
+/>
+
+<Story
+	name="Start: Rejected (tracker_unavailable)"
+	args={{
+		issue: ready,
+		id: ready.id,
+		...startState(ready, { phase: 'rejected', problem: START_PROBLEMS.tracker, retryable: true })
+	}}
+	play={async ({ canvasElement }) => {
+		await expectInHeader(canvasElement, ready.title);
+		await expect(failureText(canvasElement)).toHaveTextContent(START_FAILURES.tracker);
+	}}
+/>
+
+<Story
+	name="Start: Rejected (conflict)"
+	args={{
+		issue: ready,
+		id: ready.id,
+		...startState(ready, { phase: 'rejected', problem: START_PROBLEMS.conflict })
+	}}
+	play={async ({ canvasElement }) => {
+		await expectInHeader(canvasElement, ready.title);
+		await expect(failureText(canvasElement)).toHaveTextContent(START_FAILURES.conflictRef);
+	}}
+/>
+
+<Story
+	name="Start: Unconfirmed"
+	args={{ issue: ready, id: ready.id, ...startState(ready, { phase: 'unconfirmed' }) }}
+	play={async ({ canvasElement, args }) => {
+		const pane = firstPane(canvasElement);
+		await expect(failureText(canvasElement)).toHaveTextContent(START_FAILURES.unconfirmed);
+		await userEvent.click(pane.querySelector<HTMLButtonElement>('[data-slot="start-resend"]')!);
+		await expect(args.onresend).toHaveBeenCalledTimes(1);
+		await expect(args.onstart).not.toHaveBeenCalled();
+	}}
+/>
+
+<Story
+	name="Start: Read only"
+	args={{ issue: ready, id: ready.id, ...startState(ready, { readOnly: true }) }}
+	play={async ({ canvasElement }) => {
+		await expectDescribedReason(canvasElement, START_REASONS.readOnly);
+	}}
+/>
+
+<Story
+	name="Start: Read only while submitting"
+	args={{
+		issue: ready,
+		id: ready.id,
+		...startState(ready, { phase: 'submitting', readOnly: true })
+	}}
+	play={async ({ canvasElement, args }) => {
+		// Read-only access outranks the pending phase: the access reason, not "Starting…".
+		const start = startButton(canvasElement)!;
+		await expect(start).toHaveTextContent('Start');
+		await expect(start).not.toHaveTextContent('Starting');
+		await expect(start).not.toHaveAttribute('aria-busy');
+		await expectDescribedReason(canvasElement, START_REASONS.readOnly);
+		await userEvent.click(start, { pointerEventsCheck: 0 });
+		await expect(args.onstart).not.toHaveBeenCalled();
+	}}
+/>
+
+<Story
+	name="Start: Read only while accepted"
+	args={{ issue: ready, id: ready.id, ...startState(ready, { phase: 'accepted', readOnly: true }) }}
+	play={async ({ canvasElement }) => {
+		const start = startButton(canvasElement)!;
+		await expect(start).not.toHaveTextContent('Start accepted');
+		await expect(firstPane(canvasElement).querySelector('[data-slot="start-accepted"]')).toBeNull();
+		await expectDescribedReason(canvasElement, START_REASONS.readOnly);
+	}}
+/>
+
+<Story
+	name="Start: Read only while unconfirmed"
+	args={{
+		issue: ready,
+		id: ready.id,
+		...startState(ready, { phase: 'unconfirmed', readOnly: true })
+	}}
+	play={async ({ canvasElement }) => {
+		await expect(firstPane(canvasElement).querySelector('[data-slot="start-resend"]')).toBeNull();
+		await expectDescribedReason(canvasElement, START_REASONS.readOnly);
 	}}
 />

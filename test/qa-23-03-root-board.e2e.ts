@@ -191,7 +191,10 @@ test('AC6: the nav shows Flow board, Tickets and Stats and marks the current pag
 				await expect.soft(link, `${path} ${name}`).not.toHaveAttribute('aria-current', 'page');
 			}
 		}
-		await expect.soft(page.getByText(/new ticket/i)).toHaveCount(0);
+		// #30 added New ticket: a link to /new, never current on these pages.
+		const newTicket = nav.getByRole('link', { name: 'New ticket', exact: true });
+		await expect.soft(newTicket).toHaveAttribute('href', '/new');
+		await expect.soft(newTicket).not.toHaveAttribute('aria-current', 'page');
 		if (path === '/tickets') await shot(page, 'ac6-nav-tickets-current');
 	}
 });

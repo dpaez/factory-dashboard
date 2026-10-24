@@ -12,7 +12,17 @@
 	import IssuePreview from '$lib/components/factory/issue-preview.svelte';
 	import TicketCommands from '$lib/components/factory/ticket-commands.svelte';
 	import TicketInspector from '$lib/components/factory/ticket-inspector.svelte';
+	import type { BacklogCardModel } from '$lib/factory/backlog';
 	import { BacklogState } from '$lib/factory/backlog-state.svelte';
+	import type { StartState } from '$lib/components/factory/start-control.svelte';
+	import type { CommandPhase } from '$lib/factory/commands';
+	import { getCommandContext } from '$lib/factory/commands.svelte';
+	import {
+		startAvailability,
+		startFailureMessage,
+		startTargetFor,
+		visibleBacklog
+	} from '$lib/factory/start';
 	import { runsKey, ticketKey } from '$lib/factory/events';
 	import {
 		inspectorHref,
@@ -37,11 +47,65 @@
 		backlogState.seed(data.backlog);
 	});
 
+	// Start goes through the layout's coordinator: one action is one intent.
+	const coordinator = getCommandContext();
+	const startIntentFor = (card: Pick<BacklogCardModel, 'displayRef'>) =>
+		coordinator?.intentFor(startTargetFor(card));
+
+	let boardCards = $derived(board.lanes.flatMap((lane) => lane.cards));
+	let boardKeys = $derived(new Set(boardCards.map((card) => card.key)));
+	// A backlog issue that is a board ticket, by id or by its accepted start's key, is
+	// shown once: as the ticket. The backlog read may still list it (tracker cache).
+	let backlogCards = $derived(
+		visibleBacklog(backlogState.cards, {
+			ticketIds: boardCards.map((card) => card.id),
+			hiddenIds: backlogState.cards
+				.filter((card) => {
+					const ticket = startIntentFor(card)?.accepted?.ticket;
+					return ticket !== undefined && boardKeys.has(ticket);
+				})
+				.map((card) => card.id)
+		})
+	);
+
 	let summary = $derived({
 		...board.summary,
-		readyToStart: backlogState.readyToStart,
+		readyToStart:
+			backlogState.readyToStart === null
+				? null
+				: backlogCards.filter((card) => card.availability.kind === 'ready').length,
 		readyToStartComplete: backlogState.readyToStart === null || backlogState.complete
 	});
+
+	/** One issue's Start: availability, the phase of its start and a failure's message. */
+	function startFor(card: BacklogCardModel): StartState | undefined {
+		if (!coordinator) return undefined;
+		const intent = startIntentFor(card);
+		const phase: CommandPhase = intent?.phase ?? 'idle';
+		const explanation =
+			intent && (phase === 'rejected' || phase === 'unconfirmed')
+				? startFailureMessage(intent, 'ref').message
+				: null;
+		return {
+			start: startAvailability({ card, access: coordinator.access, phase }),
+			phase,
+			explanation
+		};
+	}
+
+	function onstart(card: BacklogCardModel) {
+		startedRefs[card.id] = card.displayRef;
+		coordinator?.submit(
+			{ command: 'start', ref: card.displayRef },
+			{ label: `Start ${card.displayRef}` }
+		);
+	}
+
+	/** An unconfirmed start is resent under the same intent id, never started again. */
+	function onresend(card: BacklogCardModel) {
+		const intent = startIntentFor(card);
+		if (intent) coordinator?.retryDelivery(intent.id);
+	}
 
 	// The selection lives only in the URL; the server load never reads it.
 	// `?issue=` and `?ticket=` share one region; an issue wins if both are present.
@@ -52,6 +116,37 @@
 			? null
 			: (backlogState.cards.find((card) => card.id === selectedIssueId) ?? null)
 	);
+
+	// The ref each issue was started with, so the handoff finds its intent after a
+	// backlog read no longer lists the issue.
+	const startedRefs: Record<string, string> = $state({});
+	let selectedStart = $derived.by(() => {
+		if (selectedIssueId === null) return undefined;
+		const ref = selectedIssue?.displayRef ?? startedRefs[selectedIssueId];
+		return ref === undefined ? undefined : startIntentFor({ displayRef: ref });
+	});
+
+	let previewStart = $derived(selectedIssue ? startFor(selectedIssue) : undefined);
+
+	// Handoff: once a read lists the selected issue's started ticket, or its start
+	// is confirmed (an already finished ticket: the inspector's read confirms it),
+	// the same region shows that ticket. Derived from intent state and the board, so
+	// a selection moved elsewhere is left alone.
+	let handedOff: string | null = null;
+	$effect(() => {
+		const intent = selectedStart;
+		const ticket = intent?.accepted?.ticket;
+		if (!intent || ticket === undefined || handedOff === intent.id) return;
+		if (intent.phase !== 'confirmed' && !(intent.phase === 'accepted' && boardKeys.has(ticket))) {
+			return;
+		}
+		handedOff = intent.id;
+		goto(`?ticket=${encodeURIComponent(ticket)}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	});
 
 	/** Select into the URL; the other selection parameter is dropped. */
 	function select(param: 'ticket' | 'issue', value: string) {
@@ -197,7 +292,7 @@
 		<FlowBoard lanes={board.lanes} {selectedKey} onselect={(key) => select('ticket', key)}>
 			{#snippet backlog()}
 				<BacklogLane
-					cards={backlogState.cards}
+					cards={backlogCards}
 					bind:label={backlogState.label}
 					fetchedAt={backlogState.fetchedAt}
 					status={backlogState.status}
@@ -208,6 +303,9 @@
 					onselect={(id) => select('issue', id)}
 					onrefresh={() => backlogState.refresh()}
 					onretry={() => backlogState.retry()}
+					startFor={coordinator ? startFor : undefined}
+					{onstart}
+					{onresend}
 				/>
 			{/snippet}
 		</FlowBoard>
@@ -221,6 +319,11 @@
 					issue={selectedIssue}
 					id={selectedIssueId}
 					loading={backlogState.status === 'loading'}
+					start={previewStart?.start}
+					phase={previewStart?.phase}
+					explanation={previewStart?.explanation}
+					{onstart}
+					{onresend}
 				/>
 			</section>
 		{:else if selectedKey !== null}

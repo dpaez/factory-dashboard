@@ -208,6 +208,16 @@ export type FakeFactoryOptions = {
 	commandEffects?: Partial<Record<FakeCommand, Partial<Schemas['TicketDetail']>>>;
 	/** Wait this long before answering an accepted command, so it stays pending. */
 	commandDelayMs?: number;
+	/**
+	 * An accepted start adds its ticket (plan, queued) before its event and
+	 * drops the started backlog issue after it, as the factory does.
+	 */
+	startAddsTicket?: boolean;
+	/**
+	 * With `startAddsTicket`: the next backlog read still lists the started
+	 * issue, as the factory's tracker cache may, and the read after drops it.
+	 */
+	startKeepsBacklogIssue?: boolean;
 };
 
 /** The factory command an upstream `POST` route names. */
@@ -312,6 +322,8 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	const token = options.token ?? FAKE_FACTORY_TOKEN;
 	const listed = [...(options.tickets ?? allTickets)];
 	let backlog = options.backlog ?? backlogIssues;
+	/** Started issue ids the next backlog read still lists (`startKeepsBacklogIssue`). */
+	const droppedAfterRead = new Set<string>();
 	const requests: { method: string; path: string }[] = [];
 	const commands: FakeCommandRequest[] = [];
 	/** The first 202 body per `idempotency-key`. */
@@ -402,6 +414,42 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		});
 	}
 
+	/**
+	 * The ticket a start adds: from the backlog issue whose `displayRef` is the
+	 * `ref` (its id becomes the ticket's id), else from the written brief.
+	 */
+	function startedTicketFor(key: string, body: unknown) {
+		const fields = (typeof body === 'object' && body !== null ? body : {}) as Record<
+			string,
+			unknown
+		>;
+		const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+		const ref = text(fields.ref);
+		const issue = ref === '' ? undefined : backlog.find((item) => item.displayRef === ref);
+		const id = issue?.id ?? (text(fields.id) || ref || key);
+		const now = new Date().toISOString();
+		const summary: Schemas['TicketSummary'] = {
+			createdAt: now,
+			displayRef: issue?.displayRef ?? (ref || id),
+			execution: 1,
+			finishedAt: null,
+			id,
+			key,
+			needsUser: false,
+			progress: { current: null, done: 0, next: null, total: 0 },
+			pullRequest: null,
+			sourceRef: issue?.url ?? (ref || id),
+			stage: 'plan',
+			startedBy: { client: 'dashboard', onBehalfOf: null },
+			status: 'queued',
+			statusReason: null,
+			title: issue?.title ?? (text(fields.text).split('\n')[0] || id),
+			trackerWarnings: [],
+			updatedAt: now
+		};
+		return { summary, issue };
+	}
+
 	/** A `POST` to a command route: check, record, replay or accept, and emit its event. */
 	async function handleCommand(
 		request: Request,
@@ -411,11 +459,12 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		const idempotencyKey = request.headers.get('idempotency-key');
 		const onBehalfOf = request.headers.get('x-factory-on-behalf-of');
 		const authorized = request.headers.get('authorization') === `Bearer ${token}`;
+		const body = await bodyOf(request);
 		commands.push({
 			method: request.method,
 			path: url.pathname,
 			command: route.command,
-			body: await bodyOf(request),
+			body,
 			idempotencyKey,
 			onBehalfOf,
 			authorization: request.headers.has('authorization')
@@ -431,8 +480,12 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		}
 
 		let ticket: string;
+		let startedTicket: ReturnType<typeof startedTicketFor> | undefined;
 		if (route.command === 'start') {
 			ticket = `fake-started-${String(++started).padStart(8, '0')}`;
+			if (options.startAddsTicket) {
+				startedTicket = startedTicketFor(ticket, body);
+			}
 		} else if (route.run !== undefined) {
 			const run = runsById.get(route.run);
 			if (!run) {
@@ -464,6 +517,7 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		if (effect && current) changedDetails.set(ticket, { ...current, ...effect });
 
 		const event = emit({
+			...(startedTicket && { addTicket: { summary: startedTicket.summary } }),
 			kind: route.command,
 			payload: {
 				actor: { client: 'dashboard', onBehalfOf },
@@ -473,15 +527,20 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				ticket
 			}
 		});
-		const body =
+		const issue = startedTicket?.issue;
+		if (issue) {
+			if (options.startKeepsBacklogIssue) droppedAfterRead.add(issue.id);
+			else backlog = backlog.filter((item) => item.id !== issue.id);
+		}
+		const answer =
 			options.commandBody ??
 			({
 				message: `Fake factory accepted ${route.command}.`,
 				revision: event.revision,
 				ticket
 			} satisfies Schemas['CommandAccepted']);
-		if (idempotencyKey !== null) replays.set(idempotencyKey, body);
-		return json(body, 202);
+		if (idempotencyKey !== null) replays.set(idempotencyKey, answer);
+		return json(answer, 202);
 	}
 
 	async function handle(request: Request): Promise<Response> {
@@ -539,11 +598,17 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				backlog = options.backlogOnRefresh;
 			}
 			const refreshed = url.searchParams.get('refresh') === 'true' && options.backlogRefreshedAt;
-			return json({
+			const page = json({
 				fetchedAt: refreshed || FAKE_BACKLOG_FETCHED_AT,
 				items: backlog.slice(start, end),
 				nextCursor: end < backlog.length ? String(end) : null
 			} satisfies Schemas['BacklogPage']);
+			// One read is every page: drop the kept issues once its last page is served.
+			if (droppedAfterRead.size > 0 && end >= backlog.length) {
+				backlog = backlog.filter((item) => !droppedAfterRead.has(item.id));
+				droppedAfterRead.clear();
+			}
+			return page;
 		}
 
 		const runMatch = path.match(/^\/v1\/runs\/([^/]+)$/);

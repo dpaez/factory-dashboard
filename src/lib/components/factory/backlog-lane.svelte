@@ -4,6 +4,7 @@
 	import { formatTimestamp } from '$lib/factory/format';
 	import { Button } from '$lib/components/ui/button';
 	import BacklogCard from './backlog-card.svelte';
+	import type { StartState } from './start-control.svelte';
 	import { CountFlash } from './count-flash.svelte';
 
 	/**
@@ -11,6 +12,8 @@
 	 * filter, when the tracker was last asked, and Refresh. A failed read stays
 	 * inside the lane: stale issues keep their timestamp and the lane offers
 	 * Retry. Presentational only: the page owns fetching and passes callbacks.
+	 * `startFor(card)` gives each card its Start state; without it, no card
+	 * shows Start.
 	 */
 	let {
 		cards,
@@ -25,7 +28,10 @@
 		onselect,
 		onfilter,
 		onrefresh,
-		onretry
+		onretry,
+		startFor,
+		onstart,
+		onresend
 	}: {
 		/** Every loaded card; the lane applies the label filter itself. */
 		cards: BacklogCardModel[];
@@ -46,6 +52,11 @@
 		onfilter?: (label: string | null) => void;
 		onrefresh?: () => void;
 		onretry?: () => void;
+		/** Each card's Start availability, phase and explanation. */
+		startFor?: (card: BacklogCardModel) => StartState | undefined;
+		onstart?: (card: BacklogCardModel) => void;
+		/** Resend a card's unconfirmed start under the same intent id. */
+		onresend?: (card: BacklogCardModel) => void;
 	} = $props();
 
 	const ALL = '';
@@ -189,8 +200,18 @@
 		{:else}
 			<ul class="flex flex-col gap-2">
 				{#each visible as card (card.id)}
+					{@const start = startFor?.(card)}
 					<li class="min-w-0">
-						<BacklogCard {card} selected={card.id === selectedId} {onselect} />
+						<BacklogCard
+							{card}
+							selected={card.id === selectedId}
+							start={start?.start}
+							phase={start?.phase}
+							explanation={start?.explanation}
+							{onselect}
+							{onstart}
+							{onresend}
+						/>
 					</li>
 				{/each}
 			</ul>
