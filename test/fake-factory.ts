@@ -17,6 +17,15 @@ import type { components } from '../src/lib/factory/generated/factory-api.d.ts';
 import { backlogIssues, backlogPage } from '../src/lib/factory/fixtures/backlog.ts';
 import { eventFrame } from '../src/lib/factory/fixtures/events.ts';
 import {
+	statsCompleteStages,
+	statsCompleteSummary,
+	statsEmptyStages,
+	statsEmptySummary,
+	statsPartialStages,
+	statsQaDisabledStages,
+	statsZeroMergesSummary
+} from '../src/lib/factory/fixtures/stats.ts';
+import {
 	agentList,
 	executionList,
 	runPage,
@@ -161,8 +170,30 @@ export function executionsFor(key: string): Schemas['ExecutionList'] {
 	};
 }
 
+/** The stats fixture cohorts the fake can serve for `/v1/stats/*`. */
+export const FAKE_STATS_COHORTS = {
+	complete: { summary: statsCompleteSummary, stages: statsCompleteStages },
+	empty: { summary: statsEmptySummary, stages: statsEmptyStages },
+	zeroMerges: { summary: statsZeroMergesSummary, stages: statsCompleteStages },
+	qaDisabled: { summary: statsCompleteSummary, stages: statsQaDisabledStages },
+	partial: { summary: statsCompleteSummary, stages: statsPartialStages },
+	/** The stages come from another factory than the summary. */
+	mismatch: {
+		summary: statsCompleteSummary,
+		stages: { ...statsCompleteStages, factoryId: 'factory-geut-02' }
+	}
+} satisfies Record<string, { summary: Schemas['StatsSummary']; stages: Schemas['StatsStages'] }>;
+
+export type FakeStatsCohort = keyof typeof FAKE_STATS_COHORTS;
+
 export type FakeFactoryOptions = {
 	token?: string;
+	/** The cohort `/v1/stats/summary` and `/v1/stats/stages` serve (default `complete`). */
+	statsCohort?: FakeStatsCohort;
+	/** Answer this problem for `GET /v1/stats/summary`. */
+	failStatsSummary?: Problem;
+	/** Answer this problem for `GET /v1/stats/stages`. */
+	failStatsStages?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}` of these keys. */
 	failDetail?: { keys: string[]; problem: Problem };
 	/** Answer this problem for `GET /v1/agents`. */
@@ -585,6 +616,14 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				items: items.slice(start, end),
 				nextCursor: end < items.length ? String(end) : null
 			} satisfies Schemas['TicketPage']);
+		}
+		if (path === '/v1/stats/summary') {
+			if (options.failStatsSummary) return problem(options.failStatsSummary);
+			return json(FAKE_STATS_COHORTS[options.statsCohort ?? 'complete'].summary);
+		}
+		if (path === '/v1/stats/stages') {
+			if (options.failStatsStages) return problem(options.failStatsStages);
+			return json(FAKE_STATS_COHORTS[options.statsCohort ?? 'complete'].stages);
 		}
 		if (path === '/v1/backlog') {
 			if (options.failBacklog) return problem(options.failBacklog);
