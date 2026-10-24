@@ -1,22 +1,59 @@
-<script>
+<script lang="ts">
+	import type { Snippet } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 
-	let { title, value, subtitle } = $props();
+	/**
+	 * A fixed-width metric card. An `unavailable` figure reads "—" with a visible
+	 * "Unavailable" label, never 0. `footer` replaces the plain-text subtitle
+	 * when the footnote needs markup, such as a denominator.
+	 */
+	type InfoCardProps = {
+		title: string;
+		value?: string | number | null;
+		subtitle?: string;
+		/** The figure is unknown: renders "—" and "Unavailable" instead of `value`. */
+		unavailable?: boolean;
+		footer?: Snippet;
+		/** Accessible text for the value, such as the exact figure behind "6.4M". */
+		valueLabel?: string;
+	};
+
+	let { title, value, subtitle, unavailable = false, footer, valueLabel }: InfoCardProps = $props();
+
+	const shown = $derived(unavailable || value == null ? '—' : value);
+	const isUnavailable = $derived(unavailable || value == null);
 </script>
 
 <Card.Root
 	class="w-64 overflow-hidden font-mono text-ellipsis text-muted-foreground md:w-56 lg:w-64"
 	size="sm"
+	data-slot="info-card"
+	data-unavailable={isUnavailable ? 'true' : undefined}
 >
 	<Card.Header>
 		<Card.Title class="text-sm font-light tracking-wide capitalize">{title}</Card.Title>
 	</Card.Header>
-	<Card.Content class="flex h-24 items-center justify-start ">
-		<p class="bg-transparent text-4xl font-bold text-foreground tabular-nums lg:text-5xl">
-			{value}
+	<Card.Content class="flex h-24 items-center justify-start gap-2">
+		<p
+			class="bg-transparent text-4xl font-bold text-foreground tabular-nums lg:text-5xl"
+			data-testid="info-card-value"
+		>
+			{#if valueLabel && !isUnavailable}
+				<span aria-hidden="true">{shown}</span><span class="sr-only">{valueLabel}</span>
+			{:else}
+				{shown}
+			{/if}
 		</p>
+		{#if isUnavailable}
+			<span class="text-xs text-foreground/75" data-testid="info-card-unavailable">Unavailable</span
+			>
+		{/if}
 	</Card.Content>
 	<Card.Footer class="items-start text-xs font-extralight tabular-nums">
-		{subtitle}
+		{#if footer}
+			{@render footer()}
+		{:else}
+			{subtitle}
+		{/if}
 	</Card.Footer>
 </Card.Root>

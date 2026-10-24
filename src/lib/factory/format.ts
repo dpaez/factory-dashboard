@@ -22,6 +22,23 @@ export function formatCost(costUsd: number | null | undefined): string {
 	return `$${costUsd.toFixed(2)}`;
 }
 
+/** A ratio as a percent: `0.8` → `80%`, `0.125` → `12.5%`; "—" when unknown. */
+export function formatPercent(ratio: number | null | undefined): string {
+	if (ratio == null || !Number.isFinite(ratio)) return UNAVAILABLE;
+	const percent = Math.round(ratio * 1_000) / 10;
+	return `${percent}%`;
+}
+
+/** A large count that fits a metric card: `6.40M`, `48.2K`, `950`; "—" when unknown. */
+export function formatCompact(count: number | null | undefined): string {
+	if (count == null || !Number.isFinite(count)) return UNAVAILABLE;
+	const abs = Math.abs(count);
+	if (abs >= 1_000_000_000) return `${(count / 1_000_000_000).toFixed(2)}B`;
+	if (abs >= 1_000_000) return `${(count / 1_000_000).toFixed(2)}M`;
+	if (abs >= 10_000) return `${(count / 1_000).toFixed(1)}K`;
+	return formatCount(count);
+}
+
 /** `1,034,700`, or "—". */
 export function formatCount(count: number | null | undefined): string {
 	if (count == null || !Number.isFinite(count)) return UNAVAILABLE;
@@ -46,8 +63,12 @@ export function formatElapsed(
 	endedAt: string | null | undefined
 ): string {
 	if (startedAt == null || endedAt == null) return UNAVAILABLE;
-	const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
-	if (!Number.isFinite(ms) || ms < 0) return UNAVAILABLE;
+	return formatSpan(new Date(endedAt).getTime() - new Date(startedAt).getTime());
+}
+
+/** A span of time as `formatElapsed` reads it: `42 s`, `2 h 5 m`; "—" when unknown. */
+export function formatSpan(ms: number | null | undefined): string {
+	if (ms == null || !Number.isFinite(ms) || ms < 0) return UNAVAILABLE;
 	const seconds = Math.round(ms / 1_000);
 	if (seconds < 1) return '<1 s';
 	if (seconds < 60) return `${seconds} s`;

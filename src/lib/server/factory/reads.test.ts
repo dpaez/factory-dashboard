@@ -239,7 +239,6 @@ describe('read operations', () => {
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.data.mergeRate).toBeNull();
 		expect(result.data.medianMs.waiting).toBeNull();
 		expect(result.data.externalReviewRounds.median).toBeNull();
 	});

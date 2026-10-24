@@ -1,5 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect } from 'storybook/test';
 	import InfoCard from './info-card.svelte';
 
 	const { Story } = defineMeta({
@@ -42,4 +43,15 @@
 <Story
 	name="Active agents unavailable"
 	args={{ title: 'Active agents', value: '—', subtitle: 'Unavailable' }}
+/>
+
+<Story
+	name="Unavailable"
+	args={{ title: 'Merge rate', value: null, unavailable: true, subtitle: 'No finished tickets' }}
+	play={async ({ canvasElement }) => {
+		const card = canvasElement.querySelector('[data-slot="info-card"]')!;
+		await expect(card.querySelector('[data-testid="info-card-value"]')).toHaveTextContent('—');
+		await expect(card).toHaveTextContent('Unavailable');
+		await expect(card).not.toHaveTextContent('0');
+	}}
 />

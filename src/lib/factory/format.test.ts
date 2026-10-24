@@ -6,6 +6,9 @@ import {
 	formatCount,
 	formatDuration,
 	formatElapsed,
+	formatCompact,
+	formatPercent,
+	formatSpan,
 	formatTimestamp,
 	stageLabel,
 	summaryText
@@ -21,6 +24,21 @@ describe('formatCost', () => {
 	it('keeps a known zero as $0.00', () => {
 		expect(formatCost(0)).toBe('$0.00');
 		expect(formatCost(3.421)).toBe('$3.42');
+	});
+});
+
+describe('formatPercent', () => {
+	it('renders an unknown ratio as —, never 0%', () => {
+		expect(formatPercent(null)).toBe('—');
+		expect(formatPercent(undefined)).toBe('—');
+		expect(formatPercent(Number.NaN)).toBe('—');
+	});
+
+	it('renders a measured ratio as a percent', () => {
+		expect(formatPercent(0)).toBe('0%');
+		expect(formatPercent(0.8)).toBe('80%');
+		expect(formatPercent(0.125)).toBe('12.5%');
+		expect(formatPercent(1)).toBe('100%');
 	});
 });
 
@@ -77,6 +95,27 @@ describe('formatDuration', () => {
 		expect(formatDuration(0)).toBe('0 ms');
 		expect(formatDuration(null)).toBe('—');
 		expect(formatDuration(Number.NaN)).toBe('—');
+	});
+});
+
+describe('formatCompact', () => {
+	it('shortens large counts and keeps small ones exact', () => {
+		expect(formatCompact(6_400_000)).toBe('6.40M');
+		expect(formatCompact(48_200)).toBe('48.2K');
+		expect(formatCompact(9_999)).toBe('9,999');
+		expect(formatCompact(0)).toBe('0');
+		expect(formatCompact(2_500_000_000)).toBe('2.50B');
+		expect(formatCompact(null)).toBe('—');
+	});
+});
+
+describe('formatSpan', () => {
+	it('reads a span in the largest units, and unknown as —', () => {
+		expect(formatSpan(0)).toBe('<1 s');
+		expect(formatSpan(36_000_000)).toBe('10 h');
+		expect(formatSpan(9_000_000)).toBe('2 h 30 m');
+		expect(formatSpan(null)).toBe('—');
+		expect(formatSpan(-1)).toBe('—');
 	});
 });
 
