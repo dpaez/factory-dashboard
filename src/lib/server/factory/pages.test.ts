@@ -12,6 +12,9 @@ import {
 	problemTrackerUnavailable,
 	problemUnauthorized,
 	problemValidationError,
+	statsTicketsComplete,
+	statsTicketsPageOne,
+	statsTicketsPageTwo,
 	ticketActiveInQa,
 	ticketActiveInWork,
 	ticketCompleteInDone,
@@ -29,7 +32,7 @@ import {
 
 import { createFactoryClient, factoryClientFromEnv } from './client';
 import { normalizeFactoryFailure } from './errors';
-import { listAllBacklog, listAllTickets, throwPageError } from './pages';
+import { listAllBacklog, listAllStatsTickets, listAllTickets, throwPageError } from './pages';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
@@ -127,6 +130,89 @@ describe('listAllTickets', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.failure.type).toBe('tracker_unavailable');
 		expect(result).not.toHaveProperty('data');
+	});
+});
+
+describe('listAllStatsTickets', () => {
+	const window = { from: '2026-10-01T00:00:00Z', to: '2026-10-31T00:00:00Z' };
+	const [a, b, c] = statsTicketsComplete.items;
+	const { items: _items, nextCursor: _cursor, ...envelope } = statsTicketsComplete;
+
+	it('follows three pages with the same from/to and reports complete', async () => {
+		const { client, requests } = scriptedClient([
+			() => json({ ...envelope, items: [a], nextCursor: '1' }),
+			() => json({ ...envelope, items: [b], nextCursor: '2' }),
+			() => json({ ...envelope, items: [c], nextCursor: null })
+		]);
+
+		const result = await listAllStatsTickets(client, window);
+
+		expect(result).toEqual({
+			ok: true,
+			data: { items: [a, b, c], envelope, complete: true, mismatch: false }
+		});
+		const urls = requests.map((request) => new URL(request.url));
+		expect(urls.every((url) => url.pathname === '/v1/stats/tickets')).toBe(true);
+		expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, '1', '2']);
+		expect(urls.every((url) => url.searchParams.get('from') === window.from)).toBe(true);
+		expect(urls.every((url) => url.searchParams.get('to') === window.to)).toBe(true);
+		expect(urls.every((url) => url.searchParams.get('limit') === '200')).toBe(true);
+	});
+
+	it('loads the two-page fixture into the complete cohort', async () => {
+		const { client } = scriptedClient([
+			() => json(statsTicketsPageOne),
+			() => json(statsTicketsPageTwo)
+		]);
+
+		const result = await listAllStatsTickets(client, window);
+
+		expect(result.ok && result.data.items).toEqual(statsTicketsComplete.items);
+		expect(result.ok && result.data.complete).toBe(true);
+	});
+
+	it('reports incomplete at the page bound', async () => {
+		const { client, requests } = scriptedClient([
+			() => json({ ...envelope, items: [a], nextCursor: '1' }),
+			() => json({ ...envelope, items: [b], nextCursor: '2' })
+		]);
+
+		const result = await listAllStatsTickets(client, window, { pages: 2, limit: 1 });
+
+		expect(result).toEqual({
+			ok: true,
+			data: { items: [a, b], envelope, complete: false, mismatch: false }
+		});
+		expect(requests).toHaveLength(2);
+		expect(new URL(requests[0]!.url).searchParams.get('limit')).toBe('1');
+	});
+
+	it('returns the first failure as is, never the loaded pages', async () => {
+		const { client } = scriptedClient([
+			() => json({ ...envelope, items: [a], nextCursor: '1' }),
+			() => problem(problemValidationError, 400),
+			() => json({ ...envelope, items: [c], nextCursor: null })
+		]);
+
+		const result = await listAllStatsTickets(client, window);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.failure.type).toBe('validation_error');
+		expect(result).not.toHaveProperty('data');
+	});
+
+	it('reports a mismatched envelope instead of merging its rows', async () => {
+		const { client } = scriptedClient([
+			() => json({ ...envelope, items: [a], nextCursor: '1' }),
+			() => json({ ...envelope, factoryId: 'factory-other', items: [b], nextCursor: null })
+		]);
+
+		const result = await listAllStatsTickets(client, window);
+
+		expect(result).toEqual({
+			ok: true,
+			data: { items: [a], envelope, complete: false, mismatch: true }
+		});
 	});
 });
 

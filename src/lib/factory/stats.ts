@@ -282,7 +282,40 @@ export const DEFINITIONS = {
 	acceptedOutputs: 'Runs whose output was accepted.',
 	stageTokens: 'Tokens per accepted output × accepted outputs, summed over model setups (rounded).',
 	coverage: 'Known stage tokens over cohort tokens.',
-	tokenCategories: 'Input, cache read, cache write, and output tokens.'
+	tokenCategories: 'Input, cache read, cache write, and output tokens.',
+	startToHandoff:
+		'Execution start to validated handoff, over executions that reached handoff. Not time to merge.',
+	startToHandoffMedian:
+		'Middle start → handoff duration (mean of the two middles for an even sample), same sample.',
+	startToHandoffP90: 'Nearest-rank P90 of start → handoff: sorted[ceil(0.9 × n) − 1], same sample.',
+	waitingBeforeHandoff:
+		'Start → handoff minus factory time, per execution: waiting for a reply, paused, or failed to resume before handoff. Waiting after handoff is not included.',
+	factoryTime: 'Start → handoff minus waiting before handoff.',
+	stageTime:
+		'Mean stage time per execution, excluding waiting. Work, QA, and review sum every visit and return. A stage the execution never ran counts as 0.',
+	unattributed: 'Factory time minus the summed mean stage times, over the same executions.',
+	agentTime: 'Mean summed run duration per execution. Runs can overlap: this is not wall time.',
+	overhead:
+		'Stage time minus agent time (validation, launching, queueing), over executions with stage time.',
+	executions: 'Executions started in the window. A rerun is its own execution.',
+	reachedHandoff: 'Executions started in the window that reached handoff.',
+	neededAPerson:
+		'Executions with any intervention (question, limit pause, reply, manual retry, manual complete, or stop) over all executions started in the window.',
+	intervention: 'Interventions of this kind across executions started in the window.',
+	externalReviewRounds:
+		'Distinct pull request commits that drew a review asking for changes, or a comment with a body, from anyone other than the author. Over executions with a merged or abandoned pull request.',
+	externalReviewRoundsMedian:
+		'Median external review rounds per execution with a merged or abandoned pull request.',
+	externalChangesRequested:
+		'Merged executions with at least one external review asking for changes, over merged executions.',
+	followUpCommits: 'Pull request commits made after handoff, over executions that reached handoff.',
+	configurationTickets: 'Executions started in the window with this factory configuration.',
+	configurationMerged: 'Executions with this factory configuration whose pull request merged.',
+	configurationMedianFactoryTime: 'Median factory time over executions that reached handoff.',
+	configurationMedianCost: 'Median run cost (USD) per execution.',
+	configurationMedianExternalReviewRounds:
+		'Median external review rounds over executions with a merged or abandoned pull request.',
+	configurationInterventions: 'Interventions of every kind, summed.'
 } as const;
 
 export function toSummaryMetrics(summary: StatsSummary, cohort: CohortRef): SummaryMetrics {

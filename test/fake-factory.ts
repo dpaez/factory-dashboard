@@ -19,6 +19,11 @@ import { eventFrame } from '../src/lib/factory/fixtures/events.ts';
 import {
 	statsCompleteStages,
 	statsCompleteSummary,
+	statsConfigurations,
+	statsTicketsComplete,
+	statsTicketsMissingTimings,
+	statsTicketsNoHandoffs,
+	statsTicketsSmallSample,
 	statsEmptyStages,
 	statsEmptySummary,
 	statsPartialStages,
@@ -186,6 +191,23 @@ export const FAKE_STATS_COHORTS = {
 
 export type FakeStatsCohort = keyof typeof FAKE_STATS_COHORTS;
 
+/** The ticket fact cohorts the fake can serve for `/v1/stats/tickets`. */
+export const FAKE_STATS_TICKETS_COHORTS = {
+	complete: statsTicketsComplete,
+	smallSample: statsTicketsSmallSample,
+	missingTimings: statsTicketsMissingTimings,
+	noHandoffs: statsTicketsNoHandoffs,
+	empty: { ...statsTicketsComplete, items: [] }
+} satisfies Record<string, Schemas['StatsTickets']>;
+
+export type FakeStatsTicketsCohort = keyof typeof FAKE_STATS_TICKETS_COHORTS;
+
+/**
+ * The fake pages stats ticket rows at most this many at a time, whatever
+ * `limit` asks for, so the complete cohort spans several pages.
+ */
+export const FAKE_STATS_TICKETS_PAGE_SIZE = 5;
+
 export type FakeFactoryOptions = {
 	token?: string;
 	/** The cohort `/v1/stats/summary` and `/v1/stats/stages` serve (default `complete`). */
@@ -194,6 +216,15 @@ export type FakeFactoryOptions = {
 	failStatsSummary?: Problem;
 	/** Answer this problem for `GET /v1/stats/stages`. */
 	failStatsStages?: Problem;
+	/** The rows `/v1/stats/tickets` pages through (default `complete`, three pages). */
+	statsTicketsCohort?: FakeStatsTicketsCohort;
+	/**
+	 * Answer this problem for `GET /v1/stats/tickets`: every page, or only the
+	 * page at this offset (`cursor`, `0` for the first).
+	 */
+	failStatsTickets?: Problem | { atCursor: number; problem: Problem };
+	/** Answer this problem for `GET /v1/stats/configurations`. */
+	failStatsConfigurations?: Problem;
 	/** Answer this problem for `GET /v1/tickets/{key}` of these keys. */
 	failDetail?: { keys: string[]; problem: Problem };
 	/** Answer this problem for `GET /v1/agents`. */
@@ -624,6 +655,30 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		if (path === '/v1/stats/stages') {
 			if (options.failStatsStages) return problem(options.failStatsStages);
 			return json(FAKE_STATS_COHORTS[options.statsCohort ?? 'complete'].stages);
+		}
+		if (path === '/v1/stats/tickets') {
+			const start = Number(url.searchParams.get('cursor') ?? 0);
+			const failure = options.failStatsTickets;
+			if (failure && 'atCursor' in failure) {
+				if (failure.atCursor === start) return problem(failure.problem);
+			} else if (failure) {
+				return problem(failure);
+			}
+			const cohort = FAKE_STATS_TICKETS_COHORTS[options.statsTicketsCohort ?? 'complete'];
+			const limit = Math.min(
+				Number(url.searchParams.get('limit') ?? 50),
+				FAKE_STATS_TICKETS_PAGE_SIZE
+			);
+			const end = start + limit;
+			return json({
+				...cohort,
+				items: cohort.items.slice(start, end),
+				nextCursor: end < cohort.items.length ? String(end) : null
+			} satisfies Schemas['StatsTickets']);
+		}
+		if (path === '/v1/stats/configurations') {
+			if (options.failStatsConfigurations) return problem(options.failStatsConfigurations);
+			return json(statsConfigurations);
 		}
 		if (path === '/v1/backlog') {
 			if (options.failBacklog) return problem(options.failBacklog);

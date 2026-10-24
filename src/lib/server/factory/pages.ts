@@ -10,6 +10,7 @@ import type { FactoryClient } from './client';
 import { CONFIGURATION_ERROR, normalizeFactoryFailure, type FactoryApiFailure } from './errors';
 import {
 	getBacklog,
+	getStatsTickets,
 	listRuns,
 	listTickets,
 	type FactoryResult,
@@ -21,6 +22,8 @@ import {
 type TicketSummary = components['schemas']['TicketSummary'];
 type Run = components['schemas']['Run'];
 type BacklogIssue = components['schemas']['BacklogIssue'];
+type StatsTickets = components['schemas']['StatsTickets'];
+type StatsTicketRow = components['schemas']['StatsTicketRow'];
 
 /** At most this many pages are read per list. */
 export const TICKET_PAGE_BOUND = 20;
@@ -141,6 +144,76 @@ export async function listAllBacklog(
 		cursor = result.data.nextCursor;
 	}
 	return { ok: true, data: { items, fetchedAt: fetchedAt ?? '', complete: false } };
+}
+
+/** At most this many stats ticket pages are read per window. */
+export const STATS_TICKETS_PAGE_BOUND = 50;
+/** Page size the stats ticket pager asks for: the API maximum. */
+export const STATS_TICKETS_PAGE_LIMIT = 200;
+
+export type StatsTicketsEnvelope = Pick<
+	StatsTickets,
+	'definitions' | 'factoryId' | 'factoryVersions'
+>;
+
+export type AllStatsTickets = {
+	/** Every row of every page, oldest start first. */
+	items: StatsTicketRow[];
+	/** The first page's envelope. */
+	envelope: StatsTicketsEnvelope;
+	/** False when the pager stopped at its bound with pages left. */
+	complete: boolean;
+	/** A later page disagreed with the first on factoryId or definitions. */
+	mismatch: boolean;
+};
+
+/**
+ * Load every `/v1/stats/tickets` page for one window: the same `from`/`to`
+ * on each request, following `nextCursor` until the last page or the bound.
+ * Returns the first failure as is. A page whose envelope disagrees with the
+ * first is reported as a mismatch and its rows are not merged; the result is
+ * then incomplete.
+ */
+export async function listAllStatsTickets(
+	client: FactoryClient,
+	window: { from: string; to: string },
+	bound: { pages?: number; limit?: number } = {}
+): Promise<FactoryResult<AllStatsTickets>> {
+	const pages = bound.pages ?? STATS_TICKETS_PAGE_BOUND;
+	const limit = bound.limit ?? STATS_TICKETS_PAGE_LIMIT;
+	const items: StatsTicketRow[] = [];
+	let envelope: StatsTicketsEnvelope | undefined;
+	let cursor: string | undefined;
+
+	for (let page = 0; page < pages; page += 1) {
+		const result = await getStatsTickets(client, {
+			from: window.from,
+			to: window.to,
+			limit,
+			...(cursor && { cursor })
+		});
+		if (!result.ok) return result;
+		const { definitions, factoryId, factoryVersions } = result.data;
+		if (envelope === undefined) {
+			envelope = { definitions, factoryId, factoryVersions: [...factoryVersions] };
+		} else if (envelope.factoryId !== factoryId || envelope.definitions !== definitions) {
+			return { ok: true, data: { items, envelope, complete: false, mismatch: true } };
+		}
+		items.push(...result.data.items);
+		if (result.data.nextCursor === null || result.data.nextCursor === '') {
+			return { ok: true, data: { items, envelope, complete: true, mismatch: false } };
+		}
+		cursor = result.data.nextCursor;
+	}
+	return {
+		ok: true,
+		data: {
+			items,
+			envelope: envelope ?? { definitions: 'stats.v1', factoryId: '', factoryVersions: [] },
+			complete: false,
+			mismatch: false
+		}
+	};
 }
 
 /** Failures that mean the dashboard's own configuration or token is wrong. */
