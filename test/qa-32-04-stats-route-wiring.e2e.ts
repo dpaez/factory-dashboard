@@ -21,7 +21,12 @@ const shot = async (page: Page, name: string) => {
 };
 
 const LEAK = 'qa-32-04 leaked detail: /srv/factory/facts.sqlite locked';
-const internal = { status: 500, title: 'Internal error', type: 'internal_error', detail: LEAK };
+const internal = {
+	status: 500,
+	title: 'Internal error',
+	type: 'internal_error',
+	detail: LEAK
+} as const;
 const PANEL_ERROR = 'This panel could not be read. Other panels are unaffected.';
 
 type Req = { method: string; path: string };
@@ -153,7 +158,9 @@ test.describe('QA 32-04: the complete multi-page cohort', () => {
 			.filter((r) => totalInterventions(r) > 0)
 			.map((r) => r.displayRef);
 		expect(expected.length).toBeGreaterThan(0);
-		const rows = contributors(page).getByRole('row').filter({ has: page.getByRole('rowheader') });
+		const rows = contributors(page)
+			.getByRole('row')
+			.filter({ has: page.getByRole('rowheader') });
 		await expect(rows.getByRole('rowheader')).toHaveText(expected);
 		await shot(page, 'ac7-needed-a-person-contributors');
 
