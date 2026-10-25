@@ -15,6 +15,13 @@
 			};
 		}
 		if (kind === 'not_found' || page.status === 404) {
+			if (page.error?.message === 'No such execution in this ticket') {
+				return {
+					heading: 'No such execution in this ticket',
+					explanation:
+						'The ticket has no execution that started at this time. The current execution is not shown in its place.'
+				};
+			}
 			return {
 				heading:
 					page.error?.message === 'No such execution' ? 'No such execution' : 'No such ticket',

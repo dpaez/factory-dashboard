@@ -218,6 +218,8 @@ test('AC9: a failed panel shows only its safe title; loading shows a skeleton', 
 });
 
 test('AC10: every stats story renders in a light and a dark pane', async ({ page }) => {
+	// One Storybook visit per story: the stats story set grew with #32's panels.
+	test.setTimeout(180_000);
 	const res = await page.request.get(`${SB}/index.json`);
 	const entries = Object.values(
 		((await res.json()) as { entries: Record<string, { id: string; type: string; title: string }> })

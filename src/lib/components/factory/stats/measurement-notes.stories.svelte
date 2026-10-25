@@ -43,6 +43,20 @@
 		);
 		await expect(note('missing-usage')).toHaveTextContent('as 0 tokens');
 		await expect(note('categories')).toHaveTextContent('geut/factory-skills#62');
+		await expect(note('start-to-handoff')).toHaveTextContent('Not time to merge');
+		await expect(note('p90')).toHaveTextContent('nearest-rank');
+		await expect(note('p90')).toHaveTextContent('ceil(0.9 × n)');
+		await expect(note('eligible-sample')).toHaveTextContent('the executions that reached handoff');
+		await expect(note('waiting')).toHaveTextContent('waiting after handoff');
+		await expect(note('stage-time')).toHaveTextContent('excluding waiting');
+		await expect(note('stage-time')).toHaveTextContent('every visit and return');
+		await expect(note('overhead')).toHaveTextContent('Overhead = stage time − agent time');
+		await expect(note('executions')).toHaveTextContent('Rows are executions, not tickets');
+		await expect(note('intervention')).toHaveTextContent(
+			'question, limit pause, reply, manual retry, manual complete, or stop'
+		);
+		await expect(note('external-review-rounds')).toHaveTextContent('a comment with a body');
+		await expect(note('external-review-rounds')).toHaveTextContent('geut/factory-skills#63');
 		await expect(note('definitions')).toHaveTextContent('Definitions: stats.v1');
 	}}
 />

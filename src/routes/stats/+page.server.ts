@@ -1,5 +1,17 @@
 import { TICKETS_KEY } from '$lib/factory/events';
 import {
+	CONTRIBUTOR_MEASURES,
+	toConfigurationComparison,
+	toContributors,
+	toTicketsQuality,
+	toTimeBreakdown,
+	type ConfigurationComparison,
+	type ContributorMeasure,
+	type Contributors,
+	type TicketsQuality,
+	type TimeBreakdown
+} from '$lib/factory/stats-tickets';
+import {
 	parseCohortWindow,
 	toCohort,
 	toStageTable,
@@ -13,8 +25,18 @@ import {
 	type TokensByStage
 } from '$lib/factory/stats';
 import { factoryClientFromEnv, type FactoryClient } from '$lib/server/factory/client';
-import { isConfigurationFailure, throwPageError } from '$lib/server/factory/pages';
-import { getStatsStages, getStatsSummary, type FactoryResult } from '$lib/server/factory/reads';
+import {
+	isConfigurationFailure,
+	listAllStatsTickets,
+	throwPageError,
+	type AllStatsTickets
+} from '$lib/server/factory/pages';
+import {
+	getStatsConfigurations,
+	getStatsStages,
+	getStatsSummary,
+	type FactoryResult
+} from '$lib/server/factory/reads';
 import type { PageServerLoad } from './$types';
 
 /** One panel's data: its model, or a safe failure with no upstream detail or body. */
@@ -47,9 +69,10 @@ function mapPanel<T, M>(result: StatsPanelResult<T>, toModel: (data: T) => M): S
 function tokensByStage(
 	stages: StatsStages,
 	summary: StatsSummary | null,
-	cohort: Cohort
+	cohort: Cohort,
+	mismatch: boolean
 ): TokensByStage {
-	if (!cohort.mismatch) return toTokensByStage(stages, summary, cohort);
+	if (!mismatch) return toTokensByStage(stages, summary, cohort);
 	const model = toTokensByStage(stages, null, cohort);
 	return {
 		...model,
@@ -59,6 +82,42 @@ function tokensByStage(
 
 const MISMATCH_REASON =
 	'The summary and stages came from different factories or definitions, so they do not compare.';
+
+/** Everything the time, quality and contributors panels show, from one complete page set. */
+export type TicketFacts = {
+	/** False when the pager stopped early or a page came from another factory. */
+	complete: boolean;
+	time: TimeBreakdown;
+	quality: TicketsQuality;
+	/** The exact executions behind each selectable figure. */
+	contributors: Record<ContributorMeasure, Contributors>;
+};
+
+/** True when both envelopes exist and agree on factory and definitions. */
+function sameEnvelope(
+	a: { factoryId: string; definitions: string } | null,
+	b: { factoryId: string; definitions: string } | null
+): boolean {
+	return a !== null && b !== null && a.factoryId === b.factoryId && a.definitions === b.definitions;
+}
+
+function toTicketFacts(
+	facts: AllStatsTickets,
+	summary: StatsSummary | null,
+	cohort: Cohort
+): TicketFacts {
+	const complete = facts.complete && !facts.mismatch;
+	// Rows reconcile with the summary only when both describe the same factory and definitions.
+	const comparable = sameEnvelope(summary, facts.envelope) ? summary : null;
+	return {
+		complete,
+		time: toTimeBreakdown(facts.items, complete, cohort),
+		quality: toTicketsQuality(facts.items, comparable, complete, cohort),
+		contributors: Object.fromEntries(
+			CONTRIBUTOR_MEASURES.map((measure) => [measure, toContributors(facts.items, measure)])
+		) as Record<ContributorMeasure, Contributors>
+	};
+}
 
 /**
  * Factory stats for one cohort. The window is computed once from the URL and
@@ -77,24 +136,47 @@ export const load: PageServerLoad = async ({ depends, fetch, url }) => {
 
 	const window = parseCohortWindow(url.searchParams);
 	const { from, to } = window;
-	const [summaryRead, stagesRead] = await Promise.all([
+	// Every ticket page is followed before any figure is computed from them.
+	const [summaryRead, stagesRead, ticketsRead, configurationsRead] = await Promise.all([
 		getStatsSummary(client, { from, to }),
-		getStatsStages(client, { from, to, groupBy: 'setup' })
+		getStatsStages(client, { from, to, groupBy: 'setup' }),
+		listAllStatsTickets(client, { from, to }),
+		getStatsConfigurations(client, { from, to })
 	]);
 	const observedAt = new Date().toISOString();
 	const summary = settle(summaryRead);
 	const stages = settle(stagesRead);
+	const tickets = settle(ticketsRead);
+	const configurations = settle(configurationsRead);
 
 	const summaryData = summary.ok ? summary.model : null;
 	const stagesData = stages.ok ? stages.model : null;
+	const ticketsEnvelope = tickets.ok ? tickets.model.envelope : null;
+	const configurationsData = configurations.ok ? configurations.model : null;
 
-	const cohort: Cohort = toCohort([summaryData, stagesData], window, observedAt);
+	const envelopes = toCohort(
+		[summaryData, stagesData, ticketsEnvelope, configurationsData],
+		window,
+		observedAt
+	);
+	// A later ticket page from another factory is a mismatch too.
+	const cohort: Cohort = {
+		...envelopes,
+		mismatch: envelopes.mismatch || (tickets.ok && tickets.model.mismatch)
+	};
+	const stagesMismatch = toCohort([summaryData, stagesData], window, observedAt).mismatch;
 	return {
 		cohort,
 		notice: window.notice,
 		summary: mapPanel(summary, (data): SummaryMetrics => toSummaryMetrics(data, cohort)),
 		stages: mapPanel(stages, (data): StageGroup[] => toStageTable(data, cohort)),
 		// The token bars need the stages; their coverage needs the summary of the same envelope.
-		tokens: mapPanel(stages, (data): TokensByStage => tokensByStage(data, summaryData, cohort))
+		tokens: mapPanel(stages, (data): TokensByStage =>
+			tokensByStage(data, summaryData, cohort, stagesMismatch)
+		),
+		tickets: mapPanel(tickets, (data): TicketFacts => toTicketFacts(data, summaryData, cohort)),
+		configurations: mapPanel(configurations, (data): ConfigurationComparison =>
+			toConfigurationComparison(data, cohort)
+		)
 	};
 };

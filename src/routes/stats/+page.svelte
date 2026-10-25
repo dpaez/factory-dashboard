@@ -1,8 +1,13 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 
+	import ConfigurationComparison from '$lib/components/factory/stats/configuration-comparison.svelte';
+	import ContributingTickets from '$lib/components/factory/stats/contributing-tickets.svelte';
+	import TicketsQuality from '$lib/components/factory/stats/tickets-quality.svelte';
+	import TimeBreakdown from '$lib/components/factory/stats/time-breakdown.svelte';
 	import CohortHeader from '$lib/components/factory/stats/cohort-header.svelte';
 	import MeasurementNotes from '$lib/components/factory/stats/measurement-notes.svelte';
 	import MetricSummaryRow from '$lib/components/factory/stats/metric-summary-row.svelte';
@@ -16,6 +21,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { CONTRIBUTOR_MEASURES, type ContributorMeasure } from '$lib/factory/stats-tickets';
 	import type { StatsPanelResult } from './+page.server';
 
 	let { data }: PageProps = $props();
@@ -24,6 +30,29 @@
 	const summary = $derived(toPanel(data.summary));
 	const stages = $derived(toPanel(data.stages));
 	const tokens = $derived(toPanel(data.tokens));
+	const tickets = $derived(toPanel(data.tickets));
+	const time = $derived(toPanel(mapResult(data.tickets, (facts) => facts.time)));
+	const quality = $derived(toPanel(mapResult(data.tickets, (facts) => facts.quality)));
+	const configurations = $derived(toPanel(data.configurations));
+
+	/** The figure ContributingTickets lists: `?measure=`, else the time sample. */
+	const measure = $derived.by((): ContributorMeasure => {
+		const param = page.url.searchParams.get('measure');
+		return (CONTRIBUTOR_MEASURES as readonly string[]).includes(param ?? '')
+			? (param as ContributorMeasure)
+			: 'timeSample';
+	});
+	const contributors = $derived(
+		toPanel(mapResult(data.tickets, (facts) => facts.contributors[measure]))
+	);
+	const complete = $derived(tickets.kind === 'ready' ? tickets.model.complete : true);
+
+	/** Selecting a figure keeps the window and swaps only `?measure=`; the load does not rerun. */
+	function select(next: ContributorMeasure) {
+		const url = new URL(page.url);
+		url.searchParams.set('measure', next);
+		void goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+	}
 
 	const DAY_MS = 86_400_000;
 	/** The window as the date inputs show it: the first and the last day included. */
@@ -34,6 +63,10 @@
 		const lastDay = to.getTime() % DAY_MS === 0 ? new Date(to.getTime() - DAY_MS) : to;
 		return lastDay.toISOString().slice(0, 10);
 	});
+
+	function mapResult<T, M>(result: StatsPanelResult<T>, to: (model: T) => M): StatsPanelResult<M> {
+		return result.ok ? { ok: true, model: to(result.model) } : result;
+	}
 
 	function toPanel<T>(result: StatsPanelResult<T>): PanelState<T> {
 		return result.ok ? readyPanel(result.model) : failedPanel(result.failure);
@@ -92,7 +125,15 @@
 				<StageTable state={stages} onretry={retry} />
 			</div>
 			<TokensByStage state={tokens} onretry={retry} />
+			<TimeBreakdown state={time} selected={measure} onselect={select} onretry={retry} />
+			<TicketsQuality state={quality} selected={measure} onselect={select} onretry={retry} />
 			<MeasurementNotes definitions={cohort.definitions} />
+			<div class="min-w-0 lg:col-span-2">
+				<ContributingTickets state={contributors} {complete} onretry={retry} />
+			</div>
+			<div class="min-w-0 lg:col-span-2">
+				<ConfigurationComparison state={configurations} onretry={retry} />
+			</div>
 		</div>
 	</section>
 </main>

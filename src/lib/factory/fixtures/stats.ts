@@ -377,3 +377,329 @@ export const statsPartialStages = {
 		})
 	]
 } satisfies Schemas['StatsStages'];
+
+/*
+ * Ticket fact rows (`/v1/stats/tickets`). One row per execution started in the
+ * window. `execution` is the execution's internal UUID, not its generation.
+ */
+
+type TicketRow = Schemas['StatsTicketRow'];
+const MINUTE = 60_000;
+
+function ticketRow(
+	row: Pick<TicketRow, 'key' | 'displayRef' | 'execution' | 'startedAt' | 'outcome'> &
+		Partial<TicketRow>
+) {
+	return {
+		agentMs: 0,
+		configuration: configurationOpus,
+		costUsd: 0,
+		externalReviewRounds: { bot: 0, human: 0, total: 0 },
+		factoryMs: null,
+		factoryVersion: '0.15.1',
+		followUpCommits: 0,
+		handedOffAt: null,
+		handoffToMergeMs: null,
+		interventions: noInterventions,
+		leadMs: null,
+		mergedAt: null,
+		overheadMs: null,
+		stageMs: {},
+		startToHandoffMs: null,
+		tokens: 0,
+		waitingMs: 0,
+		...row
+	} satisfies TicketRow;
+}
+
+/**
+ * A row that reached handoff, built like factory-skills `facts.ts`:
+ * `factoryMs = startToHandoff − waitingBefore`, `waitingMs` counts waiting
+ * before and after handoff, and `overheadMs = Σ stage − agent` (null at 0).
+ * Durations are in minutes.
+ */
+function handedOffRow(
+	row: Pick<TicketRow, 'key' | 'displayRef' | 'execution' | 'startedAt' | 'outcome'> &
+		Partial<TicketRow> & {
+			minutes: {
+				toHandoff: number;
+				waitingBefore?: number;
+				waitingAfter?: number;
+				agent?: number;
+				stages?: Record<string, number>;
+			};
+		}
+) {
+	const { minutes, ...rest } = row;
+	const stageMs = Object.fromEntries(
+		Object.entries(minutes.stages ?? {}).map(([stage, value]) => [stage, value * MINUTE])
+	);
+	const stageTotal = Object.values(stageMs).reduce((sum, value) => sum + value, 0);
+	const agentMs = (minutes.agent ?? 0) * MINUTE;
+	const startToHandoffMs = minutes.toHandoff * MINUTE;
+	const waitingBefore = (minutes.waitingBefore ?? 0) * MINUTE;
+	return ticketRow({
+		agentMs,
+		factoryMs: Math.max(0, startToHandoffMs - waitingBefore),
+		handedOffAt: new Date(Date.parse(row.startedAt) + startToHandoffMs)
+			.toISOString()
+			.replace(/\.\d+Z$/, 'Z'),
+		overheadMs: stageTotal === 0 ? null : Math.max(0, stageTotal - agentMs),
+		stageMs,
+		startToHandoffMs,
+		waitingMs: waitingBefore + (minutes.waitingAfter ?? 0) * MINUTE,
+		...rest
+	});
+}
+
+/** Generation 1 of the multi-execution ticket: `startedAt` equals its `createdAt`. */
+export const statsTicketMultiExecutionRow = handedOffRow({
+	key: 'dpaez-factory-dashboard-9-9a0b1c2d',
+	displayRef: 'dpaez/factory-dashboard#9',
+	execution: '6f1c2a7e-3b9d-4e8a-9c41-5d2f7b8e0a11',
+	startedAt: '2026-10-05T08:00:00Z',
+	outcome: 'merged',
+	costUsd: 3.9,
+	tokens: 820_000,
+	externalReviewRounds: { bot: 1, human: 1, total: 2 },
+	followUpCommits: 1,
+	interventions: { ...noInterventions, questions: 1, replies: 1 },
+	minutes: {
+		toHandoff: 240,
+		waitingBefore: 30,
+		agent: 120,
+		stages: { plan: 20, work: 100, review: 40, wrapup: 10 }
+	}
+});
+
+/**
+ * Waiting before handoff (60 min) and after it (90 min): waiting before +
+ * factory time = start → handoff, and the 90 minutes belong to no time figure.
+ */
+export const statsTicketWaitingRow = handedOffRow({
+	key: 'dpaez-factory-dashboard-14-1e2f3a4b',
+	displayRef: 'dpaez/factory-dashboard#14',
+	execution: 'a2d4e6f8-0b1c-4d3e-8f5a-6b7c8d9e0f12',
+	startedAt: '2026-10-06T10:00:00Z',
+	outcome: 'merged',
+	costUsd: 7.2,
+	tokens: 1_560_000,
+	externalReviewRounds: { bot: 0, human: 1, total: 1 },
+	interventions: { ...noInterventions, questions: 2, replies: 2, limitPauses: 1 },
+	minutes: {
+		toHandoff: 600,
+		waitingBefore: 60,
+		waitingAfter: 90,
+		agent: 300,
+		// Work and review sum a return to work.
+		stages: { plan: 30, work: 280, qa: 40, review: 90, wrapup: 15 }
+	}
+});
+
+/** Ten executions reached handoff, two did not (open and cancelled). */
+export const statsTicketsComplete = {
+	...statsHeader,
+	items: [
+		statsTicketMultiExecutionRow,
+		statsTicketWaitingRow,
+		handedOffRow({
+			key: 'dpaez-factory-dashboard-15-2a3b4c5d',
+			displayRef: 'dpaez/factory-dashboard#15',
+			execution: 'b3e5f7a9-1c2d-4e4f-9a6b-7c8d9e0f1a13',
+			startedAt: '2026-10-07T09:00:00Z',
+			outcome: 'merged',
+			costUsd: 1.1,
+			tokens: 240_000,
+			minutes: { toHandoff: 60, agent: 30, stages: { plan: 10, work: 30, wrapup: 5 } }
+		}),
+		handedOffRow({
+			key: 'dpaez-factory-dashboard-16-3b4c5d6e',
+			displayRef: 'dpaez/factory-dashboard#16',
+			execution: 'c4f6a8b0-2d3e-4f5a-8b7c-8d9e0f1a2b14',
+			startedAt: '2026-10-07T13:00:00Z',
+			outcome: 'merged',
+			costUsd: 1.6,
+			tokens: 310_000,
+			minutes: { toHandoff: 90, agent: 50, stages: { plan: 10, work: 50, review: 15 } }
+		}),
+		handedOffRow({
+			key: 'dpaez-factory-dashboard-17-4c5d6e7f',
+			displayRef: 'dpaez/factory-dashboard#17',
+			execution: 'd5a7b9c1-3e4f-4a6b-9c8d-9e0f1a2b3c15',
+			startedAt: '2026-10-08T09:00:00Z',
+			outcome: 'abandoned',
+			configuration: configurationGpt,
+			costUsd: 2.3,
+			tokens: 450_000,
+			externalReviewRounds: { bot: 2, human: 0, total: 2 },
+			interventions: { ...noInterventions, stops: 1 },
+			minutes: { toHandoff: 120, agent: 60, stages: { plan: 15, work: 70, review: 20 } }
+		}),
+		handedOffRow({
+			key: 'dpaez-factory-dashboard-18-5d6e7f8a',
+			displayRef: 'dpaez/factory-dashboard#18',
+			execution: 'e6b8c0d2-4f5a-4b7c-8d9e-0f1a2b3c4d16',
+			startedAt: '2026-10-08T14:00:00Z',
+			outcome: 'merged',
+			costUsd: 2.8,
+			tokens: 520_000,
+			minutes: {
+				toHandoff: 150,
+				agent: 80,
+				stages: { plan: 15, work: 90, qa: 15, review: 20 }
+			}
+		}),
+		handedOffRow({
+			key: 'dpaez-factory-dashboard-19-6e7f8a9b',
+			displayRef: 'dpaez/factory-dashboard#19',
+			execution: 'f7c9d1e3-5a6b-4c8d-9e0f-1a2b3c4d5e17',
+			startedAt: '2026-10-09T09:00:00Z',
+			outcome: 'merged',
+			costUsd: 3.1,
+			tokens: 600_000,
+			externalReviewRounds: { bot: 1, human: 0, total: 1 },
+			followUpCommits: 2,
+			minutes: { toHandoff: 180, agent: 90, stages: { plan: 20, work: 100, review: 30 } }
+		}),
+		handedOffRow({
+			key: 'kai-21-7f8a9b0c',
+			displayRef: 'KAI-21',
+			execution: '08d0e2f4-6b7c-4d9e-8f1a-2b3c4d5e6f18',
+			startedAt: '2026-10-10T09:00:00Z',
+			outcome: 'merged',
+			configuration: configurationGpt,
+			costUsd: 2.2,
+			tokens: 430_000,
+			interventions: { ...noInterventions, manualRetries: 1 },
+			minutes: {
+				toHandoff: 300,
+				waitingBefore: 20,
+				agent: 140,
+				stages: { plan: 20, work: 160, review: 40 }
+			}
+		}),
+		handedOffRow({
+			key: 'kai-22-8a9b0c1d',
+			displayRef: 'KAI-22',
+			execution: '19e1f3a5-7c8d-4e0f-9a2b-3c4d5e6f7a19',
+			startedAt: '2026-10-11T09:00:00Z',
+			outcome: 'merged',
+			costUsd: 4.4,
+			tokens: 900_000,
+			externalReviewRounds: { bot: 0, human: 2, total: 2 },
+			minutes: {
+				toHandoff: 360,
+				agent: 200,
+				stages: { plan: 30, work: 220, qa: 30, review: 50 }
+			}
+		}),
+		// Handed off with the pull request still open: its review rounds are
+		// outside the merged-or-abandoned sample.
+		handedOffRow({
+			key: 'kai-23-9b0c1d2e',
+			displayRef: 'KAI-23',
+			execution: '2af2a4b6-8d9e-4f1a-8b3c-4d5e6f7a8b20',
+			startedAt: '2026-10-12T09:00:00Z',
+			outcome: 'open',
+			costUsd: 5,
+			tokens: 1_020_000,
+			externalReviewRounds: { bot: 1, human: 0, total: 1 },
+			interventions: { ...noInterventions, manualCompletes: 1 },
+			minutes: {
+				toHandoff: 480,
+				waitingBefore: 40,
+				agent: 250,
+				stages: { plan: 30, work: 280, review: 60 }
+			}
+		}),
+		ticketRow({
+			key: 'dpaez-factory-dashboard-20-0c1d2e3f',
+			displayRef: 'dpaez/factory-dashboard#20',
+			execution: '3b03b5c7-9e0f-4a2b-9c4d-5e6f7a8b9c21',
+			startedAt: '2026-10-13T09:00:00Z',
+			outcome: 'open',
+			agentMs: 40 * MINUTE,
+			costUsd: 0.9,
+			tokens: 180_000,
+			interventions: { ...noInterventions, questions: 1 },
+			stageMs: { plan: 15 * MINUTE, work: 30 * MINUTE },
+			waitingMs: 120 * MINUTE
+		}),
+		ticketRow({
+			key: 'kai-24-1d2e3f4a',
+			displayRef: 'KAI-24',
+			execution: '4c14c6d8-0f1a-4b3c-8d5e-6f7a8b9c0d22',
+			startedAt: '2026-10-13T15:00:00Z',
+			outcome: 'cancelled',
+			agentMs: 10 * MINUTE,
+			costUsd: 0.3,
+			tokens: 60_000,
+			stageMs: { plan: 12 * MINUTE }
+		})
+	],
+	nextCursor: null
+} satisfies Schemas['StatsTickets'];
+
+/** The complete cohort split over two pages (`nextCursor` is an offset). */
+export const statsTicketsPageOne = {
+	...statsHeader,
+	items: statsTicketsComplete.items.slice(0, 6),
+	nextCursor: '6'
+} satisfies Schemas['StatsTickets'];
+
+export const statsTicketsPageTwo = {
+	...statsHeader,
+	items: statsTicketsComplete.items.slice(6),
+	nextCursor: null
+} satisfies Schemas['StatsTickets'];
+
+/** Three executions reached handoff: n = 3. */
+export const statsTicketsSmallSample = {
+	...statsHeader,
+	items: statsTicketsComplete.items.slice(0, 3),
+	nextCursor: null
+} satisfies Schemas['StatsTickets'];
+
+/** Handed off, but stage timings are missing on two rows: no stage time, no overhead. */
+export const statsTicketsMissingTimings = {
+	...statsHeader,
+	items: [
+		statsTicketMultiExecutionRow,
+		handedOffRow({
+			key: 'kai-31-2e3f4a5b',
+			displayRef: 'KAI-31',
+			execution: '5d25d7e9-1a2b-4c4d-9e6f-7a8b9c0d1e23',
+			startedAt: '2026-10-08T09:00:00Z',
+			outcome: 'merged',
+			agentMs: 70 * MINUTE,
+			minutes: { toHandoff: 100 }
+		}),
+		handedOffRow({
+			key: 'kai-32-3f4a5b6c',
+			displayRef: 'KAI-32',
+			execution: '6e36e8fa-2b3c-4d5e-8f7a-8b9c0d1e2f24',
+			startedAt: '2026-10-09T09:00:00Z',
+			outcome: 'abandoned',
+			minutes: { toHandoff: 140, waitingBefore: 10 }
+		})
+	],
+	nextCursor: null
+} satisfies Schemas['StatsTickets'];
+
+/** No execution reached handoff. */
+export const statsTicketsNoHandoffs = {
+	...statsHeader,
+	items: statsTicketsComplete.items
+		.filter((row) => row.startToHandoffMs === null)
+		.concat(
+			ticketRow({
+				key: 'kai-33-4a5b6c7d',
+				displayRef: 'KAI-33',
+				execution: '7f47f90b-3c4d-4e6f-9a8b-9c0d1e2f3a25',
+				startedAt: '2026-10-14T09:00:00Z',
+				outcome: 'unknown',
+				waitingMs: 30 * MINUTE
+			})
+		),
+	nextCursor: null
+} satisfies Schemas['StatsTickets'];

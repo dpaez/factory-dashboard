@@ -145,7 +145,8 @@ test.describe('QA 31-03: the complete cohort', () => {
 			const notice = page.getByRole('status').filter({ hasText: 'Showing the last 30 days' });
 			await expect(notice).toBeVisible();
 			const reads = statsReads(fake, since);
-			expect(reads.length).toBe(2);
+			// Summary, stages, configurations and every tickets page (#32).
+			expect(reads.length).toBeGreaterThanOrEqual(4);
 			const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 			for (const read of reads) {
 				expect(read.path).not.toContain('garbage');

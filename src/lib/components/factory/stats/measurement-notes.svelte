@@ -37,6 +37,44 @@
 			Token categories (input, cache read, cache write, output) are Unavailable until stats facts
 			carry them (geut/factory-skills#62).
 		</li>
+		<li data-note="start-to-handoff">
+			Start → handoff: {DEFINITIONS.startToHandoff} The median is the middle value (the mean of the two
+			middles for an even sample).
+		</li>
+		<li data-note="p90">
+			P90 is nearest-rank: the value at position ceil(0.9 × n) of the sorted durations, so it is
+			always a real execution's duration.
+		</li>
+		<li data-note="eligible-sample">
+			Every time figure (mean, median, P90, waiting before handoff, factory time, stage time and
+			agent time) uses the same sample: the executions that reached handoff. Open, cancelled and
+			unknown executions without a handoff are excluded and counted beside the headline. With no
+			such executions the figures are Unavailable, never 0.
+		</li>
+		<li data-note="waiting">
+			Waiting before handoff is start → handoff minus factory time, per execution. The factory's
+			"all waiting" also counts waiting after handoff, so it is never added to start → handoff here.
+		</li>
+		<li data-note="stage-time">
+			Stage time: {DEFINITIONS.stageTime} Factory time not covered by stage time is shown as unattributed;
+			if stage time exceeds factory time it is flagged, not clamped.
+		</li>
+		<li data-note="overhead">
+			Overhead = stage time − agent time, over executions with stage timings (its own sample). Agent
+			time sums runs that can overlap, so it is not wall time.
+		</li>
+		<li data-note="executions">
+			Rows are executions, not tickets: a rerun of a ticket is its own execution and its own row.
+		</li>
+		<li data-note="intervention">
+			An intervention is a question, limit pause, reply, manual retry, manual complete, or stop.
+			Needed a person: {DEFINITIONS.neededAPerson}
+		</li>
+		<li data-note="external-review-rounds">
+			External review rounds: {DEFINITIONS.externalReviewRounds} A comment counts, so a round is not the
+			same as changes requested. "External changes requested" is Unavailable until the factory records
+			review disposition (geut/factory-skills#63).
+		</li>
 		<li data-note="definitions">
 			Definitions: <span class="font-mono text-foreground">{definitions ?? 'Unavailable'}</span>.
 		</li>
