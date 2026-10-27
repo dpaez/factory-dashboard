@@ -4,11 +4,15 @@
 	import TicketsQuality from './tickets-quality.svelte';
 	import { failedPanel, loadingPanel, readyPanel } from './panel-state';
 	import {
+		completeExport,
 		completeTickets,
+		emptyExport,
 		emptyTickets,
 		incompleteTickets,
+		malformedExport,
 		noHandoffTickets,
-		panelFailure
+		panelFailure,
+		truncatedExport
 	} from './stats-story-cohorts';
 
 	// Stories render twice (light and dark panes); queries use the first pane.
@@ -22,6 +26,15 @@
 		await expect(changes).toHaveTextContent('— Unavailable');
 		await expect(changes).toHaveTextContent('geut/factory-skills#63');
 	};
+	const noReturnsUnavailable = async (pane: HTMLElement, reason: string) => {
+		const noReturns = row(pane, 'no-returns-to-work');
+		await expect(noReturns).toHaveAttribute('data-availability', 'unavailable');
+		await expect(
+			noReturns.querySelector('[data-testid="no-returns-to-work-value"]')
+		).toHaveTextContent('— Unavailable');
+		await expect(noReturns).toHaveTextContent(reason);
+		await expect(noReturns).not.toHaveTextContent('%');
+	};
 
 	const { Story } = defineMeta({
 		title: 'Components/Factory/Stats/TicketsQuality',
@@ -31,7 +44,7 @@
 			docs: {
 				description: {
 					component:
-						'Needed a person with its six intervention kinds, external review rounds with their stats.v1 definition, external changes requested (Unavailable until geut/factory-skills#63), and follow-up commits after handoff. Each figure keeps its own sample; there is no combined score. Selecting a row emits onselect(measure).'
+						'No returns to work (from the stats export; Unavailable when the export is incomplete or failed), needed a person with its six intervention kinds, external review rounds with their stats.v1 definition, external changes requested (Unavailable until geut/factory-skills#63), and follow-up commits after handoff. Each figure keeps its own sample; there is no combined score. Selecting a row emits onselect(measure).'
 				}
 			}
 		}
@@ -40,9 +53,20 @@
 
 <Story
 	name="Complete"
-	args={{ state: readyPanel(completeTickets.quality), onselect: fn() }}
+	args={{
+		state: readyPanel(completeTickets.quality),
+		noReturnsToWork: completeExport.noReturnsToWork,
+		onselect: fn()
+	}}
 	play={async ({ canvasElement, args }) => {
 		const pane = firstPane(canvasElement);
+		const noReturns = row(pane, 'no-returns-to-work');
+		await expect(noReturns).toHaveAttribute('data-availability', 'complete');
+		await expect(noReturns).toHaveTextContent('85% 17 of 20 executions that reached handoff');
+		await expect(
+			noReturns.querySelector('[data-testid="no-returns-to-work-definition"]')
+		).toHaveTextContent('with no return-to-work run, over executions that reached handoff');
+		await expect(within(pane).queryByRole('button', { name: 'No returns to work' })).toBeNull();
 		const needed = row(pane, 'needed-a-person');
 		await expect(needed).toHaveTextContent('50%');
 		await expect(needed).toHaveTextContent('6 of 12 executions started in the window');
@@ -78,6 +102,47 @@
 			await expect(args.onselect).toHaveBeenLastCalledWith(measure);
 		}
 		await expect(canvas.queryByRole('button', { name: 'External changes requested' })).toBeNull();
+	}}
+/>
+
+<Story
+	name="Export malformed"
+	args={{
+		state: readyPanel(completeTickets.quality),
+		noReturnsToWork: malformedExport.noReturnsToWork
+	}}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await noReturnsUnavailable(pane, 'export incomplete — 2 malformed lines');
+		await expect(row(pane, 'no-returns-to-work')).toHaveTextContent(
+			'17 of 20 executions that reached handoff'
+		);
+		// The ticket-facts figures are unaffected.
+		await expect(row(pane, 'needed-a-person')).toHaveTextContent('50%');
+	}}
+/>
+
+<Story
+	name="Export truncated"
+	args={{
+		state: readyPanel(completeTickets.quality),
+		noReturnsToWork: truncatedExport.noReturnsToWork
+	}}
+	play={async ({ canvasElement }) => {
+		await noReturnsUnavailable(firstPane(canvasElement), 'export ended early');
+	}}
+/>
+
+<Story
+	name="Export failed"
+	args={{ state: readyPanel(completeTickets.quality), noReturnsToWork: null }}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await noReturnsUnavailable(pane, 'export unavailable');
+		await expect(
+			row(pane, 'no-returns-to-work').querySelector('[data-testid="no-returns-to-work-definition"]')
+		).toHaveTextContent('over executions that reached handoff');
+		await expect(row(pane, 'needed-a-person')).toHaveTextContent('50%');
 	}}
 />
 
@@ -132,9 +197,10 @@
 
 <Story
 	name="Empty window"
-	args={{ state: readyPanel(emptyTickets.quality) }}
+	args={{ state: readyPanel(emptyTickets.quality), noReturnsToWork: emptyExport.noReturnsToWork }}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
+		await noReturnsUnavailable(pane, 'no executions reached handoff');
 		const needed = pane.querySelector('[data-testid="needed-a-person-value"]')!;
 		await expect(needed).toHaveTextContent('— Unavailable');
 		await expect(needed).toHaveTextContent('0 of 0 executions');

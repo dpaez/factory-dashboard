@@ -124,7 +124,9 @@ function isEligible(row: StatsTicketRow): row is Eligible {
 }
 
 /** Waiting before handoff for one row. Never `waitingMs`, which includes waiting after handoff. */
-export function waitingBeforeHandoff(row: Eligible): number {
+export function waitingBeforeHandoff(
+	row: Pick<Eligible, 'startToHandoffMs' | 'factoryMs'>
+): number {
 	return row.startToHandoffMs - row.factoryMs;
 }
 

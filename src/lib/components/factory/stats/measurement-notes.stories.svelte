@@ -15,7 +15,7 @@
 			docs: {
 				description: {
 					component:
-						'How the stats figures are measured: cohort inclusion, the merge-rate definition, zero vs Unavailable vs no runs, derived stage tokens, missing usage, token categories, and the definitions version.'
+						'How the stats figures are measured: cohort inclusion, the merge-rate definition, zero vs Unavailable vs no runs, derived stage tokens, missing usage, token categories, the efficiency signals and no-returns definitions, export completeness, and the definitions version.'
 				}
 			}
 		}
@@ -57,6 +57,16 @@
 		);
 		await expect(note('external-review-rounds')).toHaveTextContent('a comment with a body');
 		await expect(note('external-review-rounds')).toHaveTextContent('geut/factory-skills#63');
+		await expect(note('no-returns-to-work')).toHaveTextContent(
+			'over executions that reached handoff'
+		);
+		await expect(note('export')).toHaveTextContent('Unavailable, never 0');
+		await expect(note('waiting-share')).toHaveTextContent('not a mean of per-execution shares');
+		await expect(note('blended-cost')).toHaveTextContent('Blended: run cost (USD)');
+		await expect(note('rework')).toHaveTextContent('return-to-work and validation-correction');
+		await expect(note('usage-coverage')).toHaveTextContent('not counted as 0');
+		await expect(note('infrastructure-lost')).toHaveTextContent('overlaps with rework');
+		await expect(note('infrastructure-lost')).toHaveTextContent('counted in both figures');
 		await expect(note('definitions')).toHaveTextContent('Definitions: stats.v1');
 	}}
 />

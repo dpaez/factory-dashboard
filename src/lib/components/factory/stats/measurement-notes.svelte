@@ -75,6 +75,25 @@
 			same as changes requested. "External changes requested" is Unavailable until the factory records
 			review disposition (geut/factory-skills#63).
 		</li>
+		<li data-note="no-returns-to-work">
+			No returns to work: {DEFINITIONS.noReturnsToWork} A validation correction does not count as a return.
+		</li>
+		<li data-note="export">
+			Efficiency signals and No returns to work come from the stats export of the same window. The
+			export has no end marker: if any line is malformed, the stream ends early, or a bound is hit,
+			it is incomplete. Its shares and per-merge figures are then Unavailable, never 0, and its
+			counts are partial.
+		</li>
+		<li data-note="waiting-share">Waiting share: {DEFINITIONS.waitingShare}</li>
+		<li data-note="blended-cost">
+			Blended cost per merged ticket: {DEFINITIONS.blendedCostPerMerged}
+		</li>
+		<li data-note="rework">Rework token share: {DEFINITIONS.reworkTokenShare}</li>
+		<li data-note="usage-coverage">Runs with known usage: {DEFINITIONS.usageCoverage}</li>
+		<li data-note="infrastructure-lost">
+			Infrastructure-lost: {DEFINITIONS.infrastructureLostAttempts}
+			{DEFINITIONS.infrastructureReworkOverlap}
+		</li>
 		<li data-note="definitions">
 			Definitions: <span class="font-mono text-foreground">{definitions ?? 'Unavailable'}</span>.
 		</li>

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { formatCount, formatPercent, UNAVAILABLE } from '$lib/factory/format';
+	import { DEFINITIONS, type Metric } from '$lib/factory/stats';
+	import { EXPORT_UNAVAILABLE } from '$lib/factory/stats-efficiency';
 	import type { ContributorMeasure, TicketsQuality } from '$lib/factory/stats-tickets';
 	import MetricValue from './metric-value.svelte';
 	import type { PanelState } from './panel-state';
@@ -8,15 +10,18 @@
 	/**
 	 * How often a person had to step in, and what happened after handoff. Each
 	 * figure keeps its own numerator, denominator or sample; there is no
-	 * combined score. Selecting a row lists its executions.
+	 * combined score. Selecting a row lists its executions. "No returns to
+	 * work" comes from the stats export; `null` means the export read failed.
 	 */
 	let {
 		state: view,
+		noReturnsToWork = null,
 		selected = null,
 		onselect,
 		onretry
 	}: {
 		state: PanelState<TicketsQuality>;
+		noReturnsToWork?: Metric | null;
 		selected?: ContributorMeasure | null;
 		onselect?: (measure: ContributorMeasure) => void;
 		onretry?: () => void;
@@ -44,6 +49,7 @@
 		{@const needed = model.neededAPerson}
 		{@const rounds = model.externalReviewRounds}
 		{@const followUp = model.followUpCommits}
+		{@const noReturns = noReturnsToWork}
 		{#if !model.complete}
 			<p class="font-mono text-foreground/75" data-testid="facts-incomplete" role="note">
 				Ticket facts incomplete: not every execution in the window was loaded. Shares and medians
@@ -51,6 +57,34 @@
 			</p>
 		{/if}
 		<dl class="flex flex-col divide-y divide-foreground/10 ring-1 ring-foreground/10">
+			<div
+				class="flex flex-col gap-1 p-3"
+				data-row="no-returns-to-work"
+				data-availability={noReturns?.availability ?? 'unavailable'}
+			>
+				<dt>No returns to work</dt>
+				<dd class="flex flex-col gap-1">
+					<span class="font-mono tabular-nums" data-testid="no-returns-to-work-value">
+						{#if noReturns === null}
+							<span class="text-lg font-light"
+								>{UNAVAILABLE} <span class="sr-only">Unavailable</span></span
+							>
+							<span class="text-foreground/75">— {EXPORT_UNAVAILABLE}</span>
+						{:else}
+							<span class="text-lg font-light"><MetricValue metric={noReturns} percent /></span>
+							<span class="text-foreground/75"
+								>{formatCount(noReturns.numerator)} of {formatCount(noReturns.denominator)} executions
+								that reached handoff{#if noReturns.value === null && noReturns.unavailableReason}{' '}—
+									{noReturns.unavailableReason}{/if}</span
+							>
+						{/if}
+					</span>
+					<p class="text-foreground/75" data-testid="no-returns-to-work-definition">
+						{noReturns?.definition ?? DEFINITIONS.noReturnsToWork}
+					</p>
+				</dd>
+			</div>
+
 			<div class="flex flex-col gap-2 p-3" data-row="needed-a-person">
 				<dt>
 					<button

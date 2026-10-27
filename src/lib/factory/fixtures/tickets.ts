@@ -324,6 +324,7 @@ const usageInWork = {
 export const ticketDetailQueued = {
 	...ticketQueuedInPlan,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageEmpty
 } satisfies Schemas['TicketDetail'];
@@ -332,6 +333,7 @@ export const ticketDetailQueued = {
 export const ticketDetailActiveInWork = {
 	...ticketActiveInWork,
 	attention: [],
+	source: null,
 	tasks: tasksOfEveryStatus,
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -364,6 +366,7 @@ export const ticketDetailAgentQuestion = {
 			status: 'resolved'
 		}
 	],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -380,6 +383,7 @@ export const ticketDetailPolicyLimit = {
 			status: 'open'
 		}
 	],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -404,6 +408,7 @@ export const ticketDetailManualApproval = {
 			status: 'open'
 		}
 	],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -411,6 +416,7 @@ export const ticketDetailManualApproval = {
 export const ticketDetailMultiExecution = {
 	...ticketMultiExecution,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -439,6 +445,7 @@ export const ticketDetailFailedWithQuestion = {
 			status: 'cancelled'
 		}
 	],
+	source: null,
 	tasks: [],
 	usage: usageEmpty
 } satisfies Schemas['TicketDetail'];
@@ -567,6 +574,7 @@ export const ticketDetailActiveInQa = {
 			status: 'open'
 		}
 	],
+	source: null,
 	tasks: qaTicketTasks,
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -581,6 +589,7 @@ export const ticketDetailMultiExecutionFirst = {
 	finishedAt: '2026-10-07T17:20:00Z',
 	updatedAt: '2026-10-07T17:20:00Z',
 	progress: { current: null, done: 1, next: null, total: 1 },
+	source: null,
 	tasks: [
 		{
 			blockedBy: [],
@@ -612,6 +621,7 @@ export const ticketDetailMultiExecutionFirst = {
 export const ticketDetailPlanning = {
 	...ticketActiveInPlan,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageEmpty
 } satisfies Schemas['TicketDetail'];
@@ -644,6 +654,7 @@ const pausedTicketTasks: Schemas['Task'][] = [
 export const ticketDetailPaused = {
 	...ticketPaused,
 	attention: [],
+	source: null,
 	tasks: pausedTicketTasks,
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -652,6 +663,7 @@ export const ticketDetailPaused = {
 export const ticketDetailResuming = {
 	...ticketResuming,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
@@ -660,6 +672,7 @@ export const ticketDetailResuming = {
 export const ticketDetailFailed = {
 	...ticketFailed,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageEmpty
 } satisfies Schemas['TicketDetail'];
@@ -668,6 +681,7 @@ export const ticketDetailFailed = {
 export const ticketDetailReadyForHandoff = {
 	...ticketReadyForHandoff,
 	attention: [],
+	source: null,
 	tasks: [
 		{
 			blockedBy: [],
@@ -699,6 +713,7 @@ export const ticketDetailReadyForHandoff = {
 export const ticketDetailComplete = {
 	...ticketCompleteInDone,
 	attention: [],
+	source: null,
 	tasks: [
 		{
 			blockedBy: [],
@@ -719,6 +734,7 @@ export const ticketDetailComplete = {
 export const ticketDetailCancelled = {
 	...ticketCancelled,
 	attention: [],
+	source: null,
 	tasks: [
 		{
 			blockedBy: [],
@@ -737,6 +753,7 @@ export const ticketDetailCancelled = {
 export const ticketDetailTrackerWarnings = {
 	...ticketResumeFailed,
 	attention: [],
+	source: null,
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];

@@ -18,6 +18,7 @@ export type StatsSummaryParams = Query<'getStatsSummary'>;
 export type StatsStagesParams = Query<'getStatsStages'>;
 export type StatsConfigurationsParams = Query<'getStatsConfigurations'>;
 export type StatsTicketsParams = Query<'getStatsTickets'>;
+export type StatsExportParams = Query<'exportStats'>;
 export type TicketKey = Schemas['TicketKey'];
 export type RunId = operations['getRun']['parameters']['path']['id'];
 
