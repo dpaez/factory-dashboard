@@ -67,6 +67,7 @@
 	const unknownStage = single({
 		...ticketUnknownStage,
 		attention: [],
+		source: null,
 		tasks: [],
 		usage: ticketDetailActiveInWork.usage
 	} satisfies Schemas['TicketDetail']);

@@ -31,6 +31,13 @@ import {
 	statsZeroMergesSummary
 } from '../src/lib/factory/fixtures/stats.ts';
 import {
+	statsExportComplete,
+	statsExportEmpty,
+	statsExportText,
+	statsExportZeroMerges,
+	type StatsExportFixture
+} from '../src/lib/factory/fixtures/stats-export.ts';
+import {
 	agentList,
 	executionList,
 	runPage,
@@ -114,7 +121,7 @@ export const ticketDetails = new Map<string, Schemas['TicketDetail']>(
 	allTickets.map((ticket, index) => [
 		ticket.key,
 		{
-			...(fixtureDetails.get(ticket.key) ?? { ...ticket, attention: [], tasks: [] }),
+			...(fixtureDetails.get(ticket.key) ?? { ...ticket, attention: [], source: null, tasks: [] }),
 			usage: usageFor(index)
 		} satisfies Schemas['TicketDetail']
 	])
@@ -202,6 +209,23 @@ export const FAKE_STATS_TICKETS_COHORTS = {
 
 export type FakeStatsTicketsCohort = keyof typeof FAKE_STATS_TICKETS_COHORTS;
 
+/** The export cohorts the fake can stream for `/v1/stats/export`. */
+export const FAKE_STATS_EXPORT_COHORTS = {
+	complete: statsExportComplete,
+	zeroMerges: statsExportZeroMerges,
+	empty: statsExportEmpty,
+	/** Every line comes from another factory than the summary. */
+	mismatch: {
+		tickets: statsExportComplete.tickets.map((line) => ({ ...line, factoryId: 'factory-geut-02' })),
+		runs: statsExportComplete.runs.map((line) => ({ ...line, factoryId: 'factory-geut-02' }))
+	}
+} satisfies Record<string, StatsExportFixture>;
+
+export type FakeStatsExportCohort = keyof typeof FAKE_STATS_EXPORT_COHORTS;
+
+/** How many writes the fake splits an export body into (at arbitrary byte offsets). */
+export const FAKE_STATS_EXPORT_CHUNKS = 5;
+
 /**
  * The fake pages stats ticket rows at most this many at a time, whatever
  * `limit` asks for, so the complete cohort spans several pages.
@@ -225,6 +249,14 @@ export type FakeFactoryOptions = {
 	failStatsTickets?: Problem | { atCursor: number; problem: Problem };
 	/** Answer this problem for `GET /v1/stats/configurations`. */
 	failStatsConfigurations?: Problem;
+	/** The lines `/v1/stats/export` streams (default `complete`). */
+	statsExportCohort?: FakeStatsExportCohort;
+	/** Answer this problem for `GET /v1/stats/export`. */
+	failStatsExport?: Problem;
+	/** Inject two malformed lines (not JSON, unknown `type`) after the first export line. */
+	statsExportMalformed?: boolean;
+	/** Cut the export body in the middle of its last line and end it cleanly. */
+	statsExportTruncate?: boolean;
 	/** Answer this problem for `GET /v1/tickets/{key}` of these keys. */
 	failDetail?: { keys: string[]; problem: Problem };
 	/** Answer this problem for `GET /v1/agents`. */
@@ -387,6 +419,8 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	/** Started issue ids the next backlog read still lists (`startKeepsBacklogIssue`). */
 	const droppedAfterRead = new Set<string>();
 	const requests: { method: string; path: string }[] = [];
+	/** The `from`/`to` of every `/v1/stats/export` read, in order. */
+	const exportRequests: { from: string | null; to: string | null }[] = [];
 	const commands: FakeCommandRequest[] = [];
 	/** The first 202 body per `idempotency-key`. */
 	const replays = new Map<string, unknown>();
@@ -411,7 +445,7 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 			listed.push(summary);
 			addedDetails.set(
 				summary.key,
-				detail ?? { ...summary, attention: [], tasks: [], usage: usageFor(0) }
+				detail ?? { ...summary, attention: [], source: null, tasks: [], usage: usageFor(0) }
 			);
 		}
 		const event = { revision: ++latest, kind: input.kind, payload: input.payload };
@@ -473,6 +507,38 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				'content-type': 'text/event-stream',
 				'x-accel-buffering': 'no'
 			}
+		});
+	}
+
+	/** The selected export as NDJSON, written in several chunks split at arbitrary bytes. */
+	function streamExport(): Response {
+		const fixture = FAKE_STATS_EXPORT_COHORTS[options.statsExportCohort ?? 'complete'];
+		let text = statsExportText(fixture);
+		if (options.statsExportMalformed) {
+			const first = text.indexOf('\n') + 1;
+			text = `${text.slice(0, first)}{"type":"ticket",\n{"type":"stage"}\n${text.slice(first)}`;
+		}
+		if (options.statsExportTruncate) {
+			// Drop the final newline and the last 40 characters: a mid-line cut.
+			text = text.slice(0, Math.max(0, text.length - 41));
+		}
+		const bytes = encoder.encode(text);
+		const size = Math.ceil(bytes.length / FAKE_STATS_EXPORT_CHUNKS) || 1;
+		const chunks: Uint8Array[] = [];
+		for (let start = 0; start < bytes.length; start += size) {
+			chunks.push(bytes.subarray(start, start + size));
+		}
+		const body = new ReadableStream<Uint8Array>({
+			async pull(controller) {
+				const chunk = chunks.shift();
+				if (!chunk) return controller.close();
+				controller.enqueue(chunk);
+				// Yield between writes, so each one reaches the client separately.
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			}
+		});
+		return new Response(body, {
+			headers: { 'cache-control': 'no-store', 'content-type': 'application/x-ndjson' }
 		});
 	}
 
@@ -676,6 +742,14 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				nextCursor: end < cohort.items.length ? String(end) : null
 			} satisfies Schemas['StatsTickets']);
 		}
+		if (path === '/v1/stats/export') {
+			exportRequests.push({
+				from: url.searchParams.get('from'),
+				to: url.searchParams.get('to')
+			});
+			if (options.failStatsExport) return problem(options.failStatsExport);
+			return streamExport();
+		}
 		if (path === '/v1/stats/configurations') {
 			if (options.failStatsConfigurations) return problem(options.failStatsConfigurations);
 			return json(statsConfigurations);
@@ -776,6 +850,8 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	return {
 		handle,
 		requests,
+		/** The query of every `/v1/stats/export` read. */
+		exportRequests,
 		/** Every command received, in order, replays and refusals included. */
 		commands,
 		emit,
@@ -808,6 +884,8 @@ export async function startFakeFactory(
 		// Test-only probes, not factory routes: what the dashboard sent so far, and
 		// the event stream's controls.
 		if (incoming.url === '/__fake/requests') return sendJson(outgoing, fake.requests);
+		if (incoming.url === '/__fake/stats-export')
+			return sendJson(outgoing, fake.exportRequests);
 		if (incoming.url === '/__fake/commands') return sendJson(outgoing, fake.commands);
 		if (incoming.url === '/__fake/events/connections') return sendJson(outgoing, fake.connections);
 		if (incoming.method === 'POST' && incoming.url === '/__fake/events/drop') {

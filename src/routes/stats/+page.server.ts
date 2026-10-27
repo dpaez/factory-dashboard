@@ -1,5 +1,13 @@
 import { TICKETS_KEY } from '$lib/factory/events';
 import {
+	reconcileExport,
+	toEfficiencySignals,
+	toExportEnvelope,
+	toNoReturnsToWork,
+	type EfficiencySignals
+} from '$lib/factory/stats-efficiency';
+import type { StatsExportParse } from '$lib/factory/stats-export';
+import {
 	CONTRIBUTOR_MEASURES,
 	toConfigurationComparison,
 	toContributors,
@@ -18,6 +26,7 @@ import {
 	toSummaryMetrics,
 	toTokensByStage,
 	type Cohort,
+	type Metric,
 	type StatsStages,
 	type StatsSummary,
 	type StageGroup,
@@ -37,6 +46,7 @@ import {
 	getStatsSummary,
 	type FactoryResult
 } from '$lib/server/factory/reads';
+import { readStatsExport, type StatsExportRead } from '$lib/server/factory/stats-export';
 import type { PageServerLoad } from './$types';
 
 /** One panel's data: its model, or a safe failure with no upstream detail or body. */
@@ -119,6 +129,26 @@ function toTicketFacts(
 	};
 }
 
+/** The figures computed from the stats export. Never raw lines or diagnostics. */
+export type ExportFacts = {
+	signals: EfficiencySignals;
+	noReturnsToWork: Metric;
+};
+
+/** The export read as a `FactoryResult`, so it settles like every other read. */
+function exportResult(read: StatsExportRead): FactoryResult<StatsExportParse> {
+	if (!read.ok) return read;
+	const { ok: _ok, ...parse } = read;
+	return { ok: true, data: parse };
+}
+
+function toExportFacts(parse: StatsExportParse, cohort: Cohort): ExportFacts {
+	return {
+		signals: toEfficiencySignals(parse, cohort),
+		noReturnsToWork: toNoReturnsToWork(parse, cohort)
+	};
+}
+
 /**
  * Factory stats for one cohort. The window is computed once from the URL and
  * every read gets the identical `from`/`to`, so every panel describes the same
@@ -137,25 +167,32 @@ export const load: PageServerLoad = async ({ depends, fetch, url }) => {
 	const window = parseCohortWindow(url.searchParams);
 	const { from, to } = window;
 	// Every ticket page is followed before any figure is computed from them.
-	const [summaryRead, stagesRead, ticketsRead, configurationsRead] = await Promise.all([
+	// The export is the largest read: it is bounded by the reader and never retried here.
+	const [summaryRead, stagesRead, ticketsRead, configurationsRead, exportRead] = await Promise.all([
 		getStatsSummary(client, { from, to }),
 		getStatsStages(client, { from, to, groupBy: 'setup' }),
 		listAllStatsTickets(client, { from, to }),
-		getStatsConfigurations(client, { from, to })
+		getStatsConfigurations(client, { from, to }),
+		readStatsExport(client, { from, to })
 	]);
 	const observedAt = new Date().toISOString();
 	const summary = settle(summaryRead);
 	const stages = settle(stagesRead);
 	const tickets = settle(ticketsRead);
 	const configurations = settle(configurationsRead);
+	// With no completion marker, a ticket-line count that differs from the summary is incomplete.
+	const exported = mapPanel(settle(exportResult(exportRead)), (data) =>
+		reconcileExport(data, summary.ok ? summary.model : null)
+	);
 
 	const summaryData = summary.ok ? summary.model : null;
 	const stagesData = stages.ok ? stages.model : null;
 	const ticketsEnvelope = tickets.ok ? tickets.model.envelope : null;
 	const configurationsData = configurations.ok ? configurations.model : null;
+	const exportEnvelope = exported.ok ? toExportEnvelope(exported.model) : null;
 
 	const envelopes = toCohort(
-		[summaryData, stagesData, ticketsEnvelope, configurationsData],
+		[summaryData, stagesData, ticketsEnvelope, configurationsData, exportEnvelope],
 		window,
 		observedAt
 	);
@@ -177,6 +214,7 @@ export const load: PageServerLoad = async ({ depends, fetch, url }) => {
 		tickets: mapPanel(tickets, (data): TicketFacts => toTicketFacts(data, summaryData, cohort)),
 		configurations: mapPanel(configurations, (data): ConfigurationComparison =>
 			toConfigurationComparison(data, cohort)
-		)
+		),
+		efficiency: mapPanel(exported, (data): ExportFacts => toExportFacts(data, cohort))
 	};
 };

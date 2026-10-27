@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/factory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** See which stages this factory runs, in order */
+        get: operations["getFactory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tickets": {
         parameters: {
             query?: never;
@@ -455,6 +472,31 @@ export interface components {
             name: string;
             /** @description The X-Factory-On-Behalf-Of header, as sent. Never verified. */
             onBehalfOf: string | null;
+            /**
+             * @description What the token may do: `read`, or `act`, which includes read. Routes still check it.
+             * @enum {string}
+             */
+            scope: "act" | "read";
+        };
+        Factory: {
+            factoryId: string;
+            /** @description FACTORY.json `name`, when set. */
+            name: string | null;
+            /** @description Every stage, in flow order. */
+            stages: components["schemas"]["FactoryStage"][];
+        };
+        FactoryStage: {
+            /** @description Whether new tickets run this stage: always for a required stage. */
+            enabled: boolean;
+            /**
+             * @description The stage. The stages array gives the order.
+             * @enum {string}
+             */
+            name: "plan" | "qa" | "review" | "work" | "wrapup";
+            /** @description An optional stage runs only when FACTORY.json turns it on. */
+            optional: boolean;
+            /** @description Whether the stage runs once per task. */
+            perTask: boolean;
         };
         TicketPage: {
             items: components["schemas"]["TicketSummary"][];
@@ -548,6 +590,8 @@ export interface components {
             trackerWarnings: string[];
             updatedAt: string;
             attention: components["schemas"]["Attention"][];
+            /** @description The issue or brief this execution started from, as fetched then. Null for an execution recorded before the factory kept it. */
+            source: components["schemas"]["TicketSource"] | null;
             tasks: components["schemas"]["Task"][];
             usage: components["schemas"]["Usage"];
         };
@@ -567,6 +611,20 @@ export interface components {
             createdAt: string;
             current: boolean;
             version: number;
+        };
+        TicketSource: {
+            /** @description The tracker login of whoever opened the issue; null for a written brief. */
+            author: string | null;
+            /** @description The issue description or the brief, as markdown. */
+            body: string;
+            createdAt: string | null;
+            displayRef: string;
+            /** @description When the factory read the source. */
+            fetchedAt: string;
+            labels: string[];
+            title: string;
+            updatedAt: string | null;
+            url: string | null;
         };
         Task: {
             blockedBy: string[];
@@ -620,9 +678,15 @@ export interface components {
             endedAt: string | null;
             id: string;
             model: string;
-            /** @description What the run led to, as the status cards say it. */
+            /** @description What the run led to, as the status cards say it. Display text: map on outcomeKind. */
             outcome: string;
-            purpose: string;
+            /**
+             * @description What the run led to, as a stable key.
+             * @enum {string}
+             */
+            outcomeKind: "approved" | "blocked" | "changes_requested" | "correcting" | "diff_changed" | "failed" | "finished" | "paused" | "planned" | "ready_for_handoff" | "ready_for_review" | "retrying" | "running" | "waiting_for_user";
+            /** @enum {string} */
+            purpose: "initial" | "validation_correction" | "human_reply" | "return_to_work" | "reentry" | "manual_continue" | "infrastructure_retry";
             review: components["schemas"]["Review"] | null;
             round: number;
             sequence: number;
@@ -697,11 +761,16 @@ export interface components {
             nextCursor: string | null;
         };
         BacklogIssue: {
+            /** @description The tracker login of whoever opened it. */
+            author: string | null;
             /** @description Another issue blocks it. */
             blocked: boolean;
             blockedBy: components["schemas"]["IssueLink"][];
+            /** @description Its description, as markdown the tracker holds. */
+            body: string;
             /** @description Its sub-issues; start those instead. */
             children: components["schemas"]["IssueLink"][];
+            createdAt: string | null;
             /** @description The ref to start it with, such as owner/repo#42. */
             displayRef: string;
             id: string;
@@ -709,6 +778,7 @@ export interface components {
             title: string;
             /** @description It has sub-issues, so it cannot be started. */
             umbrella: boolean;
+            updatedAt: string | null;
             url: string;
         };
         IssueLink: {
@@ -724,6 +794,10 @@ export interface components {
             costUsd: number;
             externalReviewRounds: {
                 bot: number;
+                /** @description Rounds whose commit drew a review asking for changes. */
+                changesRequested: number;
+                /** @description Rounds whose commit only drew comments with a body. */
+                commented: number;
                 /** @description Tickets with a merged or abandoned pull request, by their number of rounds. */
                 distribution: {
                     [key: string]: number;
@@ -787,6 +861,15 @@ export interface components {
             setup: string;
             stage: string;
             thinking: string;
+            tokens: number;
+            /** @description Cached input read, in tokens; null when usage is unknown. */
+            tokensCacheRead: number | null;
+            /** @description Input written to the cache, in tokens; null when usage is unknown. */
+            tokensCacheWrite: number | null;
+            /** @description Input tokens, excluding cached input; null when usage is unknown. */
+            tokensInput: number | null;
+            /** @description Output tokens; null when usage is unknown. */
+            tokensOutput: number | null;
             tokensPerAcceptedOutput: number | null;
         };
         StatsConfigurations: {
@@ -823,6 +906,8 @@ export interface components {
             execution: string;
             externalReviewRounds: {
                 bot: number;
+                changesRequested: number;
+                commented: number;
                 human: number;
                 total: number;
             };
@@ -844,7 +929,105 @@ export interface components {
             startedAt: string;
             startToHandoffMs: number | null;
             tokens: number;
+            /** @description Cached input read, in tokens; null when usage is unknown. */
+            tokensCacheRead: number | null;
+            /** @description Input written to the cache, in tokens; null when usage is unknown. */
+            tokensCacheWrite: number | null;
+            /** @description Input tokens, excluding cached input; null when usage is unknown. */
+            tokensInput: number | null;
+            /** @description Output tokens; null when usage is unknown. */
+            tokensOutput: number | null;
             waitingMs: number;
+        };
+        StatsExportTicketLine: {
+            agentMs: number;
+            configuration: string;
+            costUsd: number;
+            displayRef: string;
+            execution: string;
+            externalReviewRounds: {
+                bot: number;
+                changesRequested: number;
+                commented: number;
+                human: number;
+                total: number;
+            };
+            factoryMs: number | null;
+            factoryVersion: string | null;
+            followUpCommits: number;
+            handedOffAt: string | null;
+            handoffToMergeMs: number | null;
+            interventions: components["schemas"]["Interventions"];
+            key: string;
+            leadMs: number | null;
+            mergedAt: string | null;
+            /** @enum {string} */
+            outcome: "abandoned" | "cancelled" | "merged" | "open" | "unknown";
+            overheadMs: number | null;
+            stageMs: {
+                [key: string]: number;
+            };
+            startedAt: string;
+            startToHandoffMs: number | null;
+            tokens: number;
+            /** @description Cached input read, in tokens; null when usage is unknown. */
+            tokensCacheRead: number | null;
+            /** @description Input written to the cache, in tokens; null when usage is unknown. */
+            tokensCacheWrite: number | null;
+            /** @description Input tokens, excluding cached input; null when usage is unknown. */
+            tokensInput: number | null;
+            /** @description Output tokens; null when usage is unknown. */
+            tokensOutput: number | null;
+            waitingMs: number;
+            /** @constant */
+            definitions: "stats.v1";
+            factoryId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ticket";
+        };
+        StatsExportRunLine: {
+            agentMs: number | null;
+            /** @description The run's ticket configuration, as on its ticket line. */
+            configuration: string;
+            costUsd: number;
+            /** @constant */
+            definitions: "stats.v1";
+            execution: string;
+            factoryId: string;
+            factoryVersion: string | null;
+            infrastructureLost: boolean;
+            model: string;
+            /** @description Whether validation accepted the run's output; null when not validated. */
+            passed: boolean | null;
+            /** @enum {string} */
+            purpose: "initial" | "validation_correction" | "human_reply" | "return_to_work" | "reentry" | "manual_continue" | "infrastructure_retry";
+            /** @description For a return to work, the stage that sent the task back. */
+            returnedFrom: ("plan" | "qa" | "review" | "work" | "wrapup") | null;
+            round: number;
+            run: string;
+            /** @description The model setup: model and thinking level. */
+            setup: string;
+            /** @enum {string} */
+            stage: "plan" | "qa" | "review" | "work" | "wrapup";
+            task: string | null;
+            thinking: string;
+            tokens: number;
+            /** @description Cached input read, in tokens; null when usage is unknown. */
+            tokensCacheRead: number | null;
+            /** @description Input written to the cache, in tokens; null when usage is unknown. */
+            tokensCacheWrite: number | null;
+            /** @description Input tokens, excluding cached input; null when usage is unknown. */
+            tokensInput: number | null;
+            /** @description Output tokens; null when usage is unknown. */
+            tokensOutput: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "run";
         };
         WebhookReceived: {
             /** @description The ticket the delivery updated, or null when it was ignored. */
@@ -947,6 +1130,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description A problem: the request was refused or failed. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getFactory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The factory and its stages. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Factory"];
                 };
             };
             /** @description A problem: the request was refused or failed. */
@@ -1427,13 +1639,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description NDJSON: one StatsTicketRow per line with `type: "ticket"`, then one run row per line with `type: "run"`. Every line carries factoryId and definitions, so another factory's export can be compared row by row. */
+            /** @description NDJSON: one StatsExportTicketLine per ticket (`type: "ticket"`), then one StatsExportRunLine per run (`type: "run"`); the schema is that of one line. Run lines carry `tokens` and its categories (`tokensInput`, `tokensOutput`, `tokensCacheRead`, `tokensCacheWrite`, null when usage is unknown). Every line carries factoryId and definitions, so another factory's export can be compared row by row. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/x-ndjson": string;
+                    "application/x-ndjson": components["schemas"]["StatsExportTicketLine"] | components["schemas"]["StatsExportRunLine"];
                 };
             };
             /** @description A problem: the request was refused or failed. */

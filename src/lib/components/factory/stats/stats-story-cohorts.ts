@@ -1,12 +1,19 @@
 /**
  * Cohorts for the stats panel stories, built from the stats fixtures through
  * the real view-model adapters: complete, empty window, zero merges, QA
- * disabled, and partial (a stage whose tokens are unknown).
+ * disabled, and partial (a stage whose tokens are unknown). Export cohorts
+ * feed EfficiencySignals and the "No returns to work" row.
  */
 import {
 	statsCompleteStages,
 	statsCompleteSummary,
 	statsEmptyStages,
+	statsExportCompleteText,
+	statsExportEmpty,
+	statsExportMalformedText,
+	statsExportText,
+	statsExportTruncatedText,
+	statsExportZeroMerges,
 	statsEmptySummary,
 	statsPartialStages,
 	statsQaDisabledStages,
@@ -35,6 +42,12 @@ import {
 	type ContributorMeasure,
 	type StatsTicketRow
 } from '$lib/factory/stats-tickets';
+import {
+	toEfficiencySignals,
+	toExportEnvelope,
+	toNoReturnsToWork
+} from '$lib/factory/stats-efficiency';
+import { createStatsExportParser, type StatsExportParse } from '$lib/factory/stats-export';
 
 const window = parseCohortWindow(
 	new URLSearchParams({ from: '2026-09-24', to: '2026-10-23' }),
@@ -127,3 +140,38 @@ export const mixedConfigurations = toConfigurationComparison(
 	},
 	toCohort(statsConfigurations, window, observedAt)
 );
+
+/*
+ * Export cohorts (`/v1/stats/export`) for the EfficiencySignals panel and the
+ * "No returns to work" row, parsed by the real parser and built through the
+ * real adapters: complete, malformed lines reported, truncated, zero merges,
+ * and empty. A failed export is a panel error, not a model.
+ */
+function exportOf(...chunks: string[]) {
+	const parser = createStatsExportParser();
+	for (const chunk of chunks) parser.push(chunk);
+	return exportCohortOf(parser.end());
+}
+
+function exportCohortOf(parse: StatsExportParse) {
+	const cohort = toCohort([statsCompleteSummary, toExportEnvelope(parse)], window, observedAt);
+	return {
+		cohort,
+		efficiency: toEfficiencySignals(parse, cohort),
+		noReturnsToWork: toNoReturnsToWork(parse, cohort)
+	};
+}
+
+export const completeExport = exportOf(statsExportCompleteText);
+export const malformedExport = exportOf(statsExportMalformedText);
+export const truncatedExport = exportOf(statsExportTruncatedText);
+export const zeroMergesExport = exportOf(statsExportText(statsExportZeroMerges));
+export const emptyExport = exportOf(statsExportText(statsExportEmpty));
+/** The read failed mid-stream: what arrived is kept, marked incomplete. */
+export const failedMidStreamExport = (() => {
+	const parser = createStatsExportParser();
+	parser.push(statsExportCompleteText.slice(0, statsExportCompleteText.length / 2));
+	return exportCohortOf(parser.fail('read failed'));
+})();
+/** The export request failed: the panel shows its error. */
+export const exportFailure = { title: 'Efficiency signals unavailable', retryable: true };

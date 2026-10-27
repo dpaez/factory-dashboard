@@ -207,6 +207,8 @@ test('AC8: configuration comparison shows samples, small-sample markers and a nu
 test('AC9: every new story renders light and dark; loading and error use the shared states', async ({
 	page
 }) => {
+	// Opens every story in five panel groups (30+); the default 30 s budget is too tight under a full run.
+	test.setTimeout(180_000);
 	const res = await page.request.get(`${SB}/index.json`);
 	const entries = Object.values(
 		((await res.json()) as { entries: Record<string, { id: string; type: string; title: string }> })

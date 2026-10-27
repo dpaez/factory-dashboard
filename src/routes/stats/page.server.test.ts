@@ -9,6 +9,7 @@ import {
 	statsCompleteSummary
 } from '$lib/factory/fixtures';
 import type { Cohort, StageGroup, SummaryMetrics, TokensByStage } from '$lib/factory/stats';
+import { EXPORT_INCOMPLETE, SUMMARY_COUNT_MISMATCH } from '$lib/factory/stats-efficiency';
 import { NO_HANDOFFS, type ConfigurationComparison } from '$lib/factory/stats-tickets';
 
 import {
@@ -17,7 +18,7 @@ import {
 	createFakeFactory,
 	type FakeFactoryOptions
 } from '../../../test/fake-factory';
-import { load, type StatsPanelResult, type TicketFacts } from './+page.server';
+import { load, type ExportFacts, type StatsPanelResult, type TicketFacts } from './+page.server';
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
@@ -55,6 +56,7 @@ type StatsData = {
 	tokens: StatsPanelResult<TokensByStage>;
 	tickets: StatsPanelResult<TicketFacts>;
 	configurations: StatsPanelResult<ConfigurationComparison>;
+	efficiency: StatsPanelResult<ExportFacts>;
 };
 
 async function run(options: FakeFactoryOptions = {}, search = '') {
@@ -68,7 +70,13 @@ async function run(options: FakeFactoryOptions = {}, search = '') {
 		const request = fake.requests.find((r) => r.path.startsWith(`${path}?`));
 		return request ? new URL(request.path, FACTORY_URL).searchParams : null;
 	};
-	return { data, requests: fake.requests, dependencies, query };
+	return {
+		data,
+		requests: fake.requests,
+		exportRequests: fake.exportRequests,
+		dependencies,
+		query
+	};
 }
 
 async function pageError(options: FakeFactoryOptions = {}) {
@@ -97,8 +105,8 @@ describe('/stats load', () => {
 	it('reads summary and stages with the identical default window', async () => {
 		const { data, requests, query } = await run();
 		const pages = Math.ceil(statsTicketsComplete.items.length / FAKE_STATS_TICKETS_PAGE_SIZE);
-		// Summary, stages, configurations and every tickets page.
-		expect(requests).toHaveLength(3 + pages);
+		// Summary, stages, configurations, the export and every tickets page.
+		expect(requests).toHaveLength(4 + pages);
 		expect(requests.every((r) => r.method === 'GET')).toBe(true);
 		const summary = query('/v1/stats/summary');
 		const stages = query('/v1/stats/stages');
@@ -121,7 +129,8 @@ describe('/stats load', () => {
 			'/v1/stats/summary',
 			'/v1/stats/stages',
 			'/v1/stats/tickets',
-			'/v1/stats/configurations'
+			'/v1/stats/configurations',
+			'/v1/stats/export'
 		]) {
 			expect(query(path)?.get('from')).toBe('2026-09-01T00:00:00Z');
 			expect(query(path)?.get('to')).toBe('2026-10-01T00:00:00Z');
@@ -189,14 +198,16 @@ describe('/stats load', () => {
 			failStatsSummary: internal,
 			failStatsStages: internal,
 			failStatsTickets: internal,
-			failStatsConfigurations: internal
+			failStatsConfigurations: internal,
+			failStatsExport: internal
 		});
 		expect(
 			data.summary.ok ||
 				data.stages.ok ||
 				data.tokens.ok ||
 				data.tickets.ok ||
-				data.configurations.ok
+				data.configurations.ok ||
+				data.efficiency.ok
 		).toBe(false);
 		expect(data.cohort.factoryId).toBeNull();
 		expect(data.cohort.window.from).toMatch(/Z$/);
@@ -403,5 +414,128 @@ describe('/stats load', () => {
 		expect(matched.tickets.ok && matched.tickets.model.quality.reconciled).toBe(false);
 		const noSummary = (await run({ failStatsSummary: internal })).data;
 		expect(noSummary.tickets.ok && noSummary.tickets.model.quality.reconciled).toBeNull();
+	});
+});
+
+describe('/stats load: the stats export', () => {
+	function efficiency(data: StatsData): ExportFacts {
+		if (!data.efficiency.ok) throw new Error('efficiency panel failed');
+		return data.efficiency.model;
+	}
+
+	it('reads the export once, in the same window as the other four reads', async () => {
+		const { data, exportRequests, query } = await run({}, '?from=2026-09-01&to=2026-09-30');
+		expect(exportRequests).toEqual([{ from: '2026-09-01T00:00:00Z', to: '2026-10-01T00:00:00Z' }]);
+		for (const path of ['/v1/stats/summary', '/v1/stats/stages', '/v1/stats/configurations']) {
+			expect(query(path)?.get('from')).toBe(data.cohort.window.from);
+			expect(query(path)?.get('to')).toBe(data.cohort.window.to);
+		}
+	});
+
+	it('the complete export gives Efficiency signals and No returns to work', async () => {
+		const { data } = await run();
+		const { signals, noReturnsToWork } = efficiency(data);
+		expect(signals.status.complete).toBe(true);
+		expect(signals.executions.value).toBe(statsCompleteSummary.started);
+		expect(signals.blendedCostPerMerged).toMatchObject({
+			availability: 'complete',
+			numerator: 48.2,
+			denominator: 16
+		});
+		expect(signals.blendedCostPerMerged.value).toBeCloseTo(3.0125);
+		expect(noReturnsToWork.availability).toBe('complete');
+		expect(noReturnsToWork.numerator).toBeTypeOf('number');
+		expect(noReturnsToWork.denominator).toBeGreaterThan(0);
+		expect(data.cohort.mismatch).toBe(false);
+	});
+
+	it('an export failure blanks only the export figures', async () => {
+		const { data } = await run({ failStatsExport: internal });
+		expect(data.efficiency).toEqual({
+			ok: false,
+			failure: { title: 'Internal error', retryable: true }
+		});
+		expect(
+			data.summary.ok &&
+				data.stages.ok &&
+				data.tokens.ok &&
+				data.tickets.ok &&
+				data.configurations.ok
+		).toBe(true);
+		expect(data.cohort.factoryId).toBe(statsCompleteSummary.factoryId);
+		expect(JSON.stringify(data)).not.toContain(SECRET_DETAIL);
+	});
+
+	it('an export 401 is the page configuration error', async () => {
+		const error = await pageError({
+			failStatsExport: {
+				status: 401,
+				title: 'Unauthorized',
+				type: 'unauthorized',
+				detail: SECRET_DETAIL
+			}
+		});
+		expect(error.status).toBe(503);
+		expect(error.body.kind).toBe('configuration');
+		expect(JSON.stringify(error.body)).not.toContain(SECRET_DETAIL);
+	});
+
+	it.each([
+		['malformed lines', { statsExportMalformed: true }, /2 malformed lines/],
+		['a truncated body', { statsExportTruncate: true }, /ended early/]
+	] as const)('%s make every share Unavailable', async (_, options, reason) => {
+		const { data } = await run(options);
+		const { signals, noReturnsToWork } = efficiency(data);
+		expect(signals.status.complete).toBe(false);
+		expect(signals.status.reason).toMatch(reason);
+		for (const metric of [
+			signals.waitingShare,
+			signals.blendedCostPerMerged,
+			signals.rework.share,
+			signals.infrastructureLost.share,
+			noReturnsToWork
+		]) {
+			expect(metric.value).toBeNull();
+			expect(metric.availability).toBe('unavailable');
+		}
+		expect(signals.executions.availability).toBe('partial');
+		expect(data.summary.ok && data.tickets.ok).toBe(true);
+	});
+
+	it('a ticket-line count that differs from summary.started is not complete', async () => {
+		const { data } = await run({ statsExportCohort: 'zeroMerges' });
+		const { signals, noReturnsToWork } = efficiency(data);
+		expect(signals.status.complete).toBe(false);
+		expect(signals.status.malformedLines).toBe(0);
+		expect(signals.status.reason).toBe(`${EXPORT_INCOMPLETE} — ${SUMMARY_COUNT_MISMATCH}`);
+		expect(signals.blendedCostPerMerged.value).toBeNull();
+		expect(noReturnsToWork.value).toBeNull();
+	});
+
+	it('the count check needs the summary: without it the export stands alone', async () => {
+		const { data } = await run({ failStatsSummary: internal });
+		expect(efficiency(data).signals.status.complete).toBe(true);
+	});
+
+	it('an export from another factory flags the cohort mismatch', async () => {
+		const { data } = await run({ statsExportCohort: 'mismatch' });
+		expect(data.cohort.mismatch).toBe(true);
+		// Another factory's count is not compared with this summary.
+		expect(efficiency(data).signals.status.complete).toBe(true);
+	});
+
+	it('serializes only view models: no raw lines, token, URL or Problem detail', async () => {
+		for (const options of [{}, { statsExportMalformed: true }, { failStatsExport: internal }]) {
+			const { data } = await run(options);
+			const serialized = JSON.stringify(data);
+			expect(serialized).not.toContain(FAKE_FACTORY_TOKEN);
+			expect(serialized).not.toContain(FACTORY_URL);
+			expect(serialized).not.toContain(FACTORY_HOST);
+			expect(serialized).not.toContain(SECRET_DETAIL);
+			expect(serialized).not.toContain('"type":"ticket"');
+			expect(serialized).not.toContain('"type":"run"');
+			expect(serialized).not.toContain('"diagnostics":[');
+			expect(serialized).not.toContain('"tickets":[{');
+		}
 	});
 });

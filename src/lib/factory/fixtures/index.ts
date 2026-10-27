@@ -9,5 +9,6 @@ export * from './me';
 export * from './problems';
 export * from './runs';
 export * from './stats';
+export * from './stats-export';
 export * from './tasks';
 export * from './tickets';

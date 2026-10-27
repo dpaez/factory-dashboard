@@ -315,7 +315,26 @@ export const DEFINITIONS = {
 	configurationMedianCost: 'Median run cost (USD) per execution.',
 	configurationMedianExternalReviewRounds:
 		'Median external review rounds over executions with a merged or abandoned pull request.',
-	configurationInterventions: 'Interventions of every kind, summed.'
+	configurationInterventions: 'Interventions of every kind, summed.',
+	waitingShare:
+		'Σ waiting before handoff over Σ start → handoff, over executions that reached handoff with both durations. Weighted by duration, not a mean of per-execution shares.',
+	blendedCostPerMerged:
+		'Blended: run cost (USD) of every execution started in the window, all outcomes, over merged executions. Not the mean cost of merged executions alone.',
+	reworkTokenShare:
+		'Tokens of return-to-work and validation-correction runs over tokens of runs with known usage. Only the run purpose counts: a repeat run alone (initial, reentry, or infrastructure retry) is not rework.',
+	reworkPurpose: 'Tokens and runs with this purpose, over runs with known usage.',
+	usageCoverage:
+		'Runs with known usage. Runs with unknown usage are left out of token shares, not counted as 0.',
+	infrastructureLostAttempts:
+		'Runs lost to infrastructure: an infrastructure retry, or a run that ended by launch failure, crash, killed pane, or gap. Any purpose, so it overlaps with rework.',
+	infrastructureLostShare:
+		'Known-usage tokens of infrastructure-lost runs over tokens of runs with known usage. Overlaps with rework: not a partition.',
+	infrastructureReworkOverlap:
+		'Runs both infrastructure-lost and rework (return to work or validation correction), counted in both figures. Never added to or subtracted from rework.',
+	noReturnsToWork:
+		'Executions that reached handoff with no return-to-work run, over executions that reached handoff. Needs the complete export (complete return history).',
+	exportExecutions: 'Ticket lines in the export: executions started in the window.',
+	exportRuns: 'Run lines in the export for executions started in the window.'
 } as const;
 
 export function toSummaryMetrics(summary: StatsSummary, cohort: CohortRef): SummaryMetrics {

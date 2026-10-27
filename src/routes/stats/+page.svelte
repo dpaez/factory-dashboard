@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 
 	import ConfigurationComparison from '$lib/components/factory/stats/configuration-comparison.svelte';
+	import EfficiencySignals from '$lib/components/factory/stats/efficiency-signals.svelte';
 	import ContributingTickets from '$lib/components/factory/stats/contributing-tickets.svelte';
 	import TicketsQuality from '$lib/components/factory/stats/tickets-quality.svelte';
 	import TimeBreakdown from '$lib/components/factory/stats/time-breakdown.svelte';
@@ -34,6 +35,11 @@
 	const time = $derived(toPanel(mapResult(data.tickets, (facts) => facts.time)));
 	const quality = $derived(toPanel(mapResult(data.tickets, (facts) => facts.quality)));
 	const configurations = $derived(toPanel(data.configurations));
+	const efficiency = $derived(toPanel(mapResult(data.efficiency, (facts) => facts.signals)));
+	/** `null` when the export read failed: the row reads Unavailable. */
+	const noReturnsToWork = $derived(
+		data.efficiency.ok ? data.efficiency.model.noReturnsToWork : null
+	);
 
 	/** The figure ContributingTickets lists: `?measure=`, else the time sample. */
 	const measure = $derived.by((): ContributorMeasure => {
@@ -126,7 +132,14 @@
 			</div>
 			<TokensByStage state={tokens} onretry={retry} />
 			<TimeBreakdown state={time} selected={measure} onselect={select} onretry={retry} />
-			<TicketsQuality state={quality} selected={measure} onselect={select} onretry={retry} />
+			<TicketsQuality
+				state={quality}
+				{noReturnsToWork}
+				selected={measure}
+				onselect={select}
+				onretry={retry}
+			/>
+			<EfficiencySignals state={efficiency} onretry={retry} />
 			<MeasurementNotes definitions={cohort.definitions} />
 			<div class="min-w-0 lg:col-span-2">
 				<ContributingTickets state={contributors} {complete} onretry={retry} />

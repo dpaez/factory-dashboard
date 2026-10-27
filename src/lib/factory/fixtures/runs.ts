@@ -42,6 +42,7 @@ const baseRun = {
 	id: 'run_base',
 	model: 'claude-opus-5-5',
 	outcome: '',
+	outcomeKind: 'running',
 	purpose: 'initial',
 	review: null,
 	round: 1,
@@ -66,6 +67,7 @@ export const runPlanPassed = {
 	startedAt: '2026-10-13T09:01:00Z',
 	endedAt: '2026-10-13T09:12:30Z',
 	outcome: 'Planned 2 tasks',
+	outcomeKind: 'planned',
 	sessionFile: '/home/agent/.pi/sessions/plan-01.jsonl',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
@@ -104,6 +106,7 @@ export const runWorkValidationFailed = {
 	startedAt: '2026-10-13T09:13:00Z',
 	endedAt: '2026-10-13T09:40:00Z',
 	outcome: 'Validation failed',
+	outcomeKind: 'correcting',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	usage: null,
@@ -159,6 +162,7 @@ export const runReviewChangesRequested = {
 	startedAt: '2026-10-13T09:41:00Z',
 	endedAt: '2026-10-13T09:52:00Z',
 	outcome: 'Changes requested',
+	outcomeKind: 'changes_requested',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	review: {
@@ -214,6 +218,7 @@ export const runReviewApproved = {
 	startedAt: '2026-10-13T10:20:00Z',
 	endedAt: '2026-10-13T10:28:00Z',
 	outcome: 'Approved',
+	outcomeKind: 'approved',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	review: { findings: [], round: 2, summary: 'All findings addressed.', verdict: 'approve' }
@@ -228,6 +233,7 @@ export const runReviewBlocked = {
 	startedAt: '2026-10-13T10:30:00Z',
 	endedAt: '2026-10-13T10:33:00Z',
 	outcome: 'Blocked',
+	outcomeKind: 'blocked',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	review: {
@@ -324,7 +330,8 @@ export const runPageFirstExecution = {
 			activity: 'Planned one task for the first attempt.',
 			startedAt: '2026-10-05T08:01:00Z',
 			endedAt: '2026-10-05T08:10:00Z',
-			outcome: 'Planned 1 task'
+			outcome: 'Planned 1 task',
+			outcomeKind: 'planned'
 		},
 		{
 			...runReviewApproved,
@@ -364,12 +371,14 @@ export const runHistoryUnknownPurpose = {
 	...baseRun,
 	id: 'run_hist_nudge',
 	ticket: historyTicket,
-	purpose: 'operator_nudge',
+	// Cast: the contract enumerates purposes; this fixture simulates a newer factory.
+	purpose: 'operator_nudge' as Schemas['Run']['purpose'],
 	sequence: 2,
 	stage: 'plan',
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	outcome: 'planned',
+	outcomeKind: 'planned',
 	startedAt: '2026-10-12T08:10:00Z',
 	endedAt: '2026-10-12T08:12:00Z',
 	activity: 'Adjusted the task order after the nudge.',
@@ -385,6 +394,7 @@ export const runHistoryWorkInitial = {
 	sequence: 3,
 	round: 1,
 	outcome: 'correcting',
+	outcomeKind: 'correcting',
 	startedAt: '2026-10-12T08:15:00Z',
 	endedAt: '2026-10-12T08:40:00Z',
 	activity: 'Implemented the client; tests not yet green.',
@@ -404,6 +414,7 @@ export const runHistoryWorkCorrection = {
 	status: 'terminal',
 	terminalKind: 'subagent_done',
 	outcome: 'ready for review',
+	outcomeKind: 'ready_for_review',
 	startedAt: '2026-10-12T08:41:00Z',
 	endedAt: '2026-10-12T08:55:00Z',
 	activity: 'Fixed the failing test.',
@@ -443,6 +454,7 @@ export const runHistoryReviewChanges = {
 	sequence: 5,
 	round: 1,
 	outcome: 'changes requested',
+	outcomeKind: 'changes_requested',
 	startedAt: '2026-10-12T09:00:00Z',
 	endedAt: '2026-10-12T09:12:00Z',
 	usage: usage(1)
@@ -461,6 +473,7 @@ export const runHistoryWorkCrashed = {
 	status: 'terminal',
 	terminalKind: 'crashed',
 	outcome: 'retrying',
+	outcomeKind: 'retrying',
 	startedAt: '2026-10-12T09:05:00Z',
 	endedAt: '2026-10-12T09:06:00Z',
 	usage: null
@@ -490,6 +503,7 @@ export const runHistoryReviewReentry = {
 	sequence: 8,
 	round: 2,
 	outcome: 'approved',
+	outcomeKind: 'approved',
 	startedAt: '2026-10-12T09:40:00Z',
 	endedAt: '2026-10-12T09:48:00Z',
 	usage: usage(1)

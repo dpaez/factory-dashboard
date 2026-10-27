@@ -14,6 +14,38 @@ const statsHeader = {
 	factoryVersions: ['0.14.0', '0.15.1']
 } satisfies Pick<Schemas['StatsSummary'], 'definitions' | 'factoryId' | 'factoryVersions'>;
 
+/**
+ * Token categories that sum to `tokens`, or all null when usage is unknown.
+ * The split is illustrative; the dashboard does not read categories yet (#62).
+ */
+export function tokenCategories(tokens: number | null) {
+	if (tokens === null) {
+		return { tokensCacheRead: null, tokensCacheWrite: null, tokensInput: null, tokensOutput: null };
+	}
+	const tokensInput = Math.round(tokens * 0.1);
+	const tokensOutput = Math.round(tokens * 0.05);
+	const tokensCacheWrite = Math.round(tokens * 0.05);
+	return {
+		tokensCacheRead: tokens - tokensInput - tokensOutput - tokensCacheWrite,
+		tokensCacheWrite,
+		tokensInput,
+		tokensOutput
+	};
+}
+
+/**
+ * A ticket's external review rounds. `changesRequested + commented = total`;
+ * by default the rounds that requested changes are half the total, rounded up.
+ */
+export function reviewRounds(
+	bot: number,
+	human: number,
+	total: number,
+	changesRequested = Math.ceil(total / 2)
+): Schemas['StatsTicketRow']['externalReviewRounds'] {
+	return { bot, changesRequested, commented: total - changesRequested, human, total };
+}
+
 const configurationOpus = 'plan=claude-opus-5-5:high work=claude-opus-5-5:high review=gpt-6:high';
 const configurationGpt = 'plan=gpt-6:medium work=gpt-6:medium review=claude-opus-5-5:high';
 
@@ -31,6 +63,9 @@ export const statsSummary = {
 	costUsd: 41.27,
 	externalReviewRounds: {
 		bot: 6,
+		// Four rounds over the merged-or-abandoned tickets (distribution).
+		changesRequested: 3,
+		commented: 1,
 		distribution: { '0': 3, '1': 2, '2': 1 },
 		human: 4,
 		median: null
@@ -68,6 +103,8 @@ export const statsStages = {
 			setup: 'claude-opus-5-5:high',
 			stage: 'work',
 			thinking: 'high',
+			tokens: 3_840_000,
+			...tokenCategories(3_840_000),
 			tokensPerAcceptedOutput: 640_000
 		},
 		{
@@ -84,6 +121,9 @@ export const statsStages = {
 			setup: 'gpt-6:medium',
 			stage: 'qa',
 			thinking: 'medium',
+			// The run was lost before usage was recorded.
+			tokens: 0,
+			...tokenCategories(null),
 			tokensPerAcceptedOutput: null
 		}
 	]
@@ -124,7 +164,7 @@ export const statsTickets = {
 			costUsd: 6.4,
 			displayRef: 'dpaez/factory-dashboard#12',
 			execution: '1',
-			externalReviewRounds: { bot: 1, human: 1, total: 2 },
+			externalReviewRounds: reviewRounds(1, 1, 2),
 			factoryMs: 5_400_000,
 			factoryVersion: '0.15.1',
 			followUpCommits: 1,
@@ -140,6 +180,7 @@ export const statsTickets = {
 			startedAt: '2026-10-12T09:00:00Z',
 			startToHandoffMs: 21_600_000,
 			tokens: 1_420_000,
+			...tokenCategories(1_420_000),
 			waitingMs: 0
 		},
 		{
@@ -148,7 +189,7 @@ export const statsTickets = {
 			costUsd: 1.2,
 			displayRef: 'KAI-12',
 			execution: '1',
-			externalReviewRounds: { bot: 0, human: 0, total: 0 },
+			externalReviewRounds: reviewRounds(0, 0, 0),
 			factoryMs: null,
 			factoryVersion: null,
 			followUpCommits: 0,
@@ -164,6 +205,7 @@ export const statsTickets = {
 			startedAt: '2026-10-09T15:00:00Z',
 			startToHandoffMs: null,
 			tokens: 210_000,
+			...tokenCategories(210_000),
 			waitingMs: 0
 		}
 	],
@@ -190,6 +232,9 @@ export const statsCompleteSummary = {
 	costUsd: 48.2,
 	externalReviewRounds: {
 		bot: 12,
+		// Sixteen rounds over the merged-or-abandoned tickets (distribution).
+		changesRequested: 9,
+		commented: 7,
 		distribution: { '0': 6, '1': 8, '2': 4 },
 		human: 10,
 		median: 1
@@ -212,8 +257,18 @@ export const statsCompleteSummary = {
 
 type StageRow = Schemas['StatsStageRow'];
 
+/**
+ * A stage row. Its `tokens` default to tokens per accepted output × accepted
+ * outputs; with no accepted outputs usage is unknown: 0 tokens, null categories.
+ */
 function stageRow(row: Pick<StageRow, 'stage' | 'model' | 'thinking'> & Partial<StageRow>) {
+	const known =
+		row.tokensPerAcceptedOutput == null || row.acceptedOutputs === undefined
+			? null
+			: Math.round(row.tokensPerAcceptedOutput * row.acceptedOutputs);
 	return {
+		tokens: known ?? 0,
+		...tokenCategories(known),
 		acceptedOutputs: 0,
 		agentMs: 0,
 		correctionsPerAcceptedOutput: null,
@@ -325,7 +380,14 @@ export const statsCompleteStages = {
 export const statsEmptySummary = {
 	...statsHeader,
 	costUsd: 0,
-	externalReviewRounds: { bot: 0, distribution: {}, human: 0, median: null },
+	externalReviewRounds: {
+		bot: 0,
+		changesRequested: 0,
+		commented: 0,
+		distribution: {},
+		human: 0,
+		median: null
+	},
 	followUpCommits: 0,
 	handedOff: 0,
 	interventions: noInterventions,
@@ -391,10 +453,11 @@ function ticketRow(
 		Partial<TicketRow>
 ) {
 	return {
+		...tokenCategories(row.tokens ?? 0),
 		agentMs: 0,
 		configuration: configurationOpus,
 		costUsd: 0,
-		externalReviewRounds: { bot: 0, human: 0, total: 0 },
+		externalReviewRounds: reviewRounds(0, 0, 0),
 		factoryMs: null,
 		factoryVersion: '0.15.1',
 		followUpCommits: 0,
@@ -461,7 +524,7 @@ export const statsTicketMultiExecutionRow = handedOffRow({
 	outcome: 'merged',
 	costUsd: 3.9,
 	tokens: 820_000,
-	externalReviewRounds: { bot: 1, human: 1, total: 2 },
+	externalReviewRounds: reviewRounds(1, 1, 2),
 	followUpCommits: 1,
 	interventions: { ...noInterventions, questions: 1, replies: 1 },
 	minutes: {
@@ -484,7 +547,7 @@ export const statsTicketWaitingRow = handedOffRow({
 	outcome: 'merged',
 	costUsd: 7.2,
 	tokens: 1_560_000,
-	externalReviewRounds: { bot: 0, human: 1, total: 1 },
+	externalReviewRounds: reviewRounds(0, 1, 1),
 	interventions: { ...noInterventions, questions: 2, replies: 2, limitPauses: 1 },
 	minutes: {
 		toHandoff: 600,
@@ -531,7 +594,7 @@ export const statsTicketsComplete = {
 			configuration: configurationGpt,
 			costUsd: 2.3,
 			tokens: 450_000,
-			externalReviewRounds: { bot: 2, human: 0, total: 2 },
+			externalReviewRounds: reviewRounds(2, 0, 2),
 			interventions: { ...noInterventions, stops: 1 },
 			minutes: { toHandoff: 120, agent: 60, stages: { plan: 15, work: 70, review: 20 } }
 		}),
@@ -557,7 +620,7 @@ export const statsTicketsComplete = {
 			outcome: 'merged',
 			costUsd: 3.1,
 			tokens: 600_000,
-			externalReviewRounds: { bot: 1, human: 0, total: 1 },
+			externalReviewRounds: reviewRounds(1, 0, 1),
 			followUpCommits: 2,
 			minutes: { toHandoff: 180, agent: 90, stages: { plan: 20, work: 100, review: 30 } }
 		}),
@@ -586,7 +649,7 @@ export const statsTicketsComplete = {
 			outcome: 'merged',
 			costUsd: 4.4,
 			tokens: 900_000,
-			externalReviewRounds: { bot: 0, human: 2, total: 2 },
+			externalReviewRounds: reviewRounds(0, 2, 2),
 			minutes: {
 				toHandoff: 360,
 				agent: 200,
@@ -603,7 +666,7 @@ export const statsTicketsComplete = {
 			outcome: 'open',
 			costUsd: 5,
 			tokens: 1_020_000,
-			externalReviewRounds: { bot: 1, human: 0, total: 1 },
+			externalReviewRounds: reviewRounds(1, 0, 1),
 			interventions: { ...noInterventions, manualCompletes: 1 },
 			minutes: {
 				toHandoff: 480,
