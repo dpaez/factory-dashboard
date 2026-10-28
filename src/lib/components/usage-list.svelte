@@ -27,7 +27,7 @@
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
-		{#each runs as run (run.id)}
+		{#each runs as run, i (`${run.id}-${i}`)}
 			<Table.Row data-run={run.id}>
 				<Table.Cell class="text-end text-muted-foreground tabular-nums">{run.sequence}</Table.Cell>
 				<Table.Cell class="font-medium">{stageLabel(run.stage)}</Table.Cell>

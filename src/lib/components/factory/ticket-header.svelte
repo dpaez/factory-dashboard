@@ -133,7 +133,7 @@
 				Tracker warnings
 			</h3>
 			<ul class="flex flex-col gap-1 font-mono">
-				{#each header.trackerWarnings as warning (warning)}
+				{#each header.trackerWarnings as warning, i (`${warning}-${i}`)}
 					<li>{warning}</li>
 				{/each}
 			</ul>

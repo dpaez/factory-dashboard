@@ -20,5 +20,6 @@ export default defineConfig({
 	timeout: 30_000,
 	retries: 0,
 	globalSetup: './test/global-setup.ts',
-	testMatch: '**/*.e2e.{ts,js}'
+	testMatch: '**/*.e2e.{ts,js}',
+	testDir: './test',
 });
