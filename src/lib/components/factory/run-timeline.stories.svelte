@@ -79,6 +79,18 @@
 		);
 		await expect(retry.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Running');
 		await expect(pane.querySelector('[aria-pressed="true"]')).toBeNull();
+
+		// Badges use only the five signal tones, and both panes render the same badges.
+		const signals = [...canvasElement.querySelectorAll('[data-slot="status-badge"]')].map((b) =>
+			b.getAttribute('data-signal')
+		);
+		await expect(signals.length).toBeGreaterThan(0);
+		for (const signal of signals) {
+			await expect(['run', 'wait', 'standby', 'fault', 'clear']).toContain(signal);
+		}
+		await expect(pane.querySelectorAll('[data-slot="status-badge"]')).toHaveLength(
+			signals.length / 2
+		);
 	}}
 />
 

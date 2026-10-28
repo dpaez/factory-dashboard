@@ -66,6 +66,15 @@ function expectSafe(text: string) {
 	expect(text).not.toContain(UPSTREAM);
 }
 
+/** A failure body has only the safe envelope and failure fields: no raw upstream problem. */
+function expectSafeFailure(body: unknown) {
+	expect(Object.keys(body as object).sort()).toEqual(['failure', 'ok']);
+	const { failure } = body as { failure: object };
+	for (const key of Object.keys(failure)) {
+		expect(['type', 'title', 'detail', 'retryable']).toContain(key);
+	}
+}
+
 function runOf(body: RunResult) {
 	if (!body.ok) throw new Error(`expected a run, got ${body.failure.type}`);
 	return body.run;
@@ -122,6 +131,7 @@ describe('GET /api/factory/runs/[id]', () => {
 		expect(status).toBe(404);
 		expect(cacheControl).toBe('no-store');
 		expect(body).toMatchObject({ ok: false, failure: { type: 'not_found', retryable: false } });
+		expectSafeFailure(body);
 		expectSafe(text);
 	});
 
@@ -132,6 +142,24 @@ describe('GET /api/factory/runs/[id]', () => {
 		expect(status).toBe(500);
 		expect(body).toMatchObject({ ok: false, failure: { type: 'internal_error', retryable: true } });
 		expectSafe(text);
+	});
+
+	it('an upstream 503 keeps its status and retryable, with only the safe failure fields', async () => {
+		const { status, body, text } = await get(runWorkValidationFailed.id, {
+			failRun: {
+				status: 503,
+				title: 'Tracker unavailable',
+				type: 'tracker_unavailable',
+				detail: UPSTREAM
+			}
+		});
+		expect(status).toBe(503);
+		expect(body).toMatchObject({
+			ok: false,
+			failure: { type: 'tracker_unavailable', retryable: true }
+		});
+		expectSafeFailure(body);
+		expect(text).not.toContain(FACTORY_HOST);
 	});
 
 	it('never echoes an upstream body that breaks the contract', async () => {
@@ -148,6 +176,7 @@ describe('GET /api/factory/runs/[id]', () => {
 		const { status, body, text } = await get(runWorkValidationFailed.id);
 		expect(status).toBe(401);
 		expect(body).toMatchObject({ ok: false, failure: { type: 'unauthorized' } });
+		expectSafeFailure(body);
 		expect(text).not.toContain('not-the-token');
 		expectSafe(text);
 	});

@@ -1,5 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect } from 'storybook/test';
 	import InfoCostCard from './info-cost-card.svelte';
 	import { ticketDetailActiveInWork } from '$lib/factory/fixtures';
 
@@ -47,6 +48,15 @@
 		tokensOutputUsage: null,
 		tokensCacheRead: null,
 		tokensCacheWrite: null
+	}}
+	play={async ({ canvasElement }) => {
+		// Unknown cost reads "—" in both panes, never $0.00.
+		const panes = canvasElement.querySelectorAll('[data-theme-pane]');
+		await expect(panes).toHaveLength(2);
+		for (const pane of panes) {
+			await expect(pane).toHaveTextContent('—');
+			await expect(pane).not.toHaveTextContent('$0.00');
+		}
 	}}
 />
 

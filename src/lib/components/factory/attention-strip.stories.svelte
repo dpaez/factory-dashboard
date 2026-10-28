@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { expect, fn, userEvent, within } from 'storybook/test';
+	import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 	import AttentionStrip from './attention-strip.svelte';
 	import { toAttention } from '$lib/factory/attention';
 	import {
@@ -25,6 +25,18 @@
 		[...pane.querySelectorAll<HTMLElement>('[data-slot="attention-group"]')].map((group) =>
 			group.textContent?.replace(/\s+/g, ' ').trim()
 		);
+
+	/** A one-reason story: one ticket, one group, and Open next. */
+	const oneReason =
+		(label: string) =>
+		async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+			const pane = firstPane(canvasElement);
+			await expect(pane.querySelector('[data-slot="attention-headline"]')).toHaveTextContent(
+				'1 ticket needs attention'
+			);
+			await expect(groupsOf(pane)).toEqual([`${label} 1 ticket`]);
+			await expect(pane.querySelector('[data-slot="attention-open-next"]')).toBeVisible();
+		};
 
 	const details = [ticketDetailAgentQuestion, ticketDetailPolicyLimit, ticketDetailManualApproval];
 	const only = (ticket: Parameters<typeof toAttention>[0]['tickets'][number]) =>
@@ -93,49 +105,29 @@
 <Story
 	name="Limit"
 	args={{ attention: only(ticketWaitingForPolicyLimit) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Limit 1 ticket']);
-	}}
+	play={oneReason('Limit')}
 />
 
 <Story
 	name="Approval"
 	args={{ attention: only(ticketWaitingForManualApproval) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Approval 1 ticket']);
-	}}
+	play={oneReason('Approval')}
 />
 
 <Story
 	name="Waiting for a reply"
 	args={{ attention: toAttention({ tickets: [ticketWaitingForAgentQuestion], complete: true }) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Waiting for a reply 1 ticket']);
-	}}
+	play={oneReason('Waiting for a reply')}
 />
 
-<Story
-	name="Paused"
-	args={{ attention: only(ticketPaused) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Paused 1 ticket']);
-	}}
-/>
+<Story name="Paused" args={{ attention: only(ticketPaused) }} play={oneReason('Paused')} />
 
-<Story
-	name="Failed"
-	args={{ attention: only(ticketFailed) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Failed 1 ticket']);
-	}}
-/>
+<Story name="Failed" args={{ attention: only(ticketFailed) }} play={oneReason('Failed')} />
 
 <Story
 	name="Ready for handoff"
 	args={{ attention: only(ticketReadyForHandoff) }}
-	play={async ({ canvasElement }) => {
-		await expect(groupsOf(firstPane(canvasElement))).toEqual(['Ready for handoff 1 ticket']);
-	}}
+	play={oneReason('Ready for handoff')}
 />
 
 <Story
@@ -164,12 +156,44 @@
 		await expect(keys.at(-1)).toBe(ticketReadyForHandoff.key);
 		for (const [index, key] of keys.entries()) {
 			await expect(button).toHaveAttribute('data-target-key', key);
+			// The button names its destination before the press.
+			await expect(button).toHaveAccessibleName(`Open next ${mixed.queue[index]!.displayRef}`);
 			await userEvent.click(button);
 			await expect(args.onselect).toHaveBeenNthCalledWith(index + 1, key);
 		}
 		await expect(button).toHaveAttribute('data-target-key', keys[0]);
 		await userEvent.click(button);
 		await expect(args.onselect).toHaveBeenLastCalledWith(keys[0]);
+
+		// DESIGN.md, in both panes: Open next is the only Beacon Yellow surface; it is square,
+		// casts no shadow at rest, and shows a focus ring from the keyboard.
+		for (const each of canvasElement.querySelectorAll<HTMLElement>('[data-theme-pane]')) {
+			const strip = each.querySelector<HTMLElement>('[data-slot="attention-strip"]')!;
+			const open = strip.querySelector<HTMLElement>('[data-slot="attention-open-next"]')!;
+			open.blur();
+			await waitFor(() =>
+				expect(
+					getComputedStyle(open)
+						.boxShadow.replace(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, )?/g, '')
+						.trim()
+				).toMatch(/^(none)?$/)
+			);
+			const beacon = getComputedStyle(open).backgroundColor;
+			const beaconUsers = [strip, ...strip.querySelectorAll<HTMLElement>('*')].filter(
+				(element) => getComputedStyle(element).backgroundColor === beacon
+			);
+			await expect(beaconUsers).toEqual([open]);
+			await expect(getComputedStyle(open).borderTopLeftRadius).toBe('0px');
+			await expect(strip.closest('.not-prose')).not.toBeNull();
+		}
+		(document.activeElement as HTMLElement | null)?.blur();
+		await userEvent.tab();
+		await expect(button).toHaveFocus();
+		const focused = getComputedStyle(button);
+		await expect(
+			(focused.outlineStyle !== 'none' && focused.outlineWidth !== '0px') ||
+				focused.boxShadow !== 'none'
+		).toBe(true);
 	}}
 />
 
@@ -186,6 +210,7 @@
 			'Paused 1 ticket',
 			'Failed 1 ticket'
 		]);
+		await expect(canvasElement).not.toHaveTextContent(/needs user|blocked/i);
 	}}
 />
 
@@ -196,10 +221,21 @@
 		const headline = firstPane(canvasElement).querySelector('[data-slot="attention-headline"]');
 		await expect(headline).toHaveTextContent(/at least 3/);
 		await expect(headline).toHaveTextContent('(partial)');
+		await expect(canvasElement).not.toHaveTextContent(/needs user|blocked/i);
 	}}
 />
 
-<Story name="Long titles and references" args={{ attention: long }} />
+<Story
+	name="Long titles and references"
+	args={{ attention: long }}
+	play={async ({ canvasElement }) => {
+		// The long reference stays inside the strip.
+		const pane = firstPane(canvasElement);
+		const strip = pane.querySelector<HTMLElement>('[data-slot="attention-strip"]')!;
+		await expect(pane.querySelector('[data-slot="attention-open-next"]')).toBeVisible();
+		await expect(strip.scrollWidth).toBeLessThanOrEqual(strip.clientWidth + 1);
+	}}
+/>
 
 <Story
 	name="Empty"

@@ -98,9 +98,19 @@ factory server is down or answers unexpectedly, the page says it is unreachable;
 `pnpm test` runs the unit and Storybook tests. Unit tests use fake `fetch` responses and the typed fixtures
 in `src/lib/factory/fixtures`; they never need a factory server.
 
-`pnpm test:e2e` runs Playwright against a production build. It starts a fake factory
-(`test/fake-factory.ts`, plain `node`) that serves the typed fixtures over GET only and checks the bearer
-token, and points the preview server at it. End-to-end tests never send commands to a real factory.
+`pnpm test` runs three vitest projects: `server` (view models, factory client reads, route loads and
+`/api/factory/*` handlers), `client` (rune state modules and component behaviour in a browser) and `storybook`
+(every story renders in light and dark panes, and its `play` function asserts the state). Component states
+are proved there. Playwright never starts Storybook.
+
+`pnpm test:e2e` runs Playwright against a production build, for critical user paths only. It builds once
+per run. Then each worker starts its own fake factory (`test/fake-factory.ts`, plain `node`, typed fixtures,
+bearer token checked) and its own `node build` pointed at it, both on free ports, through the shared fixture
+`test/fixtures.ts`. Tests pick fake options with `test.use({ fakeOptions })`. Each test has 30 s and no
+retries. The whole run takes under a minute (about 16 s of build and 36 s of tests). End-to-end tests never
+send commands to a real factory.
+
+See [`test/README.md`](test/README.md) for the layers, the fixture and how to add a feature spec.
 
 ### Factory API contract
 

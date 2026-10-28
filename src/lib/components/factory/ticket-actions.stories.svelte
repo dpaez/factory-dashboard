@@ -1,5 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import type { ComponentProps } from 'svelte';
 	import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 	import TicketActions, { ACTION_NOTES, type TicketActionsFeedback } from './ticket-actions.svelte';
 	import { toTicketDetail } from '$lib/factory/adapters';
@@ -150,6 +151,101 @@
 	const multi = build(ticketDetailActiveInWork, { runs: runsTwoActive });
 
 	const accessCommands = fn<(input: CommandInput) => void>();
+
+	// Cancel goes through the dialog. An open dialog portals to <body>, outside the
+	// side-by-side `.dark` pane, and two open copies would compete for the focus trap. So
+	// each dialog state runs twice, as a light story and a dark story (story-level globals),
+	// and `expectTheme` checks the theme it ran in.
+	const lightTheme = { theme: 'light' };
+	const darkTheme = { theme: 'dark' };
+	type DialogContext = {
+		args: Partial<ComponentProps<typeof TicketActions>>;
+		canvasElement: HTMLElement;
+		globals: Record<string, unknown>;
+	};
+	const expectTheme = async (theme: unknown) => {
+		await expect(document.querySelectorAll('[data-theme-pane]')).toHaveLength(1);
+		await expect(document.documentElement.classList.contains('dark')).toBe(theme === 'dark');
+	};
+	const inTheme =
+		(play: (context: DialogContext) => Promise<void>) => async (context: DialogContext) => {
+			await expectTheme(context.globals.theme);
+			// A story that starts closed waits for the previous story's dialog to release its
+			// page lock; a story that starts open holds the lock itself.
+			if (!context.args.cancelOpen && context.args.state)
+				await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
+			await play(context);
+		};
+	const cancelDismissedPlay = inTheme(async ({ args, canvasElement }) => {
+		const body = within(document.body);
+		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
+		await expect(args.oncommand).not.toHaveBeenCalled();
+		let dialog = await body.findByRole('alertdialog');
+		await userEvent.click(within(dialog).getByRole('button', { name: 'Keep execution' }));
+		await waitFor(() => expect(body.queryByRole('alertdialog')).toBeNull());
+		// The closed dialog releases the page's pointer lock after its exit.
+		await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
+
+		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
+		dialog = await body.findByRole('alertdialog');
+		await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+		await userEvent.keyboard('{Escape}');
+		await waitFor(() => expect(body.queryByRole('alertdialog')).toBeNull());
+		await expect(args.oncommand).toHaveBeenCalledTimes(0);
+	});
+	const cancelConfirmedPlay = inTheme(async ({ args, canvasElement }) => {
+		const body = within(document.body);
+		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
+		const dialog = await body.findByRole('alertdialog', {
+			name: `Cancel execution ${ticketDetailPaused.execution} of ${ticketDetailPaused.displayRef}?`
+		});
+		await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel execution' }));
+		await expect(args.oncommand).toHaveBeenCalledOnce();
+		await expect(args.oncommand).toHaveBeenCalledWith({
+			command: 'cancel',
+			ticket: ticketDetailPaused.key
+		});
+		// The dialog waits for the parent: it stays open until the cancel is confirmed.
+		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
+		await waitFor(() => expect(body.getByRole('alertdialog')).toBeVisible());
+	});
+	const cancelPendingPlay = inTheme(async ({ args }) => {
+		const body = within(document.body);
+		const dialog = await body.findByRole('alertdialog');
+		const action = within(dialog).getByRole('button', { name: 'Cancelling…' });
+		await expect(action).toBeDisabled();
+		await expect(action).toHaveAttribute('aria-busy', 'true');
+		await userEvent.click(action, { pointerEventsCheck: 0 });
+		await expect(args.oncommand).not.toHaveBeenCalled();
+		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
+		await waitFor(() => expect(body.getByRole('alertdialog')).toBeVisible());
+	});
+	const cancelRefusedPlay = inTheme(async () => {
+		accessCommands.mockClear();
+		const body = within(document.body);
+		const dialog = await body.findByRole('alertdialog');
+		await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel execution' }));
+		await expect(accessCommands).toHaveBeenCalledOnce();
+		await expect(accessCommands).toHaveBeenCalledWith({
+			command: 'cancel',
+			ticket: ticketDetailPaused.key
+		});
+
+		// The rejection keeps the dialog open; known read-only access disables its action.
+		await waitFor(() =>
+			expect(within(dialog).getByTestId('cancel-blocked')).toHaveTextContent(
+				ACTION_REASONS.readOnly
+			)
+		);
+		const action = within(dialog).getByRole('button', { name: 'Cancel execution' });
+		await expect(action).toBeDisabled();
+		await expect(within(dialog).getByTestId('cancel-explanation')).toHaveTextContent(
+			EXPLANATIONS.access
+		);
+		await userEvent.click(action, { pointerEventsCheck: 0 });
+		await expect(accessCommands).toHaveBeenCalledOnce();
+		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
+	});
 
 	const { Story } = defineMeta({
 		title: 'Components/Factory/TicketActions',
@@ -487,102 +583,60 @@
 	}}
 />
 
-<!-- Cancel goes through the dialog. One theme each: an open dialog portals to <body>. -->
+<!-- Cancel goes through the dialog: each state as a light and a dark story (see cancelDismissedPlay). -->
 
 <Story
-	name="Cancel dismissed"
-	globals={{ theme: 'light' }}
+	name="Cancel dismissed, light"
+	globals={lightTheme}
 	args={paused}
-	play={async ({ args, canvasElement }) => {
-		const body = within(document.body);
-		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
-		await expect(args.oncommand).not.toHaveBeenCalled();
-		let dialog = await body.findByRole('alertdialog');
-		await userEvent.click(within(dialog).getByRole('button', { name: 'Keep execution' }));
-		await waitFor(() => expect(body.queryByRole('alertdialog')).toBeNull());
-		// The closed dialog releases the page's pointer lock after its exit.
-		await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
-
-		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
-		dialog = await body.findByRole('alertdialog');
-		await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
-		await userEvent.keyboard('{Escape}');
-		await waitFor(() => expect(body.queryByRole('alertdialog')).toBeNull());
-		await expect(args.oncommand).toHaveBeenCalledTimes(0);
-	}}
+	play={cancelDismissedPlay}
 />
 
 <Story
-	name="Cancel confirmed"
-	globals={{ theme: 'dark' }}
+	name="Cancel confirmed, light"
+	globals={lightTheme}
 	args={paused}
-	play={async ({ args, canvasElement }) => {
-		const body = within(document.body);
-		await userEvent.click(control(firstPane(canvasElement), 'cancel'));
-		const dialog = await body.findByRole('alertdialog', {
-			name: `Cancel execution ${ticketDetailPaused.execution} of ${ticketDetailPaused.displayRef}?`
-		});
-		await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel execution' }));
-		await expect(args.oncommand).toHaveBeenCalledOnce();
-		await expect(args.oncommand).toHaveBeenCalledWith({
-			command: 'cancel',
-			ticket: ticketDetailPaused.key
-		});
-		// The dialog waits for the parent: it stays open until the cancel is confirmed.
-		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
-		await waitFor(() => expect(body.getByRole('alertdialog')).toBeVisible());
-	}}
+	play={cancelConfirmedPlay}
 />
 
 <Story
-	name="Cancel pending in dialog"
-	globals={{ theme: 'light' }}
+	name="Cancel pending in dialog, light"
+	globals={lightTheme}
 	args={{
 		...build(ticketDetailPaused, { feedback: { cancel: accepted } }),
 		cancelOpen: true
 	}}
-	play={async ({ args }) => {
-		const body = within(document.body);
-		const dialog = await body.findByRole('alertdialog');
-		const action = within(dialog).getByRole('button', { name: 'Cancelling…' });
-		await expect(action).toBeDisabled();
-		await expect(action).toHaveAttribute('aria-busy', 'true');
-		await userEvent.click(action, { pointerEventsCheck: 0 });
-		await expect(args.oncommand).not.toHaveBeenCalled();
-		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
-		await waitFor(() => expect(body.getByRole('alertdialog')).toBeVisible());
-	}}
+	play={cancelPendingPlay}
 />
 
 <Story
-	name="Cancel refused for access while open"
-	globals={{ theme: 'dark' }}
-	play={async () => {
-		accessCommands.mockClear();
-		const body = within(document.body);
-		const dialog = await body.findByRole('alertdialog');
-		await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel execution' }));
-		await expect(accessCommands).toHaveBeenCalledOnce();
-		await expect(accessCommands).toHaveBeenCalledWith({
-			command: 'cancel',
-			ticket: ticketDetailPaused.key
-		});
+	name="Cancel refused for access while open, light"
+	globals={lightTheme}
+	play={cancelRefusedPlay}
+>
+	{#snippet template()}
+		<TicketActions {...accessArgs} oncommand={refuseForScope} bind:cancelOpen={accessOpen} />
+	{/snippet}
+</Story>
 
-		// The rejection keeps the dialog open; known read-only access disables its action.
-		await waitFor(() =>
-			expect(within(dialog).getByTestId('cancel-blocked')).toHaveTextContent(
-				ACTION_REASONS.readOnly
-			)
-		);
-		const action = within(dialog).getByRole('button', { name: 'Cancel execution' });
-		await expect(action).toBeDisabled();
-		await expect(within(dialog).getByTestId('cancel-explanation')).toHaveTextContent(
-			EXPLANATIONS.access
-		);
-		await userEvent.click(action, { pointerEventsCheck: 0 });
-		await expect(accessCommands).toHaveBeenCalledOnce();
-		await expect(body.getByRole('alertdialog')).toHaveAttribute('data-state', 'open');
+<Story name="Cancel dismissed, dark" globals={darkTheme} args={paused} play={cancelDismissedPlay} />
+
+<Story name="Cancel confirmed, dark" globals={darkTheme} args={paused} play={cancelConfirmedPlay} />
+
+<Story
+	name="Cancel pending in dialog, dark"
+	globals={darkTheme}
+	args={{
+		...build(ticketDetailPaused, { feedback: { cancel: accepted } }),
+		cancelOpen: true
 	}}
+	play={cancelPendingPlay}
+/>
+
+<Story
+	name="Cancel refused for access while open, dark"
+	globals={darkTheme}
+	play={cancelRefusedPlay}
 >
 	{#snippet template()}
 		<TicketActions {...accessArgs} oncommand={refuseForScope} bind:cancelOpen={accessOpen} />

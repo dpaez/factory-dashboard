@@ -169,6 +169,7 @@ describe('POST /api/factory/commands/[command]', () => {
 		['retry', { intent: 'not-a-uuid', ticket: KEY }, 'body.intent'],
 		['retry', { intent: INTENT, ticket: 'Not A Key' }, 'body.ticket'],
 		['reply', { intent: INTENT, ticket: KEY, answer: '' }, 'body.answer'],
+		['reply', { intent: INTENT, ticket: KEY, answer: '   ' }, 'body.answer'],
 		['start', { intent: INTENT, ref: '#1', id: 'a', text: 'b' }, 'body.ref'],
 		['start', { intent: INTENT }, 'body.ref']
 	])('%s %o is a 400 validation_error at %s, sending nothing', async (command, body, path) => {
@@ -298,6 +299,31 @@ describe('POST /api/factory/commands/[command]', () => {
 		expect(result.status).toBe(status);
 		expect(result.cacheControl).toBe('no-store');
 		expect(result.body).toMatchObject({ ok: false, failure: { type, title: problem.title } });
+		expectSafe(result.text, result.headers);
+	});
+
+	it('keeps only the safe failure fields of a problem with extra upstream fields', async () => {
+		const result = await post(
+			'retry',
+			{ intent: INTENT, ticket: KEY },
+			{
+				fakeOptions: {
+					failCommand: {
+						problem: {
+							status: 409,
+							type: 'invalid_state',
+							title: 'Invalid state',
+							[UPSTREAM]: `${UPSTREAM} ${FACTORY_URL}/v1/tickets`
+						} as never
+					}
+				}
+			}
+		);
+		expect(result.status).toBe(409);
+		expect(result.body).toEqual({
+			ok: false,
+			failure: { type: 'invalid_state', title: 'Invalid state', retryable: false }
+		});
 		expectSafe(result.text, result.headers);
 	});
 

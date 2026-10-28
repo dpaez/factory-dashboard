@@ -1,5 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect } from 'storybook/test';
 	import TicketsTable from './tickets-table.svelte';
 	import { columns } from './tickets-table-columns';
 	import { toTicketRow } from '$lib/factory/adapters';
@@ -37,7 +38,15 @@
 
 <Story name="All tickets, cost unavailable" args={{ data: allTickets, columns }} />
 
-<Story name="Empty" args={{ data: [], columns }} />
+<Story
+	name="Empty"
+	args={{ data: [], columns }}
+	play={async ({ canvasElement }) => {
+		for (const pane of canvasElement.querySelectorAll('[data-theme-pane]')) {
+			await expect(pane).toHaveTextContent('No tickets.');
+		}
+	}}
+/>
 
 <Story
 	name="Long values"
