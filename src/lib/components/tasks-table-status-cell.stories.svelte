@@ -1,5 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { expect } from 'storybook/test';
 	import TasksTableStatusCell from './tasks-table-status-cell.svelte';
 	import {
 		taskActive,
@@ -37,7 +38,15 @@
 <Story name="Pending" args={{ status: taskPending.status, stage: taskPending.stage }} />
 <Story name="Blocked QA" args={{ status: taskBlocked.status, stage: taskBlocked.stage }} />
 <Story name="Cancelled work" args={{ status: taskCancelled.status, stage: taskCancelled.stage }} />
-<Story name="Unknown value" args={{ status: 'archived', stage: null }} />
+<Story
+	name="Unknown value"
+	args={{ status: 'archived', stage: null }}
+	play={async ({ canvasElement }) => {
+		const badge = canvasElement.querySelector('[data-slot="status-badge"]');
+		await expect(badge).toHaveTextContent('archived');
+		await expect(badge).toHaveAttribute('data-signal', 'standby');
+	}}
+/>
 
 <Story name="Every fixture" asChild>
 	<div class="flex flex-wrap items-center gap-2">

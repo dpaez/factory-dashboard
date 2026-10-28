@@ -7,7 +7,9 @@
  * stream and can add a ticket with them.
  *
  * Run it with `node test/fake-factory.ts` (Node strips the types). Env:
- * `FAKE_FACTORY_PORT` (default 7799) and `FAKE_FACTORY_TOKEN`.
+ * `FAKE_FACTORY_PORT` (default 7799) and `FAKE_FACTORY_TOKEN`. The e2e suite
+ * starts it in-process on a free port instead (`startFakeFactory(0)`, see
+ * `test/fixtures.ts`).
  *
  * Imports use explicit `.ts` paths so Node can load them without a bundler.
  */
@@ -870,12 +872,43 @@ async function readJson(incoming: IncomingMessage): Promise<unknown> {
 	return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-/** Serve the fake over HTTP. Resolves once it listens. */
+/** A running fake factory: its server, where it listens, and the fake behind it. */
+export type RunningFakeFactory = {
+	server: Server;
+	/** The port it listens on: the one asked for, or the free one picked for `0`. */
+	port: number;
+	/** `http://127.0.0.1:<port>`, what the app's `FACTORY_API_URL` names. */
+	url: string;
+	/** The request log of the fake it started with (stale after `reset`). */
+	requests: { method: string; path: string }[];
+	/** The fake it started with (stale after `reset`). */
+	fake: FakeFactory;
+	/** The fake that answers now. */
+	current(): FakeFactory;
+	/**
+	 * Replace the fake with a fresh one built from `options`: open streams drop,
+	 * and the request, command and event logs start empty. The port stays.
+	 */
+	reset(options?: FakeFactoryOptions): FakeFactory;
+};
+
+/**
+ * Serve the fake over HTTP. Resolves once it listens. Port `0` picks a free
+ * port; read it from the result. `POST /__fake/reset` with a
+ * `FakeFactoryOptions` JSON body (or none) reconfigures it in place.
+ */
 export async function startFakeFactory(
 	port = FAKE_FACTORY_PORT,
 	options: FakeFactoryOptions = {}
-): Promise<{ server: Server; requests: { method: string; path: string }[]; fake: FakeFactory }> {
-	const fake = createFakeFactory(options);
+): Promise<RunningFakeFactory> {
+	const initial = createFakeFactory(options);
+	let fake = initial;
+	const reset = (next: FakeFactoryOptions = {}) => {
+		fake.dropStreams();
+		fake = createFakeFactory(next);
+		return fake;
+	};
+	let listening = port;
 	const sendJson = (outgoing: ServerResponse, body: unknown) => {
 		outgoing.writeHead(200, { 'content-type': 'application/json' });
 		outgoing.end(JSON.stringify(body));
@@ -884,8 +917,7 @@ export async function startFakeFactory(
 		// Test-only probes, not factory routes: what the dashboard sent so far, and
 		// the event stream's controls.
 		if (incoming.url === '/__fake/requests') return sendJson(outgoing, fake.requests);
-		if (incoming.url === '/__fake/stats-export')
-			return sendJson(outgoing, fake.exportRequests);
+		if (incoming.url === '/__fake/stats-export') return sendJson(outgoing, fake.exportRequests);
 		if (incoming.url === '/__fake/commands') return sendJson(outgoing, fake.commands);
 		if (incoming.url === '/__fake/events/connections') return sendJson(outgoing, fake.connections);
 		if (incoming.method === 'POST' && incoming.url === '/__fake/events/drop') {
@@ -894,6 +926,13 @@ export async function startFakeFactory(
 		}
 		if (incoming.method === 'POST' && incoming.url === '/__fake/events') {
 			return sendJson(outgoing, fake.emit((await readJson(incoming)) as FakeEventInput));
+		}
+		if (incoming.method === 'POST' && incoming.url === '/__fake/reset') {
+			const chunks: Buffer[] = [];
+			for await (const chunk of incoming) chunks.push(chunk as Buffer);
+			const text = Buffer.concat(chunks).toString('utf8');
+			reset(text === '' ? {} : (JSON.parse(text) as FakeFactoryOptions));
+			return sendJson(outgoing, { reset: true });
 		}
 
 		const headers = new Headers();
@@ -910,7 +949,7 @@ export async function startFakeFactory(
 		const abort = new AbortController();
 		outgoing.once('close', () => abort.abort());
 		const response = await fake.handle(
-			new Request(`http://127.0.0.1:${port}${incoming.url ?? '/'}`, {
+			new Request(`http://127.0.0.1:${listening}${incoming.url ?? '/'}`, {
 				method: incoming.method,
 				headers,
 				body,
@@ -942,7 +981,17 @@ export async function startFakeFactory(
 		return close(callback);
 	};
 	await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
-	return { server, requests: fake.requests, fake };
+	const address = server.address();
+	if (address && typeof address === 'object') listening = address.port;
+	return {
+		server,
+		port: listening,
+		url: `http://127.0.0.1:${listening}`,
+		requests: initial.requests,
+		fake: initial,
+		current: () => fake,
+		reset
+	};
 }
 
 // `node test/fake-factory.ts` starts the server (Playwright's webServer does this).

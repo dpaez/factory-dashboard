@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { ArrowRight, Factory, Plus } from '@lucide/svelte';
+	import { expect, within } from 'storybook/test';
 	import Button from './button.svelte';
 
 	const variants = ['default', 'outline', 'secondary', 'ghost', 'destructive', 'link'] as const;
@@ -33,7 +34,24 @@
 
 <Story name="Disabled" args={{ variant: 'default', disabled: true }}>Start run</Story>
 
-<Story name="All variants" asChild>
+<!-- DESIGN.md: Beacon Yellow is the primary in each theme, and buttons are square. -->
+<Story
+	name="All variants"
+	asChild
+	play={async ({ canvasElement }) => {
+		const beacon = { light: 'oklch(0.852 0.199 91.936)', dark: 'oklch(0.795 0.184 86.047)' };
+		const panes = [...canvasElement.querySelectorAll<HTMLElement>('[data-theme-pane]')];
+		await expect(panes.map((pane) => pane.dataset.themePane)).toEqual(['light', 'dark']);
+		for (const pane of panes) {
+			const button = within(pane).getByRole('button', { name: 'default' });
+			const primary = getComputedStyle(button).getPropertyValue('--primary').trim();
+			await expect(primary).toBe(beacon[pane.dataset.themePane as 'light' | 'dark']);
+			for (const each of within(pane).getAllByRole('button')) {
+				await expect(getComputedStyle(each).borderRadius).toBe('0px');
+			}
+		}
+	}}
+>
 	<div class="flex flex-wrap items-center gap-2">
 		{#each variants as variant (variant)}
 			<Button {variant}>{variant}</Button>

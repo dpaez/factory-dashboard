@@ -102,6 +102,7 @@
 		await expect(pane.querySelector('[data-testid="current-task"]')).toHaveTextContent(
 			'Typed read operations and API fixtures'
 		);
+		await expect(pane.querySelector('[data-testid="current-task"]')).toHaveTextContent('round 1');
 		await expect(pane.querySelector('[data-testid="past-execution"]')).toBeNull();
 		await expect(pane.querySelector('[data-testid="tracker-warnings"]')).toBeNull();
 		await expect(pane.querySelector('button')).toBeNull();

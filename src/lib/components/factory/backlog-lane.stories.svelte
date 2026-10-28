@@ -145,7 +145,18 @@
 	args={{ cards: [], fetchedAt: null, status: 'loading' }}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expect(pane.querySelectorAll('[data-slot="card-placeholder"]')).toHaveLength(3);
+		await expect(pane.querySelector('[data-slot="backlog-lane"]')).toHaveAttribute(
+			'aria-busy',
+			'true'
+		);
+		const placeholders = pane.querySelectorAll('[data-slot="card-placeholder"]');
+		await expect(placeholders).toHaveLength(3);
+		// Card-shaped: wider than tall, and tall enough to read as a card.
+		for (const placeholder of placeholders) {
+			const box = placeholder.getBoundingClientRect();
+			await expect(box.height).toBeGreaterThan(40);
+			await expect(box.width).toBeGreaterThan(box.height);
+		}
 		await expect(pane.querySelector('[data-slot="card-placeholder"]')).toHaveClass(
 			'motion-reduce:animate-none'
 		);

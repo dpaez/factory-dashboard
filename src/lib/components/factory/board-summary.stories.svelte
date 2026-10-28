@@ -35,6 +35,16 @@
 		const ready = canvasElement.querySelector('[data-summary="ready-to-start"]');
 		await expect(ready).toHaveTextContent('5 ready to start');
 		await expect(ready).not.toHaveTextContent('at least');
+		await expect(canvasElement.querySelector('[data-summary="in-progress"]')).toHaveTextContent(
+			/^\s*12\s*in progress\s*$/
+		);
+		await expect(canvasElement.querySelector('[data-summary="agents-running"]')).toHaveTextContent(
+			/^\s*2\s*agents running\s*$/
+		);
+		// DESIGN.md: every number is tabular mono.
+		const value = canvasElement.querySelector('[data-summary="in-progress"] span')!;
+		await expect(getComputedStyle(value).fontFamily).toMatch(/mono/i);
+		await expect(getComputedStyle(value).fontVariantNumeric).toContain('tabular-nums');
 	}}
 />
 
@@ -51,7 +61,7 @@
 	}}
 	play={async ({ canvasElement }) => {
 		await expect(canvasElement.querySelector('[data-summary="ready-to-start"]')).toHaveTextContent(
-			'Unavailable'
+			/^\s*Unavailable\s*ready to start\s*$/
 		);
 	}}
 />

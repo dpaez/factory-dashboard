@@ -117,7 +117,9 @@
 <Story name="Open dark" globals={dark} play={openPlay} />
 
 <Story name="Pending light" globals={light} args={{ phase: 'accepted' }} play={pendingPlay} />
-<Story name="Pending dark" globals={dark} args={{ phase: 'submitting' }} play={pendingPlay} />
+<Story name="Pending dark" globals={dark} args={{ phase: 'accepted' }} play={pendingPlay} />
+<Story name="Submitting light" globals={light} args={{ phase: 'submitting' }} play={pendingPlay} />
+<Story name="Submitting dark" globals={dark} args={{ phase: 'submitting' }} play={pendingPlay} />
 
 <Story
 	name="Rejected light"
@@ -153,5 +155,7 @@
 	play={readOnlyPlay}
 />
 
-<Story name="Dismissed with Keep execution" globals={light} play={dismissPlay('keep')} />
-<Story name="Dismissed with Escape" globals={dark} play={dismissPlay('escape')} />
+<Story name="Dismissed with Keep execution, light" globals={light} play={dismissPlay('keep')} />
+<Story name="Dismissed with Keep execution, dark" globals={dark} play={dismissPlay('keep')} />
+<Story name="Dismissed with Escape, light" globals={light} play={dismissPlay('escape')} />
+<Story name="Dismissed with Escape, dark" globals={dark} play={dismissPlay('escape')} />

@@ -77,6 +77,10 @@
 		await expect(button).toHaveTextContent(backlogIssuePlain.displayRef);
 		await expect(button).toHaveTextContent(backlogIssuePlain.title);
 		await expect(button.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Ready');
+		await expect(button.querySelector('[data-slot="status-badge"]')).toHaveAttribute(
+			'data-signal',
+			'standby'
+		);
 		await expect(button.querySelector('[data-slot="issue-label"]')).toHaveTextContent(
 			'enhancement'
 		);
@@ -113,10 +117,12 @@
 <Story
 	name="Umbrella with sub-issues"
 	args={{ card: toBacklogCard(backlogUmbrellaIssue) }}
-	play={async ({ canvasElement }) => {
+	play={async ({ canvasElement, args }) => {
 		const pane = firstPane(canvasElement);
 		const button = cardButton(canvasElement);
-		await expect(button.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Umbrella');
+		const badge = button.querySelector('[data-slot="status-badge"]');
+		await expect(badge).toHaveTextContent('Umbrella');
+		await expect(badge).toHaveAttribute('data-signal', 'standby');
 		// Sub-issue links sit after the button, never inside it.
 		await expect(button.querySelector('a')).toBeNull();
 		const links = pane.querySelectorAll<HTMLAnchorElement>('[data-slot="sub-issues"] a');
@@ -133,6 +139,13 @@
 		await userEvent.tab();
 		await expect(links[1]).toHaveFocus();
 		await expectNoStart(canvasElement);
+
+		// Enter and Space on the card select its issue.
+		button.focus();
+		await userEvent.keyboard('{Enter}');
+		await userEvent.keyboard(' ');
+		await expect(args.onselect).toHaveBeenCalledTimes(2);
+		await expect(args.onselect).toHaveBeenLastCalledWith(backlogUmbrellaIssue.id);
 	}}
 />
 
@@ -165,6 +178,19 @@
 		// Plain outline badges: never a signal tone.
 		for (const label of labels) await expect(label).not.toHaveAttribute('data-signal');
 		await expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+		// Uncoloured: one neutral fill and ink for every label, with an outline; they wrap
+		// onto several rows and stay inside the narrow card.
+		const styles = new Set(
+			[...labels].map((l) => `${getComputedStyle(l).backgroundColor}|${getComputedStyle(l).color}`)
+		);
+		await expect(styles.size).toBe(1);
+		const right = card.getBoundingClientRect().right;
+		for (const label of labels) {
+			await expect(parseFloat(getComputedStyle(label).borderTopWidth)).toBeGreaterThan(0);
+			await expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(right + 1);
+		}
+		const rows = new Set([...labels].map((l) => Math.round(l.getBoundingClientRect().top)));
+		await expect(rows.size).toBeGreaterThan(1);
 	}}
 >
 	{#snippet template(args)}

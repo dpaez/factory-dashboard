@@ -21,6 +21,38 @@
 	const button = (scope: HTMLElement, name: string) =>
 		within(scope).queryByRole('button', { name });
 
+	/**
+	 * DESIGN.md, in both panes: no elevation, no Beacon Yellow, and square surfaces (only the
+	 * signal chip is a pill).
+	 */
+	const expectFlat = async (canvasElement: HTMLElement) => {
+		const panes = canvasElement.querySelectorAll<HTMLElement>('[data-theme-pane]');
+		await expect(panes).toHaveLength(2);
+		for (const pane of panes) {
+			await expect(pane.querySelectorAll('[aria-live="polite"]')).toHaveLength(1);
+			const probe = document.createElement('span');
+			probe.className = 'bg-primary';
+			pane.append(probe);
+			const beacon = getComputedStyle(probe).backgroundColor;
+			probe.remove();
+			const root = pane.querySelector('[data-slot="command-feedback"]')!;
+			for (const element of root.querySelectorAll('*')) {
+				const style = getComputedStyle(element);
+				// A focus ring is a spread-only layer (0 offset, 0 blur); anything else is elevation.
+				const elevation = style.boxShadow
+					.split(/,(?![^(]*\))/)
+					.map((layer) => layer.trim())
+					.filter((layer) => layer !== 'none' && !layer.startsWith('rgba(0, 0, 0, 0)'))
+					.filter((layer) => !/\) 0px 0px 0px \d+(\.\d+)?px$/.test(layer));
+				await expect(elevation).toEqual([]);
+				if (!element.closest('[data-slot="status-badge"]'))
+					await expect(style.borderRadius).toBe('0px');
+				for (const color of [style.color, style.backgroundColor, style.borderColor])
+					await expect(color).not.toBe(beacon);
+			}
+		}
+	};
+
 	const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 	const sending: CommandFeedbackItem = {
@@ -97,6 +129,7 @@
 	name="Empty"
 	args={{ intents: [], notice: null }}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelectorAll('[aria-live="polite"]')).toHaveLength(1);
 		await expect(live(pane)).toHaveTextContent('');
@@ -110,6 +143,7 @@
 	name="Pending"
 	args={{ intents: [sending], notice: `Retry: ${EXPLANATIONS.submitting}` }}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent('Retry: Sending to the factory.');
 		const [row] = rows(pane);
@@ -132,6 +166,7 @@
 	name="Accepted awaiting"
 	args={{ intents: [accepted], notice: `Start ticket: ${EXPLANATIONS.accepted}` }}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent('Start ticket: Accepted, waiting for the factory.');
 		const [row] = rows(pane);
@@ -150,6 +185,7 @@
 	name="Confirmed"
 	args={{ intents: [confirmed], notice: `Retry: ${EXPLANATIONS.confirmed}` }}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent('Retry: The factory recorded it.');
 		await expect(rows(pane)).toHaveLength(0);
@@ -161,6 +197,7 @@
 	name="Rejected"
 	args={{ intents: [stale, access, validation], notice: `Reply: ${EXPLANATIONS.validation}` }}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent('Reply: Fix the highlighted fields.');
 		const [staleRow, accessRow, validationRow] = rows(pane);
@@ -186,6 +223,7 @@
 	name="Rejected dismiss"
 	args={{ intents: [stale], notice: null }}
 	play={async ({ args, canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		// The notice cleared; the unresolved row stays listed.
 		await expect(live(pane)).toHaveTextContent('');
@@ -199,6 +237,7 @@
 	name="Unconfirmed"
 	args={{ intents: [unconfirmed], notice: `Stop run: ${EXPLANATIONS.unconfirmed}` }}
 	play={async ({ args, canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent(`Stop run: ${EXPLANATIONS.unconfirmed}`);
 		const [row] = rows(pane);
@@ -233,6 +272,7 @@
 		notice: null
 	}}
 	play={async ({ canvasElement }) => {
+		await expectFlat(canvasElement);
 		const pane = firstPane(canvasElement);
 		await expect(live(pane)).toHaveTextContent('');
 		await expect(rows(pane).map((row) => row.dataset.phase)).toEqual([

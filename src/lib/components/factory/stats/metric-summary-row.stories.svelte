@@ -46,6 +46,17 @@
 		await expect(pane.querySelector('[data-testid="merge-rate-denominator"]')).toHaveTextContent(
 			'16 of 20 finished · 6 open or unknown excluded'
 		);
+		// Every figure is readable: none is clipped by its card.
+		const values = pane.querySelectorAll('[data-testid="info-card-value"]');
+		await expect(values).toHaveLength(3);
+		for (const value of values) {
+			const range = document.createRange();
+			range.selectNodeContents(value);
+			const text = range.getBoundingClientRect();
+			const card = value.closest('[data-slot="info-card"]')!.getBoundingClientRect();
+			await expect(text.left).toBeGreaterThanOrEqual(card.left);
+			await expect(text.right).toBeLessThanOrEqual(card.right);
+		}
 
 		const details = pane.querySelector('[data-testid="inspect-cohort"]') as HTMLDetailsElement;
 		await expect(details.open).toBe(false);

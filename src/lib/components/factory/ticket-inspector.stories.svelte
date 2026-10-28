@@ -88,6 +88,39 @@
 		usage: null
 	});
 
+	/**
+	 * DESIGN.md, in both panes: no Beacon Yellow surface outside the lifecycle locator, and
+	 * every status badge takes one of the five signal tones.
+	 */
+	const expectSignalTones = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+		const panes = canvasElement.querySelectorAll<HTMLElement>('[data-theme-pane]');
+		await expect(panes).toHaveLength(2);
+		for (const pane of panes) {
+			const root = pane.querySelector<HTMLElement>('[data-testid="ticket-inspector"]')!;
+			const probe = (cls: string) => {
+				const element = document.createElement('span');
+				element.className = cls;
+				root.append(element);
+				const color = getComputedStyle(element).backgroundColor;
+				element.remove();
+				return color;
+			};
+			const beacon = probe('bg-primary');
+			const tones = ['run', 'wait', 'standby', 'fault', 'clear'].map((t) =>
+				probe(`bg-signal-${t}`)
+			);
+			const surfaces = [...root.querySelectorAll<HTMLElement>('*')].filter(
+				(element) =>
+					!element.closest('[data-testid="timeline"]') &&
+					getComputedStyle(element).backgroundColor === beacon
+			);
+			await expect(surfaces).toEqual([]);
+			for (const badge of root.querySelectorAll('[data-slot="status-badge"]')) {
+				await expect(tones).toContain(getComputedStyle(badge).backgroundColor);
+			}
+		}
+	};
+
 	const panelText = (pane: HTMLElement) => within(pane).getByRole('tabpanel').textContent ?? '';
 
 	/**
@@ -144,6 +177,7 @@
 	name="Running"
 	args={base(running)}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		const root = pane.querySelector<HTMLElement>('[data-testid="ticket-inspector"]')!;
 		await expect(root.tagName).toBe('SECTION');
@@ -179,6 +213,7 @@
 	name="Waiting with question"
 	args={base(loaded(single(ticketDetailAgentQuestion)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		const attention = pane.querySelector('[data-slot="inspector-attention"]')!;
 		await expect(attention).toHaveTextContent(ticketDetailAgentQuestion.attention[0]!.question);
@@ -203,6 +238,7 @@
 	name="Paused"
 	args={base(loaded(single(ticketDetailPaused)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Paused');
 		await expect(pane.querySelector('[data-slot="inspector-attention"]')).toBeNull();
@@ -213,6 +249,7 @@
 	name="Failed"
 	args={base(loaded(single(ticketDetailFailed)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveAttribute(
 			'data-signal',
@@ -225,6 +262,7 @@
 	name="Ready for handoff"
 	args={base(loaded(single(ticketDetailReadyForHandoff)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveTextContent(
 			'Ready for handoff'
@@ -239,6 +277,7 @@
 	name="Complete"
 	args={base(loaded(single(ticketDetailComplete)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveAttribute(
 			'data-signal',
@@ -251,6 +290,7 @@
 	name="Cancelled"
 	args={base(loaded(single(ticketDetailCancelled)))}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-slot="status-badge"]')).toHaveTextContent('Cancelled');
 	}}
@@ -276,6 +316,7 @@
 	name="Rerun, past execution"
 	args={base(rerunPast)}
 	play={async ({ canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-testid="ticket-inspector"]')).toHaveAttribute(
 			'data-execution',
@@ -659,6 +700,7 @@
 		onretry: fn()
 	}}
 	play={async ({ args, canvasElement }) => {
+		await expectSignalTones({ canvasElement });
 		const pane = firstPane(canvasElement);
 		await expect(pane.querySelector('[data-testid="ticket-inspector"]')).toHaveAccessibleName(
 			'The factory is unavailable'

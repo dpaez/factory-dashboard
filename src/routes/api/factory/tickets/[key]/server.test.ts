@@ -74,6 +74,15 @@ function expectSafe(text: string) {
 	expect(text).not.toContain(UPSTREAM);
 }
 
+/** A failure body has only the safe envelope and failure fields: no raw upstream problem. */
+function expectSafeFailure(body: unknown) {
+	expect(Object.keys(body as object).sort()).toEqual(['failure', 'ok']);
+	const { failure } = body as { failure: object };
+	for (const key of Object.keys(failure)) {
+		expect(['type', 'title', 'detail', 'retryable']).toContain(key);
+	}
+}
+
 function detailOf(body: TicketResult) {
 	if (!body.ok) throw new Error(`expected a detail, got ${body.failure.type}`);
 	return body;
@@ -170,6 +179,7 @@ describe('GET /api/factory/tickets/[key]', () => {
 		const { status, body, text } = await get('no-such-ticket-00000000');
 		expect(status).toBe(404);
 		expect(body).toMatchObject({ ok: false, failure: { type: 'ticket_not_found' } });
+		expectSafeFailure(body);
 		expectSafe(text);
 	});
 
@@ -210,6 +220,7 @@ describe('GET /api/factory/tickets/[key]', () => {
 		});
 		expect(status).toBe(500);
 		expect(body).toMatchObject({ ok: false, failure: { type: 'internal_error', retryable: true } });
+		expectSafeFailure(body);
 		expectSafe(text);
 	});
 
@@ -239,6 +250,7 @@ describe('GET /api/factory/tickets/[key]', () => {
 		const { status, body, text } = await get(MULTI);
 		expect(status).toBe(401);
 		expect(body).toMatchObject({ ok: false, failure: { type: 'unauthorized' } });
+		expectSafeFailure(body);
 		expect(text).not.toContain('not-the-token');
 		expectSafe(text);
 	});
