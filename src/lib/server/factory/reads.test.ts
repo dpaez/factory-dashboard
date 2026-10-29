@@ -4,6 +4,7 @@ import {
 	agentList,
 	backlogPage,
 	executionList,
+	factory,
 	meWithOperator,
 	problemTicketNotFound,
 	problemValidationError,
@@ -21,6 +22,7 @@ import { createFactoryClient, type FactoryClient } from './client';
 import { CONTRACT_ERROR, NETWORK_ERROR } from './errors';
 import {
 	getBacklog,
+	getFactory,
 	getMe,
 	getRun,
 	getStatsConfigurations,
@@ -78,6 +80,13 @@ const KEY = 'dpaez-factory-dashboard-17-e32797ab';
 
 const cases: ReadCase[] = [
 	{ name: 'getMe', call: (c) => getMe(c), path: '/v1/me', query: [], fixture: meWithOperator },
+	{
+		name: 'getFactory',
+		call: (c) => getFactory(c),
+		path: '/v1/factory',
+		query: [],
+		fixture: factory
+	},
 	{
 		name: 'listTickets without params',
 		call: (c) => listTickets(c),

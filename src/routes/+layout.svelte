@@ -24,8 +24,7 @@
 		toCommandFeedbackItem
 	} from '$lib/factory/commands.svelte';
 
-	let { children } = $props();
-	let companyName = 'Chan';
+	let { children, data } = $props();
 
 	// One stream for the whole session: it survives navigation, and never runs during SSR.
 	// An invalidation started during a navigation would cancel it (SvelteKit lets
@@ -85,7 +84,7 @@
 			<div class="flex items-center gap-2">
 				<Logo />
 				<Separator orientation="vertical" />
-				<h3 class="text-2xl font-light">{companyName}</h3>
+				<h3 class="text-2xl font-light">{data.companyName}</h3>
 			</div>
 			<div class="flex items-center gap-4">
 				<ConnectionStatus

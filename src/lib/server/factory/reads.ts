@@ -44,6 +44,11 @@ export function getMe(client: FactoryClient): Promise<FactoryResult<Schemas['Me'
 	return read(() => client.GET('/v1/me'));
 }
 
+/** `GET /v1/factory`: the factory's FACTORY.json name and its stages. */
+export function getFactory(client: FactoryClient): Promise<FactoryResult<Schemas['Factory']>> {
+	return read(() => client.GET('/v1/factory'));
+}
+
 /** `GET /v1/tickets`. `stage` and `state` take one value or several (repeated keys). */
 export function listTickets(
 	client: FactoryClient,

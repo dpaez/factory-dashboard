@@ -17,6 +17,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import type { components } from '../src/lib/factory/generated/factory-api.d.ts';
 import { backlogIssues, backlogPage } from '../src/lib/factory/fixtures/backlog.ts';
+import { factory as factoryFixture } from '../src/lib/factory/fixtures/factory.ts';
 import { eventFrame } from '../src/lib/factory/fixtures/events.ts';
 import {
 	statsCompleteStages,
@@ -263,6 +264,11 @@ export type FakeFactoryOptions = {
 	failDetail?: { keys: string[]; problem: Problem };
 	/** Answer this problem for `GET /v1/agents`. */
 	failAgents?: Problem;
+	/**
+	 * `GET /v1/factory` `name`. Omitted uses the fixture name; `null` is an
+	 * unset FACTORY.json name.
+	 */
+	factoryName?: string | null;
 	/** Answer this problem for `GET /v1/tickets`. */
 	failTickets?: Problem;
 	/** Answer this problem for `GET /v1/tickets?needsUser=true` only: the attention read. */
@@ -687,6 +693,10 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 		const path = url.pathname;
 		if (path === '/v1/events') {
 			return options.failEvents ? problem(options.failEvents) : streamEvents(request, url);
+		}
+		if (path === '/v1/factory') {
+			const name = options.factoryName === undefined ? factoryFixture.name : options.factoryName;
+			return json({ ...factoryFixture, name } satisfies Schemas['Factory']);
 		}
 		if (path === '/v1/agents') {
 			return options.failAgents ? problem(options.failAgents) : json(agentList);
