@@ -58,7 +58,11 @@
 			<span class="font-mono text-[0.625rem] break-all text-foreground/75 tabular-nums"
 				>{card.displayRef}</span
 			>
-			<span class="font-medium wrap-anywhere text-foreground">{card.title}</span>
+			<span
+				data-slot="backlog-title"
+				class="line-clamp-2 text-sm font-medium text-foreground"
+				title={card.title}>{card.title}</span
+			>
 		</span>
 
 		<span class="flex min-w-0 flex-wrap items-center gap-1">

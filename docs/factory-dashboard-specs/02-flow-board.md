@@ -79,7 +79,7 @@ Use the repository grid breakpoints: one lane per row below md, three at md, six
 
 **Inputs:** backlog items, freshness, capability, pending starts. **Outputs:** start, inspect sub-issues, refresh backlog.
 
-Lives in the first column, separated by a subtle divider at desktop widths. A failed backlog read is contained to this lane; the rest of the factory remains usable.
+Lives in the first column, separated by a subtle divider, and folds to the left behind an icon button so Plan, Work, QA, Review and Handoff stay on screen. A failed backlog read is contained to this lane; the rest of the factory remains usable.
 
 Empty state: “Backlog clear.” Loading uses card-shaped placeholders. Failure offers retry and preserves stale items with a timestamp when available.
 
@@ -111,7 +111,7 @@ Umbrella detection is documented; child-list availability must be verified. If c
 
 ## IssuePreview
 
-**Placement:** the same region below the board as the TicketInspector; selecting a backlog card or a ticket card behaves identically. Content is a separate component, not an inspector mode.
+**Placement:** the board drawer, the same panel as the TicketInspector, over the right side of the lanes. Selecting a backlog card or a ticket card behaves identically. The board stays usable; Escape or Close dismisses the panel and returns focus to the card. Content is a separate component, not an inspector mode.
 
 **Display model:** display reference, title, labels, tracker link ("Open in tracker", external), blockers and sub-issues as links, start availability and command state. Planned when the API supplies them ([geut/factory-skills#61](https://github.com/geut/factory-skills/issues/61)): author, created/updated time, and the description rendered as markdown. Until then those fields render **Unavailable** with the tracker link; fixtures and stories include them so the full layout is designed.
 

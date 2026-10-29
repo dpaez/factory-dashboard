@@ -39,7 +39,7 @@
 			docs: {
 				description: {
 					component:
-						'The Backlog lane: open backlog issues with a single-select label filter, when the tracker was last asked, and Refresh. A failed read stays in the lane; stale issues keep their timestamp and the lane offers Retry. Read-only.'
+						'The Backlog lane, a recessed well before the pipeline: pinned name, count, Refresh, timestamp and label filter, then a list that scrolls on its own. A failed read stays in the lane; stale issues keep their timestamp and the lane offers Retry. Read-only.'
 				}
 			}
 		}

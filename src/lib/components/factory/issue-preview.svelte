@@ -1,20 +1,24 @@
 <script lang="ts">
+	import { X as CloseIcon } from '@lucide/svelte';
 	import type { BacklogCardModel } from '$lib/factory/backlog';
 	import { formatTimestamp } from '$lib/factory/format';
 	import { renderMarkdown } from '$lib/factory/markdown';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import IssueLink from './issue-link.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import StartControl, { type StartState } from './start-control.svelte';
 
 	/**
 	 * The Issue preview: a read-only summary of one backlog issue, shown in
-	 * the region below the board. Facts the tracker did not supply read
-	 * "Unavailable". Given only an id (`issue` null), it says the issue is not
-	 * in the loaded backlog, or that the backlog is still loading. Given
-	 * `start`, the header offers Start and shows its command state; a rejected
-	 * start keeps the preview and shows the reason.
+	 * the board drawer. Facts the tracker did not supply read "Unavailable".
+	 * Given only an id (`issue` null), it says the issue is not in the loaded
+	 * backlog, or that the backlog is still loading. Given `start`, the header
+	 * offers Start and shows its command state; a rejected start keeps the
+	 * preview and shows the reason. `onclose` adds Close.
 	 */
+	const uid = $props.id();
+
 	let {
 		issue,
 		id,
@@ -23,7 +27,9 @@
 		phase = 'idle',
 		explanation = null,
 		onstart,
-		onresend
+		onresend,
+		onclose,
+		headingId = `${uid}-heading`
 	}: {
 		issue: BacklogCardModel | null;
 		/** The selected id; shown when the issue is not in the loaded backlog. */
@@ -37,6 +43,10 @@
 		onstart?: (issue: BacklogCardModel) => void;
 		/** Resend an unconfirmed start under the same intent id. */
 		onresend?: (issue: BacklogCardModel) => void;
+		/** Closes the preview; no Close control without it. */
+		onclose?: () => void;
+		/** The title's id, so the drawer can name itself. */
+		headingId?: string;
 	} = $props();
 
 	/** Markdown typography: visible heading hierarchy, list markers and indentation. */
@@ -51,8 +61,6 @@
 		'[&_hr]:border-border [&_img]:max-w-full [&_strong]:font-semibold [&_em]:italic'
 	].join(' ');
 
-	const uid = $props.id();
-	const headingId = `${uid}-heading`;
 	const description = $derived(
 		issue?.description == null ? null : renderMarkdown(issue.description)
 	);
@@ -62,58 +70,74 @@
 	data-slot="issue-preview"
 	data-issue-id={id}
 	aria-labelledby={headingId}
-	class="not-prose flex min-w-0 flex-col gap-4 bg-card p-4 text-xs/relaxed text-card-foreground ring-1 ring-foreground/10"
+	class="not-prose flex min-w-0 flex-col gap-4 p-4 text-xs/relaxed text-card-foreground md:px-6"
 >
 	{#if issue === null}
-		<h2 id={headingId} class="text-[0.625rem] font-medium text-foreground/75">Issue preview</h2>
-		<p class="flex flex-wrap items-baseline gap-x-2">
-			<span class="font-mono break-all text-foreground tabular-nums">{id}</span>
-			<span class="text-foreground/75">
-				{loading ? 'Loading the backlog…' : 'Not in the loaded backlog.'}
-			</span>
-		</p>
-	{:else}
-		<header class="flex min-w-0 flex-col gap-1">
-			<span class="text-[0.625rem] font-medium text-foreground/75">Issue preview</span>
-			<span class="font-mono text-[0.625rem] break-all text-foreground/75 tabular-nums"
-				>{issue.displayRef}</span
-			>
-			<h2 id={headingId} class="text-base font-medium wrap-anywhere text-foreground">
-				{issue.title}
-			</h2>
-			<div class="flex min-w-0 flex-wrap items-center gap-1">
-				<StatusBadge
-					label={issue.availability.badge.label}
-					signal={issue.availability.badge.signal}
-				/>
-				{#each issue.labels as label (label)}
-					<Badge
-						variant="outline"
-						data-slot="issue-label"
-						class="h-auto max-w-full text-left wrap-anywhere whitespace-normal">{label}</Badge
-					>
-				{/each}
+		<div class="flex items-start justify-between gap-3">
+			<div class="flex min-w-0 flex-col gap-2">
+				<h2 id={headingId} class="text-[0.625rem] font-medium text-foreground/75">Issue preview</h2>
+				<p class="flex flex-wrap items-baseline gap-x-2">
+					<span class="font-mono break-all text-foreground tabular-nums">{id}</span>
+					<span class="text-foreground/75">
+						{loading ? 'Loading the backlog…' : 'Not in the loaded backlog.'}
+					</span>
+				</p>
 			</div>
-			<a
-				href={issue.url}
-				target="_blank"
-				rel="noopener noreferrer"
-				data-slot="open-in-tracker"
-				class="self-start underline outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-			>
-				Open in tracker <span aria-hidden="true">↗</span><span class="sr-only"
-					>(opens in a new tab)</span
+			{#if onclose}
+				<Button variant="ghost" size="icon" aria-label="Close issue preview" onclick={onclose}>
+					<CloseIcon aria-hidden="true" />
+				</Button>
+			{/if}
+		</div>
+	{:else}
+		<header class="flex min-w-0 items-start justify-between gap-3">
+			<div class="flex min-w-0 flex-col gap-1">
+				<span class="text-[0.625rem] font-medium text-foreground/75">Issue preview</span>
+				<span class="font-mono text-[0.625rem] break-all text-foreground/75 tabular-nums"
+					>{issue.displayRef}</span
 				>
-			</a>
-			{#if start}
-				<StartControl
-					class="pt-2"
-					{start}
-					{phase}
-					{explanation}
-					onstart={() => onstart?.(issue)}
-					onresend={() => onresend?.(issue)}
-				/>
+				<h2 id={headingId} class="text-base font-medium wrap-anywhere text-foreground">
+					{issue.title}
+				</h2>
+				<div class="flex min-w-0 flex-wrap items-center gap-1">
+					<StatusBadge
+						label={issue.availability.badge.label}
+						signal={issue.availability.badge.signal}
+					/>
+					{#each issue.labels as label (label)}
+						<Badge
+							variant="outline"
+							data-slot="issue-label"
+							class="h-auto max-w-full text-left wrap-anywhere whitespace-normal">{label}</Badge
+						>
+					{/each}
+				</div>
+				<a
+					href={issue.url}
+					target="_blank"
+					rel="noopener noreferrer"
+					data-slot="open-in-tracker"
+					class="self-start underline outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+				>
+					Open in tracker <span aria-hidden="true">↗</span><span class="sr-only"
+						>(opens in a new tab)</span
+					>
+				</a>
+				{#if start}
+					<StartControl
+						class="pt-2"
+						{start}
+						{phase}
+						{explanation}
+						onstart={() => onstart?.(issue)}
+						onresend={() => onresend?.(issue)}
+					/>
+				{/if}
+			</div>
+			{#if onclose}
+				<Button variant="ghost" size="icon" aria-label="Close issue preview" onclick={onclose}>
+					<CloseIcon aria-hidden="true" />
+				</Button>
 			{/if}
 		</header>
 

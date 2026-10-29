@@ -35,7 +35,7 @@
 			docs: {
 				description: {
 					component:
-						'One Flow board lane: label, mono card count (flashes on change) and the QA "optional" marker. Empty, loading and error states keep the heading.'
+						'One Flow board lane on a recessed well: pinned label, mono card count (flashes on change) and the QA "optional" marker, then a list that scrolls on its own. Empty, loading and error states keep the heading.'
 				}
 			}
 		}

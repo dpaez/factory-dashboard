@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { cn } from '$lib/utils.js';
 	import { nextAttention, type AttentionModel } from '$lib/factory/attention';
 	import StatusBadge from './status-badge.svelte';
 
@@ -47,13 +48,19 @@
 
 	const uid = $props.id();
 	const headingId = `${uid}-heading`;
+	const failed = $derived(error !== null || (!loading && attention === null));
+	const active = $derived(!loading && !failed && count > 0);
 </script>
 
 <div
 	role="group"
 	data-slot="attention-strip"
 	aria-labelledby={headingId}
-	class="not-prose flex flex-col gap-2 border border-border p-3 text-xs text-foreground"
+	class={cn(
+		'not-prose flex flex-col gap-2 text-xs text-foreground',
+		active && 'border-l-2 border-l-signal-wait bg-muted px-3 py-2',
+		failed && 'border border-border p-3'
+	)}
 >
 	{#if error !== null || (!loading && attention === null)}
 		<h2 id={headingId} class="sr-only">Needs attention</h2>
@@ -84,12 +91,16 @@
 		</h2>
 	{:else}
 		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-			<h2 id={headingId} data-slot="attention-headline" class="text-xs font-medium text-foreground">
-				<span class="font-mono tabular-nums">
+			<h2
+				id={headingId}
+				data-slot="attention-headline"
+				class="flex items-baseline gap-2 text-sm font-medium text-foreground"
+			>
+				<span class="font-mono text-2xl font-bold tabular-nums">
 					{#if partial}at least {count}<span class="sr-only">, partial list</span
 						>{:else}{count}{/if}
 				</span>
-				{count === 1 ? 'ticket needs attention' : 'tickets need attention'}
+				<span>{count === 1 ? 'ticket needs attention' : 'tickets need attention'}</span>
 				{#if partial}
 					<span aria-hidden="true" class="font-mono text-[0.625rem] font-normal text-foreground/75"
 						>(partial)</span

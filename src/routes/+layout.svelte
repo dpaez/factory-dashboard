@@ -15,6 +15,7 @@
 	import { navigating, page } from '$app/state';
 
 	import Logo from '$lib/components/logo.svelte';
+	import { cn } from '$lib/utils.js';
 	import ConnectionStatus from '$lib/components/factory/connection-status.svelte';
 	import CommandFeedback from '$lib/components/factory/command-feedback.svelte';
 	import { LiveController, setLiveContext } from '$lib/factory/live.svelte';
@@ -58,6 +59,9 @@
 	});
 
 	const newCurrent = $derived(page.url.pathname === '/new');
+	// The Flow board fills the viewport and scrolls inside its lanes. Every other
+	// route keeps the document scroll, so scroll restoration there is unchanged.
+	const fill = $derived(page.url.pathname === '/');
 
 	const NAV = [
 		{ href: '/', label: 'Flow board', icon: FactoryIcon },
@@ -77,9 +81,12 @@
 	<title>Factory Dashboard</title>
 </svelte:head>
 <div
-	class="mx-auto prose flex max-w-7xl flex-col overflow-hidden bg-background prose-zinc lg:prose-lg dark:prose-invert"
+	class={cn(
+		'mx-auto prose flex w-full flex-col overflow-hidden bg-background prose-zinc lg:prose-lg dark:prose-invert',
+		fill ? 'h-dvh max-w-screen-2xl' : 'max-w-7xl'
+	)}
 >
-	<div class="flex flex-col">
+	<div class={cn('flex min-h-0 flex-col', fill && 'h-full')}>
 		<header class="not-prose flex items-center justify-between gap-2 bg-muted px-8 py-4">
 			<div class="flex items-center gap-2">
 				<Logo />
@@ -130,7 +137,12 @@
 			</Button>
 		</nav>
 		<Separator />
-		<div class="flex flex-col overflow-y-auto scroll-smooth px-8 py-4">
+		<div
+			class={cn(
+				'flex flex-col px-8 py-4',
+				fill ? 'min-h-0 flex-1 overflow-hidden' : 'overflow-y-auto scroll-smooth'
+			)}
+		>
 			<ModeWatcher />
 			{@render children()}
 		</div>

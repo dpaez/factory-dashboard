@@ -161,4 +161,10 @@
 	html {
 		@apply font-sans;
 	}
+	/* Lane and drawer scrollbars are part of the instrument, not the browser default. */
+	[data-slot='lane-scroll'],
+	[data-slot='board-drawer-scroll'] {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
 }

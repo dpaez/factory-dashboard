@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { cn } from '$lib/utils.js';
 	import type { BoardSummary } from '$lib/factory/board';
 
 	/**
-	 * The Flow board's compact count strip. A count that was not read reads
+	 * The Flow board's count strip. A count that was not read reads
 	 * "Unavailable"; a count from a partial ticket or backlog list is marked as
-	 * a lower bound, never a bare total.
+	 * a lower bound, never a bare total. The numeral is the metric voice;
+	 * the label under it is mono and quiet.
 	 */
 	let { summary }: { summary: BoardSummary } = $props();
 
@@ -28,11 +30,16 @@
 <ul
 	data-slot="board-summary"
 	aria-label="Board summary"
-	class="not-prose flex flex-wrap items-baseline gap-x-6 gap-y-1 text-xs text-foreground/75"
+	class="not-prose flex flex-wrap items-end gap-x-6 gap-y-2"
 >
 	{#each items as item (item.id)}
-		<li data-summary={item.id} class="flex items-baseline gap-1.5">
-			<span class="font-mono text-foreground tabular-nums">
+		<li data-summary={item.id} class="flex flex-col gap-0.5">
+			<span
+				class={cn(
+					'font-mono font-bold text-foreground tabular-nums',
+					item.value !== null && !item.partial ? 'text-2xl md:text-3xl' : 'text-lg'
+				)}
+			>
 				{#if item.value === null}
 					Unavailable
 				{:else if item.partial}
@@ -41,9 +48,11 @@
 					{item.value}
 				{/if}
 			</span>
-			<span>{item.label}</span>
+			<span class="font-mono text-xs tracking-wide text-foreground/75">{item.label}</span>
 			{#if item.partial && item.value !== null}
-				<span aria-hidden="true" class="font-mono text-[0.625rem]">(partial)</span>
+				<span aria-hidden="true" class="font-mono text-[0.625rem] text-foreground/75"
+					>(partial)</span
+				>
 			{/if}
 		</li>
 	{/each}

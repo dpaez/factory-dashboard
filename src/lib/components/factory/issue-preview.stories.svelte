@@ -44,13 +44,13 @@
 	const { Story } = defineMeta({
 		title: 'Components/Factory/IssuePreview',
 		component: IssuePreview,
-		args: { onstart: fn(), onresend: fn() },
+		args: { onstart: fn(), onresend: fn(), onclose: fn() },
 		parameters: {
 			a11y: { test: 'error' },
 			docs: {
 				description: {
 					component:
-						'A read-only summary of one backlog issue: title, display reference, labels, availability, "Open in tracker", blockers and sub-issues as links, author, created and updated time, and the description as sanitized markdown. Facts the tracker did not supply read "Unavailable". Given `start`, the header offers Start with the same command states as the BacklogCard.'
+						'A read-only summary of one backlog issue in the board drawer: title, display reference, labels, availability, "Open in tracker", blockers and sub-issues as links, author, created and updated time, and the description as sanitized markdown. Facts the tracker did not supply read "Unavailable". Given `start`, the header offers Start with the same command states as the BacklogCard. Given `onclose`, Close sits beside the title.'
 				}
 			}
 		}

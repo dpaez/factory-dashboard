@@ -11,7 +11,7 @@
 			docs: {
 				description: {
 					component:
-						'Compact Flow board counts. A count that was not read reads "Unavailable"; a partial ticket or backlog list marks its count as a lower bound. Ready to start counts backlog issues that are neither blocked nor umbrella.'
+						'Flow board counts in the metric voice: a bold mono numeral over a quiet mono label. A count that was not read reads "Unavailable"; a partial ticket or backlog list marks its count as a lower bound. Ready to start counts backlog issues that are neither blocked nor umbrella.'
 				}
 			}
 		}
