@@ -108,7 +108,8 @@
 						<Badge
 							variant="outline"
 							data-slot="issue-label"
-							class="h-auto max-w-full text-left wrap-anywhere whitespace-normal">{label}</Badge
+							class="h-auto max-w-full bg-muted text-left wrap-anywhere whitespace-normal text-foreground"
+							>{label}</Badge
 						>
 					{/each}
 				</div>

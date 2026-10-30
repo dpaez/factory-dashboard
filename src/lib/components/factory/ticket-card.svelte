@@ -47,10 +47,10 @@
 	aria-pressed={selected}
 	onclick={() => onselect?.(card.key)}
 	class={cn(
-		'flex w-full min-w-0 flex-col gap-2 border-l-2 bg-card p-3 text-left text-xs/relaxed text-card-foreground ring-1 ring-foreground/10 transition-colors outline-none hover:bg-accent/50',
+		'flex w-full min-w-0 flex-col gap-2 border-l-2 bg-card p-3 text-left text-xs/relaxed text-card-foreground ring-1 ring-foreground/10 transition-colors outline-none hover:bg-primary/10',
 		'focus-visible:ring-2 focus-visible:ring-ring/30',
 		card.needsUser ? 'border-l-signal-wait' : 'border-l-transparent',
-		selected && 'bg-accent ring-2 ring-foreground/60'
+		selected && 'bg-primary/15 ring-2 ring-foreground/60 hover:bg-primary/20'
 	)}
 >
 	<span class="flex min-w-0 flex-col gap-0.5">

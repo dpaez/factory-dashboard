@@ -6,10 +6,10 @@ colors:
   beacon-yellow-dark: "oklch(0.795 0.184 86.047)"
   beacon-ink: "oklch(0.421 0.095 57.708)"
   instrument-ink: "oklch(0.148 0.004 228.8)"
-  cold-paper: "oklch(97.64% 0.01307 106.777)"
-  panel-white: "oklch(1 0 0)"
-  recess-grey: "oklch(0.963 0.002 197.1)"
-  hairline: "oklch(0.925 0.005 214.3)"
+  cold-paper: "oklch(0.955 0.006 220)"
+  panel-white: "oklch(0.985 0.004 220)"
+  recess-grey: "oklch(0.925 0.010 220)"
+  hairline: "oklch(0.86 0.012 220)"
   fault-red: "oklch(0.577 0.245 27.325)"
   fault-red-dark: "oklch(0.704 0.191 22.216)"
   chart-blue-1: "oklch(0.828 0.111 230.318)"
@@ -134,10 +134,10 @@ Defined in `src/routes/layout.css` as `--signal-{run,wait,standby,fault,clear}` 
 
 ### Neutral
 - **Instrument Ink** (`oklch(0.148 0.004 228.8)`): body text / dark-mode background.
-- **Cold Paper** (`oklch(97.64% 0.01307 106.777)`): the light-mode page background — a faint green-grey, machined paint rather than office white.
-- **Panel White** (`oklch(1 0 0)`): card and popover surfaces; in dark mode this role becomes **Console Slate** (`oklch(0.218 0.008 223.9)`).
-- **Recess Grey** (`oklch(0.963 0.002 197.1)`): the header band, muted surfaces, and untracked step dots; dark mode `oklch(0.275 0.011 216.9)`.
-- **Hairline** (`oklch(0.925 0.005 214.3)`): all 1px borders and separators; dark mode `oklch(1 0 0 / 10%)`.
+- **Cold Paper** (`oklch(0.955 0.006 220)`): the light-mode page background — the same cool metal as the wells and cards, a step lighter than Recess Grey.
+- **Panel White** (`oklch(0.985 0.004 220)`): card and popover surfaces, a cool panel rather than pure white; in dark mode this role becomes **Console Slate** (`oklch(0.218 0.008 223.9)`).
+- **Recess Grey** (`oklch(0.925 0.010 220)`): the header band, muted surfaces, and untracked step dots; dark mode `oklch(0.275 0.011 216.9)`.
+- **Hairline** (`oklch(0.86 0.012 220)`): all 1px borders and separators; dark mode `oklch(1 0 0 / 10%)`.
 
 **The Beacon Rule.** Beacon Yellow is a live-signal color only. If a surface isn't reporting activity, progress, or an action, it doesn't get the beacon. Its scarcity against the grey field is the mechanism.
 
@@ -162,7 +162,7 @@ Defined in `src/routes/layout.css` as `--signal-{run,wait,standby,fault,clear}` 
 
 ## Layout
 
-Routes other than the Flow board sit in a fixed center column, `max-w-7xl` (80rem), and scroll with the document. The Flow board (`/`) is a viewport instrument: the shell is `h-dvh` and `max-w-screen-2xl`, and the page does not scroll. All horizontal gutters are `px-8` (32px). The page stack is header band → nav row → hairline separator → content. On the board, content is a status rail over a lane row; elsewhere, blocks separate by `gap-6` (24px). Card padding stays on the 8-unit rhythm (`spacing(4)` default, `spacing(3)` in `size="sm"` cards).
+The Flow board, Tickets, and Stats share one shell, `max-w-screen-2xl`, so the header and nav keep one width on a wide screen. The Flow board (`/`) is a viewport instrument: the shell is also `h-dvh`, and the page does not scroll. Tickets and Stats scroll with the document. The new-ticket route stays in a center column, `max-w-7xl` (80rem). All horizontal gutters are `px-8` (32px). The page stack is header band → nav row → hairline separator → content. On the board, content is a status rail over a lane row; elsewhere, blocks separate by `gap-6` (24px). Card padding stays on the 8-unit rhythm (`spacing(4)` default, `spacing(3)` in `size="sm"` cards).
 
 - **Header:** full-width Recess Grey band, `py-4`, logo + wordmark left, dark-mode toggle right.
 - **Nav:** two outline buttons (Main / Tickets), left-aligned, `gap-2`, no active-state underline — current location reads from the button being a link target.
@@ -213,7 +213,7 @@ Borders are always 1px, always Hairline or a semantic token (`border-t-primary` 
 
 ### Flow board card and drawer
 - **Lane:** Recess Grey well. Header is the stage name in `text-sm` medium sans and the count in mono `text-lg` 700. Only the card list scrolls.
-- **Ticket card:** three tiers on Panel White with a 1px ring. Identity is the mono reference and a `text-sm` title (clamped to two lines). Signal is the status chip; a ticket that needs attention carries a 2px Signal Wait leading edge and the words "Needs attention". Telemetry (progress, updated time, tokens) sits under a hairline. Selected is `bg-accent` plus a 2px foreground ring.
+- **Ticket card:** three tiers on Panel White with a 1px ring. Identity is the mono reference and a `text-sm` title (clamped to two lines). Signal is the status chip; a ticket that needs attention carries a 2px Signal Wait leading edge and the words "Needs attention". Telemetry (progress, updated time, tokens) sits under a hairline. Selected is a Beacon wash (`bg-primary/15`) plus a 2px foreground ring. The attention block is a Signal Wait wash behind its 2px edge.
 - **Drawer:** Panel White, 1px leading hairline, no shadow and no scrim. It overlays the lanes and does not trap focus. Enter and exit are a 150ms translate, dropped under reduced motion.
 
 ### Timeline / Progress (signature)

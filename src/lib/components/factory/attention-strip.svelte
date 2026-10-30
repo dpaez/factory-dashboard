@@ -63,7 +63,7 @@
 	aria-labelledby={headingId}
 	class={cn(
 		'not-prose flex flex-col gap-2 text-xs text-foreground',
-		active && 'border-l-2 border-l-signal-wait bg-muted px-3 py-1.5 md:py-2',
+		active && 'border-l-2 border-l-signal-wait bg-signal-wait/15 px-3 py-1.5 md:py-2',
 		failed && 'border border-border p-3'
 	)}
 >
