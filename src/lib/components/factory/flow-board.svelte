@@ -2,14 +2,16 @@
 	import { PanelLeftClose, PanelLeftOpen } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { cn } from '$lib/utils.js';
 	import { toBoard, type BoardLane } from '$lib/factory/board';
 	import StageLane from './stage-lane.svelte';
 
 	/**
-	 * The Flow board: one lane per stage in projection order, in a single row
-	 * that fits the viewport. The pipeline lanes share the width and stay on
-	 * screen; each one scrolls its own cards. Selection is owned by the caller
-	 * (`selectedKey`, `onselect`). Nothing is draggable.
+	 * The Flow board: one lane per stage in projection order. From the `lg`
+	 * breakpoint up, the lanes share one viewport row and each scrolls its
+	 * cards. Below that, a phone shows one column and a tablet two, and the
+	 * rest stack; each column peeks one card until See more. Selection is
+	 * owned by the caller (`selectedKey`, `onselect`). Nothing is draggable.
 	 *
 	 * A ticket that changes lanes is a new card element, so the focused card
 	 * would lose focus to `body`. The board remembers the focused card's key
@@ -107,7 +109,7 @@
 <div
 	bind:this={root}
 	data-slot="flow-board"
-	class="not-prose flex h-full min-h-0 min-w-0 gap-3 overflow-hidden"
+	class="not-prose grid h-auto grid-cols-1 gap-3 md:grid-cols-2 lg:flex lg:h-full lg:min-h-0 lg:grid-cols-none lg:overflow-hidden"
 	{onfocusin}
 	{onfocusout}
 >
@@ -115,11 +117,12 @@
 		<div
 			data-slot="flow-board-backlog"
 			data-open={backlogOpen ? 'true' : 'false'}
-			class="flex h-full min-h-0 shrink-0 border-r border-border bg-muted {backlogOpen
-				? 'w-80 max-w-[36%] min-w-12'
-				: 'w-8'}"
+			class={cn(
+				'flex min-h-0 flex-col bg-muted lg:h-full lg:shrink-0 lg:flex-row lg:border-r lg:border-border',
+				backlogOpen ? 'lg:w-80 lg:max-w-[36%] lg:min-w-12' : 'lg:w-8'
+			)}
 		>
-			<div class="flex w-8 shrink-0 justify-center pt-1.5">
+			<div class="hidden w-8 shrink-0 justify-center pt-1.5 lg:flex">
 				<Button
 					variant="ghost"
 					size="icon-sm"
@@ -138,15 +141,13 @@
 					{/if}
 				</Button>
 			</div>
-			{#if backlogOpen}
-				<div class="min-h-0 min-w-0 flex-1">
-					{@render backlog()}
-				</div>
-			{/if}
+			<div class={cn('min-h-0 min-w-0', backlogOpen ? 'lg:flex-1' : 'lg:hidden')}>
+				{@render backlog()}
+			</div>
 		</div>
 	{/if}
 	<div
-		class="grid h-full min-h-0 min-w-0 flex-1 auto-cols-[minmax(0,1fr)] grid-flow-col grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden"
+		class="contents lg:grid lg:h-full lg:min-h-0 lg:min-w-0 lg:flex-1 lg:auto-cols-[minmax(0,1fr)] lg:grid-flow-col lg:grid-rows-[minmax(0,1fr)] lg:gap-3 lg:overflow-hidden"
 	>
 		{#each shown as lane (lane.id)}
 			<StageLane {lane} {selectedKey} {loading} {error} {onselect} />

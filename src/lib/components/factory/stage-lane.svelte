@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { BoardLane } from '$lib/factory/board';
 	import { CountFlash } from './count-flash.svelte';
@@ -30,14 +31,24 @@
 	const flash = new CountFlash(() => count);
 	const uid = $props.id();
 	const headingId = `${uid}-heading`;
+
+	// Below the desktop row, a lane shows one card until See more opens it.
+	// A selected card past that first one keeps the lane open so it can take focus.
+	let opened = $state(false);
+	const selectedPastPeek = $derived(lane.cards.findIndex((card) => card.key === selectedKey) > 0);
+	const expanded = $derived(opened || selectedPastPeek);
 </script>
 
 <div
 	role="group"
 	data-slot="stage-lane"
 	data-lane={lane.id}
+	data-expanded={expanded ? 'true' : 'false'}
 	aria-labelledby={headingId}
-	class="flex h-full min-h-0 min-w-0 snap-start flex-col bg-muted"
+	class={cn(
+		'group/lane flex min-h-0 min-w-0 flex-col bg-muted max-lg:self-start lg:h-full',
+		expanded && 'h-80'
+	)}
 >
 	<h2
 		id={headingId}
@@ -81,8 +92,8 @@
 			</p>
 		{:else}
 			<ul class="flex flex-col gap-2">
-				{#each lane.cards as card (card.key)}
-					<li class="min-w-0">
+				{#each lane.cards as card, index (card.key)}
+					<li class={cn('min-w-0', index > 0 && 'max-lg:group-data-[expanded=false]/lane:hidden')}>
 						<TicketCard
 							{card}
 							selected={card.key === selectedKey}
@@ -94,4 +105,16 @@
 			</ul>
 		{/if}
 	</LaneScroll>
+	{#if count > 1}
+		<Button
+			variant="ghost"
+			size="sm"
+			data-slot="lane-more"
+			class="m-2 self-start lg:hidden"
+			aria-expanded={expanded}
+			onclick={() => (opened = !opened)}
+		>
+			{expanded ? 'See less' : 'See more'}
+		</Button>
+	{/if}
 </div>

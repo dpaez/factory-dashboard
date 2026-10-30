@@ -7,6 +7,8 @@
 	/**
 	 * The Flow board's attention strip: how many tickets need attention, why,
 	 * and "Open next", which selects the next ticket in the priority queue.
+	 * Below the `md` breakpoint the strip is the headline and See more; the
+	 * reasons and Open next stay behind that control.
 	 *
 	 * The parent owns the selection (`selectedKey`, `onselect`). The strip keeps
 	 * only the set of tickets it has already opened, so repeated presses advance
@@ -48,8 +50,11 @@
 
 	const uid = $props.id();
 	const headingId = `${uid}-heading`;
+	const detailsId = `${uid}-details`;
 	const failed = $derived(error !== null || (!loading && attention === null));
 	const active = $derived(!loading && !failed && count > 0);
+	// Phone width: the headline is the strip until the operator asks for the rest.
+	let opened = $state(false);
 </script>
 
 <div
@@ -58,7 +63,7 @@
 	aria-labelledby={headingId}
 	class={cn(
 		'not-prose flex flex-col gap-2 text-xs text-foreground',
-		active && 'border-l-2 border-l-signal-wait bg-muted px-3 py-2',
+		active && 'border-l-2 border-l-signal-wait bg-muted px-3 py-1.5 md:py-2',
 		failed && 'border border-border p-3'
 	)}
 >
@@ -90,13 +95,13 @@
 			No attention needed.
 		</h2>
 	{:else}
-		<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 			<h2
 				id={headingId}
 				data-slot="attention-headline"
-				class="flex items-baseline gap-2 text-sm font-medium text-foreground"
+				class="flex min-w-0 items-baseline gap-1.5 text-sm font-medium text-foreground md:gap-2"
 			>
-				<span class="font-mono text-2xl font-bold tabular-nums">
+				<span class="font-mono font-bold tabular-nums max-md:text-sm md:text-2xl">
 					{#if partial}at least {count}<span class="sr-only">, partial list</span
 						>{:else}{count}{/if}
 				</span>
@@ -107,11 +112,22 @@
 					>
 				{/if}
 			</h2>
+			<Button
+				variant="ghost"
+				size="xs"
+				data-slot="attention-more"
+				class="md:hidden"
+				aria-expanded={opened}
+				aria-controls={detailsId}
+				onclick={() => (opened = !opened)}
+			>
+				{opened ? 'See less' : 'See more'}
+			</Button>
 			{#if next && target}
 				<Button
 					data-slot="attention-open-next"
 					data-target-key={next.key}
-					class="max-w-full min-w-0"
+					class={cn('max-w-full min-w-0 max-md:basis-full', !opened && 'max-md:hidden')}
 					onclick={openNext}
 				>
 					<span>Open next</span>
@@ -119,7 +135,11 @@
 				</Button>
 			{/if}
 		</div>
-		<ul aria-label="Attention reasons" class="flex flex-wrap items-center gap-x-4 gap-y-1">
+		<ul
+			id={detailsId}
+			aria-label="Attention reasons"
+			class={cn('flex flex-wrap items-center gap-x-4 gap-y-1', !opened && 'max-md:hidden')}
+		>
 			{#each attention?.groups ?? [] as group (group.reason)}
 				<li
 					data-slot="attention-group"

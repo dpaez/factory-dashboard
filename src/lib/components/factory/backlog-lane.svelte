@@ -73,6 +73,10 @@
 
 	const showCards = $derived(status === 'ready' || (status === 'failed' && cards.length > 0));
 
+	let opened = $state(false);
+	const selectedPastPeek = $derived(visible.findIndex((card) => card.id === selectedId) > 0);
+	const expanded = $derived(opened || selectedPastPeek);
+
 	function choose(event: Event) {
 		const value = (event.currentTarget as HTMLSelectElement).value;
 		label = value === ALL ? null : value;
@@ -85,9 +89,13 @@
 	data-slot="backlog-lane"
 	data-lane="backlog"
 	data-status={status}
+	data-expanded={expanded ? 'true' : 'false'}
 	aria-labelledby={headingId}
 	aria-busy={status === 'loading' || refreshing}
-	class="flex h-full min-h-0 w-full min-w-0 flex-col bg-muted"
+	class={cn(
+		'group/lane flex min-h-0 w-full min-w-0 flex-col bg-muted max-lg:self-start lg:h-full',
+		expanded && 'h-80'
+	)}
 >
 	<div class="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2">
 		<div class="flex flex-wrap items-baseline justify-between gap-x-2">
@@ -207,9 +215,11 @@
 				</p>
 			{:else}
 				<ul class="flex flex-col gap-2">
-					{#each visible as card (card.id)}
+					{#each visible as card, index (card.id)}
 						{@const start = startFor?.(card)}
-						<li class="min-w-0">
+						<li
+							class={cn('min-w-0', index > 0 && 'max-lg:group-data-[expanded=false]/lane:hidden')}
+						>
 							<BacklogCard
 								{card}
 								selected={card.id === selectedId}
@@ -225,11 +235,26 @@
 				</ul>
 			{/if}
 			{#if !complete}
-				<p data-slot="backlog-partial" class="text-[0.625rem] text-foreground/75">
+				<p
+					data-slot="backlog-partial"
+					class="text-[0.625rem] text-foreground/75 max-lg:group-data-[expanded=false]/lane:hidden"
+				>
 					Partial list: the backlog has more issues than the board reads. See the tracker for the
 					rest.
 				</p>
 			{/if}
 		{/if}
 	</LaneScroll>
+	{#if showCards && count > 1}
+		<Button
+			variant="ghost"
+			size="sm"
+			data-slot="lane-more"
+			class="m-2 self-start lg:hidden"
+			aria-expanded={expanded}
+			onclick={() => (opened = !opened)}
+		>
+			{expanded ? 'See less' : 'See more'}
+		</Button>
+	{/if}
 </div>

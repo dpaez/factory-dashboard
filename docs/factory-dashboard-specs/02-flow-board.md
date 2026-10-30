@@ -45,6 +45,7 @@ Displays open executions, active agents, and eligible backlog items. Labels are 
 - Repeated activation advances through unresolved items; resolving an item removes it from the queue.
 - Use authoritative needs-user information where available. Add handoffs as a separate attention category rather than pretending they are unanswered questions.
 - Empty state: “No attention needed.” Do not leave an active “Open next” button with no target.
+- Below `md`, the strip shows the headline and See more. Reasons and Open next open from that control. From `md` up, the strip stays open.
 
 **Acceptance:** the summary and destination agree; selection does not jump spontaneously when new events arrive.
 
@@ -71,7 +72,7 @@ Preserve stage/status separately: a paused worker stays in Work. Review-to-Work 
 
 Keep ordering stable within a lane, using entry time where available and a deterministic fallback such as ticket key. Do not reorder on each message or cost update. Unknown stages get a visible “Other” fallback with their raw label until the adapter is updated.
 
-Use the repository grid breakpoints: one lane per row below md, three at md, six at lg. Shared max-width/gutters remain in the existing layout. The backlog divider uses `border-border`; cards and lane headings remain square and shadow-free.
+Below `md`, one column. From `md` until `lg`, two columns, and the rest stack. From `lg` up, every lane shares one row and shrinks to fit. Below `lg`, each column shows one card until See more opens a shared fixed height whose list scrolls. Shared max-width/gutters remain in the existing layout. The backlog divider uses `border-border`; cards and lane headings remain square and shadow-free.
 
 **Acceptance:** one card per current execution; no dragging between lanes; empty lanes remain recognizable; a live move preserves ticket selection and keyboard focus.
 

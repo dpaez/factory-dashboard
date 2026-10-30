@@ -288,9 +288,13 @@
 </script>
 
 <main class="flex min-h-0 flex-1 flex-col gap-3">
-	<section class="not-prose flex shrink-0 flex-col gap-3">
-		<div class="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-			<h2 id={BOARD_HEADING} tabindex="-1" class="text-2xl font-light outline-none">Flow board</h2>
+	<section class="not-prose flex shrink-0 flex-col gap-2 md:gap-3">
+		<div
+			class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 md:items-end md:gap-x-8 md:gap-y-3"
+		>
+			<h2 id={BOARD_HEADING} tabindex="-1" class="text-xl font-light outline-none md:text-2xl">
+				Flow board
+			</h2>
 			<BoardSummary {summary} />
 		</div>
 		<AttentionStrip
@@ -302,7 +306,7 @@
 	</section>
 
 	<section aria-label="Flow board lanes" class="relative min-h-0 flex-1 overflow-hidden">
-		<div class="absolute inset-0">
+		<div class="absolute inset-0 overflow-y-auto lg:overflow-hidden">
 			<FlowBoard lanes={board.lanes} {selectedKey} onselect={(key) => select('ticket', key)}>
 				{#snippet backlog()}
 					<BacklogLane
