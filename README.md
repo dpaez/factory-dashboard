@@ -16,25 +16,34 @@ The dashboard is a client of the factory server API. Its SvelteKit server loads 
 
 ## sbx-shell-pi kit integration (in progress)
 
-> **Status: in progress** — the mixin kit is not published yet. Everything below is the planned shape of the integration; track it in [sbx-shell-pi PR #6](https://github.com/geut/sbx-shell-pi/pull/6).
+> **Status: planned** — the mixin kit is not published yet. The shape below is the agreed integration; track it in [sbx-shell-pi PR #6](https://github.com/geut/sbx-shell-pi/pull/6).
 
-[sbx-shell-pi](https://github.com/geut/sbx-shell-pi) is migrating its sandbox images to **kits** (v3 sandbox kits: `pi`, `pi-docker`, `factory`). Kits compose: a **mixin** kit adds a capability to a workload kit instead of shipping yet another full image.
+The dashboard ships as a v3 **mixin** kit, because a set has no Dockerfile and can only list published kits, so the dashboard's files need their own kit. [sbx-shell-pi](https://github.com/geut/sbx-shell-pi) then publishes a **set** (the factory workload plus this mixin) as one image to `sbx run`. Until that set exists, the mixin also works on its own with `--kit` on the factory workload.
 
-This dashboard is planned to be published as one of those mixins — tentatively `ghcr.io/geut/sbx-kit-factory-dashboard` (name and version are not final). It will require `node >= 24` and `pi-factory >= 1`. Only the sbx-shell-pi `factory` workload provides those names, so the mixin composes only onto that kit and cannot be installed on the single-pi kits.
+Reference: `ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0`. It may move to `ghcr.io/geut` later.
 
-Once composed:
+It requires `node >= 24` and [`io.github.geut/pi-factory >= 1`](https://github.com/geut/sbx-shell-pi#factory-contract). The workload's `pi-factory@1` was renamed into the `io.github.geut/` namespace, because bare names belong to Docker's `com.docker.kit/` vocabulary. It also needs sbx 0.47 or newer, because the factory workload declares `long-running@1`.
 
-- **Herdr stays the entrypoint.** The mixin does not replace or wrap the terminal workflow.
-- The dashboard runs beside Herdr and reads the project's factory through the factory server API, as described in [PRODUCT.md](./PRODUCT.md). The terminal remains the control path.
+The dashboard relies on that [factory contract](https://github.com/geut/sbx-shell-pi#factory-contract): `factory-up` starts `factory serve` on container port `7731` (`0.0.0.0`) and writes `.factory/dashboard.env` (mode `0600`) with `FACTORY_API_URL` and an `act` `FACTORY_API_TOKEN` for the `dashboard` client.
 
-Planned usage, once the mixin is published:
+**Planned startup.** A background lifecycle startup hook launches the dashboard on every boot, beside Herdr. Herdr stays the entrypoint. The dashboard listens on container port `7732` (`HOST=0.0.0.0`), published as `factory-dashboard`. Until `factory-up` has run, it shows the configuration page telling you to run `factory-up`. After that, it reads `$WORKSPACE_DIR/.factory/dashboard.env` on each request, so a rotated token is picked up without a restart. Real environment variables take precedence.
 
-```bash
-sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
-  --kit ghcr.io/geut/sbx-kit-factory-dashboard:0.1.0
-```
+**Planned walkthrough**
 
-The `0.1.0` tag is tentative. The mixin set is fixed when the sandbox is created, so changing it means creating a new sandbox.
+1. On the host:
+
+   ```bash
+   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
+     --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0
+   ```
+
+   Once the set is published, a single image reference replaces this.
+
+2. In the sandbox, set up the factory in the repository so that `.factory/FACTORY.json` exists.
+3. In the sandbox, in a Herdr pane at the repository root: `factory-up`.
+4. On the host, run `sbx ports factory` to find the host port for `factory-dashboard`, then open it in a browser.
+
+The mixin set is fixed when the sandbox is created, so changing it means creating a new sandbox.
 
 ## Development
 
