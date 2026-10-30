@@ -64,9 +64,7 @@
 	// width across those routes. They still scroll with the document.
 	const fill = $derived(page.url.pathname === '/');
 	const wide = $derived(
-		fill ||
-			page.url.pathname.startsWith('/tickets') ||
-			page.url.pathname.startsWith('/stats')
+		fill || page.url.pathname.startsWith('/tickets') || page.url.pathname.startsWith('/stats')
 	);
 
 	const NAV = [
@@ -129,7 +127,7 @@
 					variant={current ? 'secondary' : 'outline'}
 					href={item.href}
 					aria-current={current ? 'page' : undefined}
-					class="flex items-center max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:shrink max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2 max-md:whitespace-normal max-md:text-center md:p-4"
+					class="flex items-center max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:shrink max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2 max-md:text-center max-md:whitespace-normal md:p-4"
 					size="lg"
 				>
 					<item.icon class="size-4 shrink-0 max-md:m-0 md:mr-2 md:-ml-1" />
@@ -142,7 +140,7 @@
 				href="/new"
 				aria-current={newCurrent ? 'page' : undefined}
 				data-testid="nav-new-ticket"
-				class="flex items-center max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:shrink max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2 max-md:whitespace-normal max-md:text-center md:ml-auto md:p-4"
+				class="flex items-center max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:shrink max-md:flex-col max-md:justify-center max-md:gap-1 max-md:px-1 max-md:py-2 max-md:text-center max-md:whitespace-normal md:ml-auto md:p-4"
 				size="lg"
 			>
 				<PlusIcon class="size-4 shrink-0 max-md:m-0 md:mr-2 md:-ml-1" />

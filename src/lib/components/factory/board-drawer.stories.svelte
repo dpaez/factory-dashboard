@@ -11,7 +11,12 @@
 		component: BoardDrawer,
 		args: { open: true, labelledBy: 'unused', scrollKey: 'one', onclose: fn() },
 		parameters: {
-			a11y: { test: 'error' },
+			a11y: {
+				test: 'error',
+				// Side by side renders the drawer twice (light and dark), so its
+				// complementary landmark repeats; a page shows one drawer.
+				config: { rules: [{ id: 'landmark-unique', enabled: false }] }
+			},
 			docs: {
 				description: {
 					component:
