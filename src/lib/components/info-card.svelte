@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { cn } from '$lib/utils.js';
 
 	/**
 	 * A fixed-width metric card. An `unavailable` figure reads "—" with a visible
@@ -16,26 +17,44 @@
 		footer?: Snippet;
 		/** Accessible text for the value, such as the exact figure behind "6.4M". */
 		valueLabel?: string;
+		/** Fill the parent instead of the fixed metric-card width. */
+		fluid?: boolean;
 	};
 
-	let { title, value, subtitle, unavailable = false, footer, valueLabel }: InfoCardProps = $props();
+	let {
+		title,
+		value,
+		subtitle,
+		unavailable = false,
+		footer,
+		valueLabel,
+		fluid = false
+	}: InfoCardProps = $props();
 
 	const shown = $derived(unavailable || value == null ? '—' : value);
 	const isUnavailable = $derived(unavailable || value == null);
 </script>
 
 <Card.Root
-	class="w-64 overflow-hidden font-mono text-ellipsis text-muted-foreground md:w-56 lg:w-64"
+	class={cn(
+		'overflow-hidden font-mono text-ellipsis text-muted-foreground',
+		fluid ? '@container w-full rounded-none ring-0' : 'w-64 md:w-56 lg:w-64'
+	)}
 	size="sm"
 	data-slot="info-card"
 	data-unavailable={isUnavailable ? 'true' : undefined}
 >
 	<Card.Header>
-		<Card.Title class="text-sm font-light tracking-wide capitalize">{title}</Card.Title>
+		<Card.Title class="text-sm font-light tracking-wide text-foreground capitalize"
+			>{title}</Card.Title
+		>
 	</Card.Header>
 	<Card.Content class="flex h-24 items-center justify-start gap-2">
 		<p
-			class="bg-transparent text-4xl font-bold text-foreground tabular-nums lg:text-5xl"
+			class={cn(
+				'bg-transparent text-4xl font-bold text-foreground tabular-nums',
+				fluid ? '@min-[16rem]:text-5xl' : 'lg:text-5xl'
+			)}
 			data-testid="info-card-value"
 		>
 			{#if valueLabel && !isUnavailable}
@@ -49,7 +68,7 @@
 			>
 		{/if}
 	</Card.Content>
-	<Card.Footer class="items-start text-xs font-extralight tabular-nums">
+	<Card.Footer class="items-start text-xs font-extralight text-foreground/75 tabular-nums">
 		{#if footer}
 			{@render footer()}
 		{:else}

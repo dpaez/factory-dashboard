@@ -6,10 +6,10 @@ colors:
   beacon-yellow-dark: "oklch(0.795 0.184 86.047)"
   beacon-ink: "oklch(0.421 0.095 57.708)"
   instrument-ink: "oklch(0.148 0.004 228.8)"
-  cold-paper: "oklch(97.64% 0.01307 106.777)"
-  panel-white: "oklch(1 0 0)"
-  recess-grey: "oklch(0.963 0.002 197.1)"
-  hairline: "oklch(0.925 0.005 214.3)"
+  cold-paper: "oklch(0.955 0.006 220)"
+  panel-white: "oklch(0.985 0.004 220)"
+  recess-grey: "oklch(0.925 0.010 220)"
+  hairline: "oklch(0.86 0.012 220)"
   fault-red: "oklch(0.577 0.245 27.325)"
   fault-red-dark: "oklch(0.704 0.191 22.216)"
   chart-blue-1: "oklch(0.828 0.111 230.318)"
@@ -134,10 +134,10 @@ Defined in `src/routes/layout.css` as `--signal-{run,wait,standby,fault,clear}` 
 
 ### Neutral
 - **Instrument Ink** (`oklch(0.148 0.004 228.8)`): body text / dark-mode background.
-- **Cold Paper** (`oklch(97.64% 0.01307 106.777)`): the light-mode page background — a faint green-grey, machined paint rather than office white.
-- **Panel White** (`oklch(1 0 0)`): card and popover surfaces; in dark mode this role becomes **Console Slate** (`oklch(0.218 0.008 223.9)`).
-- **Recess Grey** (`oklch(0.963 0.002 197.1)`): the header band, muted surfaces, and untracked step dots; dark mode `oklch(0.275 0.011 216.9)`.
-- **Hairline** (`oklch(0.925 0.005 214.3)`): all 1px borders and separators; dark mode `oklch(1 0 0 / 10%)`.
+- **Cold Paper** (`oklch(0.955 0.006 220)`): the light-mode page background — the same cool metal as the wells and cards, a step lighter than Recess Grey.
+- **Panel White** (`oklch(0.985 0.004 220)`): card and popover surfaces, a cool panel rather than pure white; in dark mode this role becomes **Console Slate** (`oklch(0.218 0.008 223.9)`).
+- **Recess Grey** (`oklch(0.925 0.010 220)`): the header band, muted surfaces, and untracked step dots; dark mode `oklch(0.275 0.011 216.9)`.
+- **Hairline** (`oklch(0.86 0.012 220)`): all 1px borders and separators; dark mode `oklch(1 0 0 / 10%)`.
 
 **The Beacon Rule.** Beacon Yellow is a live-signal color only. If a surface isn't reporting activity, progress, or an action, it doesn't get the beacon. Its scarcity against the grey field is the mechanism.
 
@@ -162,14 +162,16 @@ Defined in `src/routes/layout.css` as `--signal-{run,wait,standby,fault,clear}` 
 
 ## Layout
 
-Fixed center column, `max-w-7xl` (80rem), all horizontal gutters `px-8` (32px). The page stack is header band → nav row → hairline separator → content, each content block separated by `gap-6` (24px) with an 8-unit rhythm (`spacing(4)` card padding default, `spacing(3)` in `size="sm"` cards).
+The Flow board, Tickets, and Stats share one shell, `max-w-screen-2xl`, so the header and nav keep one width on a wide screen. The Flow board (`/`) is a viewport instrument: the shell is also `h-dvh`, and the page does not scroll. Tickets and Stats scroll with the document. The new-ticket route stays in a center column, `max-w-7xl` (80rem). All horizontal gutters are `px-8` (32px). The page stack is header band → nav row → hairline separator → content. On the board, content is a status rail over a lane row; elsewhere, blocks separate by `gap-6` (24px). Card padding stays on the 8-unit rhythm (`spacing(4)` default, `spacing(3)` in `size="sm"` cards).
 
 - **Header:** full-width Recess Grey band, `py-4`, logo + wordmark left, dark-mode toggle right.
 - **Nav:** two outline buttons (Main / Tickets), left-aligned, `gap-2`, no active-state underline — current location reads from the button being a link target.
 - **Overview grids:** stat row is `grid-cols-1 md:grid-cols-3` of fixed-width cards (`w-64`, `md:w-56`, `lg:w-64`); the workflow row is `grid-cols-2 lg:grid-cols-4` (`w-32`/`w-48` cards). Cards center within their track (`justify-items-center-safe`).
 - **Tables:** TanStack tickets table with a sticky header row on the Accent surface (`sticky top-0 bg-accent`, sans extrabold), mono body at `text-xs md:text-sm`; the cost column is hidden below `lg`.
 - **Ticket detail:** content sections wrap in a Panel White band (`bg-card p-4 md:px-8`) and cap at `max-w-5xl` for readability; stat mini-cards sit in a `grid-cols-2` with `gap-y-4 gap-x-2`.
-- **Breakpoints:** Tailwind defaults (`md` 768px, `lg` 1024px). Mobile = single-column stacks with cards at their smaller fixed widths; desktop adds the 3/4-column grids. Typography plugin (`prose`) styles the layout scaffold only; component text opts out with `not-prose`.
+- **Stats:** four tiers. A one-line cohort fact, then a full-width strip of three fluid indicator cards (tokens, cost, merge rate) divided by a hairline. Tokens by stage and Time to handoff sit beside each other on Panel White. The Stages table shows six core columns until More columns; Quality, Efficiency and Configurations share one tab band, and contributing executions follow the selected measure.
+- **Flow board:** the status rail (title at the Title scale, metric numerals, attention block) stays fixed. Below `md` the title and metric numerals step down one size, and the attention block collapses to its headline until See more. From `lg` up, lanes are one row that fits the viewport, on a Recess Grey well with Panel White cards. Plan, Work, QA, Review and Handoff stay on screen and share the width. Below `lg`, a phone stacks one column and a tablet two, the stack scrolls inside the board, and each column shows one card until See more opens it to a shared fixed height with its own scroll. A lane's header (name, mono count, QA "optional") is pinned; its cards scroll inside the lane. The Backlog is the first column, divided from the pipeline by a trailing hairline, and folds to the left behind an icon button. It folds on its own when the row is too narrow for those five lanes to stay readable, until the operator opens it. When a column has more cards than fit, a short mask of the lane well marks the overflowing edge. Selecting a ticket or issue opens a non-modal drawer on the right of the lanes (`min(40rem, 100%)`, Panel White, 1px leading hairline, its own scroll). The board stays usable underneath. The drawer slides 150ms on enter and exit, and that movement is removed under `prefers-reduced-motion`.
+- **Breakpoints:** Tailwind defaults (`md` 768px, `lg` 1024px). From `lg` up, the pipeline lanes stay in one row and shrink to fit. Below `lg`, a phone is one column and a tablet is two, and the rest stack inside the board. Columns do not scroll sideways. Other pages: mobile is single-column stacks with cards at their smaller fixed widths; desktop adds the 3/4-column grids. Typography plugin (`prose`) styles the layout scaffold only; component text opts out with `not-prose`.
 
 ## Elevation & Depth
 
@@ -208,7 +210,12 @@ Borders are always 1px, always Hairline or a semantic token (`border-t-primary` 
 - **Style:** `bg-primary/20` beacon wash, `shadow-none`, `border-t border-t-primary` — the beacon cap-band. Fixed `h-24`, xs label in muted sans, mono content. Used on Ticket Detail.
 
 ### Workflow Stage Cards (`work-card`)
-- **Style:** metric card at `h-16` scale; rests on Recess Grey and **flashes to full Beacon Yellow for 300ms** (`transition-colors duration-300`) when its count changes. This flash is the product's signature moment: the board lighting up as the factory moves.
+- **Style:** metric card at `h-16` scale; rests on Recess Grey and **flashes to full Beacon Yellow for 300ms** (`transition-colors duration-300`) when its count changes. This flash is the product's signature moment: the board lighting up as the factory moves. The lane count on the Flow board uses the same flash.
+
+### Flow board card and drawer
+- **Lane:** Recess Grey well. Header is the stage name in `text-sm` medium sans and the count in mono `text-lg` 700. Only the card list scrolls.
+- **Ticket card:** three tiers on Panel White with a 1px ring. Identity is the mono reference and a `text-sm` title (clamped to two lines). Signal is the status chip; a ticket that needs attention carries a 2px Signal Wait leading edge and the words "Needs attention". Telemetry (progress, updated time, tokens) sits under a hairline. Selected is a Beacon wash (`bg-primary/15`) plus a 2px foreground ring. The attention block is a Signal Wait wash behind its 2px edge.
+- **Drawer:** Panel White, 1px leading hairline, no shadow and no scrim. It overlays the lanes and does not trap focus. Enter and exit are a 150ms translate, dropped under reduced motion.
 
 ### Timeline / Progress (signature)
 - **Style:** 4px `bg-muted` track, `bg-primary` fill tweened over 800ms with `cubicInOut`; step dots ride the track (`-mt-4.5`), beacon-filled when reached, grey before, labels below in light xs mono. Current step index maps the pipeline plan→work→review→wrapup→done.
@@ -229,13 +236,13 @@ Borders are always 1px, always Hairline or a semantic token (`border-t-primary` 
 - **Do** set status chips from the five-signal strip and route them through the Two-Ink Rule; when migrating, define them as CSS variables (`--signal-run` etc.) in `layout.css`, not as utility classes per component.
 - **Do** render every numeric value in `font-mono tabular-nums`, including timestamps and IDs.
 - **Do** use the 300-weight sans for all headings at large sizes and reserve weight 700 for mono metrics.
-- **Do** keep the work-card beacon flash and the timeline as the two only motion moments; both are signal-bearing.
+- **Do** keep motion to three signal-bearing moments: the work-card beacon flash, the timeline fill, and the board drawer's 150ms slide (removed under reduced motion).
 - **Do** separate surfaces with tonal steps or 1px hairlines (`--border`), and rings (`ring-1 ring-foreground/10`) for cards.
 
 ### Don't:
 - **Don't** add border-radius to any new surface — the scale is zeroed; pills (`rounded-full`) for badges/dots are the only exception.
 - **Don't** use Beacon Yellow as decoration, on large text blocks, or as generic "success"; that's Signal Run's job.
 - **Don't** add raw Tailwind palette classes (`bg-green-500` and friends) anywhere; they're legacy debt, not vocabulary.
-- **Don't** introduce shadows, gradients, or blur/glass; depth is tonal only.
+- **Don't** introduce shadows, decorative gradients, or blur/glass; depth is tonal only. The lane overflow cue is a mask of the lane well, not a gradient treatment.
 - **Don't** put proportional font digits in data positions or colored-gray text on colored surfaces (secondary text on a signal chip stays in the ink family).
 - **Don't** document the Roboto import as the product font until it is actually wired into `--font-sans`; until then system sans is the truth.

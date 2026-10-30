@@ -80,7 +80,7 @@
 			docs: {
 				description: {
 					component:
-						'How many tickets need attention (distinct tickets), grouped by reason, and Open next. Each press selects the next ticket in priority order (decisions, waiting, paused and failed first, then handoffs; oldest first) and wraps. The button names its target before the press. New data never moves the selection.'
+						'How many tickets need attention (distinct tickets), grouped by reason, and Open next. A count above zero sits on Recess Grey with a Signal Wait edge and a metric numeral. Each press selects the next ticket in priority order (decisions, waiting, paused and failed first, then handoffs; oldest first) and wraps. The button names its target before the press. New data never moves the selection.'
 				}
 			}
 		}

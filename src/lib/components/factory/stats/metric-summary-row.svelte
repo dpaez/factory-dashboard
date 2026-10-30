@@ -25,7 +25,7 @@
 	data-slot="metric-summary-row"
 	data-state={view.kind}
 	aria-busy={view.kind === 'loading' ? 'true' : undefined}
-	class="not-prose flex flex-col items-center gap-4 text-xs/relaxed"
+	class="not-prose flex flex-col items-start gap-4 text-xs/relaxed"
 >
 	{#if view.kind !== 'ready'}
 		<StatsPanelState state={view} {onretry} />
@@ -33,25 +33,28 @@
 		{@const metrics = view.model}
 		{@const merge = metrics.mergeRate}
 		{@const started = metrics.started.value}
-		<div class="grid grid-cols-1 justify-items-center gap-4 md:grid-cols-3">
-			<div data-metric="tokens">
+		<div class="grid w-full grid-cols-1 gap-px bg-border sm:grid-cols-3">
+			<div data-metric="tokens" class="min-w-0 bg-card">
 				<InfoCard
+					fluid
 					title={metrics.tokens.label}
 					value={formatCompact(metrics.tokens.value)}
 					unavailable={metrics.tokens.value === null}
 					subtitle={`${formatCount(metrics.tokens.value)} tokens · all outcomes · ${formatCount(started)} started`}
 				/>
 			</div>
-			<div data-metric="cost">
+			<div data-metric="cost" class="min-w-0 bg-card">
 				<InfoCard
+					fluid
 					title={metrics.cost.label}
 					value={formatCost(metrics.cost.value)}
 					unavailable={metrics.cost.value === null}
 					subtitle={`All outcomes · ${formatCount(started)} started`}
 				/>
 			</div>
-			<div data-metric="merge-rate">
+			<div data-metric="merge-rate" class="min-w-0 bg-card">
 				<InfoCard
+					fluid
 					title={merge.label}
 					value={formatPercent(merge.value)}
 					unavailable={merge.value === null}
@@ -70,7 +73,7 @@
 			</div>
 		</div>
 
-		<details class="w-full max-w-3xl font-mono text-xs" data-testid="inspect-cohort">
+		<details class="w-full font-mono text-xs" data-testid="inspect-cohort">
 			<summary class="cursor-pointer text-foreground/75 hover:text-foreground"
 				>Inspect cohort</summary
 			>

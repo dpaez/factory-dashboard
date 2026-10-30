@@ -7,6 +7,7 @@
 
 	import AttentionStrip from '$lib/components/factory/attention-strip.svelte';
 	import BacklogLane from '$lib/components/factory/backlog-lane.svelte';
+	import BoardDrawer from '$lib/components/factory/board-drawer.svelte';
 	import BoardSummary from '$lib/components/factory/board-summary.svelte';
 	import FlowBoard from '$lib/components/factory/flow-board.svelte';
 	import IssuePreview from '$lib/components/factory/issue-preview.svelte';
@@ -197,8 +198,10 @@
 	);
 
 	const INSPECTOR_HEADING = 'board-inspector-heading';
+	const PREVIEW_HEADING = 'board-issue-heading';
 	const BOARD_HEADING = 'flow-board-heading';
 	const STAY = { keepFocus: true, noScroll: true } as const;
+	const drawerOpen = $derived(selectedIssueId !== null || selectedKey !== null);
 
 	function chooseTab(next: InspectorTab) {
 		goto(inspectorHref(page.url, { tab: next }), STAY);
@@ -224,37 +227,45 @@
 			STAY
 		);
 		await tick();
-		const card =
-			key === null
-				? null
-				: document.querySelector<HTMLElement>(
-						`[data-slot="ticket-card"][data-ticket-key="${CSS.escape(key)}"]`
-					);
+		focusCard(
+			key === null ? null : `[data-slot="ticket-card"][data-ticket-key="${CSS.escape(key)}"]`
+		);
+	}
+
+	async function closeIssue() {
+		const id = selectedIssueId;
+		const search = new URLSearchParams(page.url.search);
+		search.delete('issue');
+		const query = search.toString();
+		await goto(`${page.url.pathname}${query ? `?${query}` : ''}`, STAY);
+		await tick();
+		focusCard(
+			id === null ? null : `[data-slot="backlog-card-button"][data-issue-id="${CSS.escape(id)}"]`
+		);
+	}
+
+	function focusCard(selector: string | null) {
+		const card = selector === null ? null : document.querySelector<HTMLElement>(selector);
 		(card ?? document.getElementById(BOARD_HEADING))?.focus();
 	}
 
-	// Opening a ticket brings the Inspector heading into view only when any of it
-	// is offscreen; focus stays where it was (the card). The check waits for the
-	// read to settle, so it measures the heading the operator will read.
-	let region: HTMLElement | undefined = $state();
-	let openedKey: string | null | undefined = undefined;
+	// Bring the selected card into view inside its own lane.
 	$effect(() => {
 		const key = selectedKey;
-		// A page loaded with ?ticket= starts where the browser put it.
-		if (openedKey === undefined) openedKey = key;
-		if (key === null || key === openedKey) {
-			openedKey = key;
-			return;
-		}
-		// Wait for the region to mount and the read to settle before taking the key.
-		if (!region || inspectorView.kind === 'loading') return;
-		const heading = document.getElementById(INSPECTOR_HEADING);
-		if (!heading) return;
-		openedKey = key;
-		const box = heading.getBoundingClientRect();
-		if (box.top < 0 || box.bottom > window.innerHeight) {
-			heading.scrollIntoView({ block: 'center' });
-		}
+		const issueId = selectedIssueId;
+		if (key === null && issueId === null) return;
+		const selector =
+			key !== null
+				? `[data-slot="ticket-card"][data-ticket-key="${CSS.escape(key)}"]`
+				: `[data-slot="backlog-card-button"][data-issue-id="${CSS.escape(issueId!)}"]`;
+		let cancelled = false;
+		void tick().then(() => {
+			if (cancelled) return;
+			document.querySelector(selector)?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+		});
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	// An execution link replaces the header it lives in, so its focus would fall
@@ -276,10 +287,16 @@
 	});
 </script>
 
-<main class="flex flex-col gap-6">
-	<section class="not-prose mt-2 flex flex-col gap-3">
-		<h2 id={BOARD_HEADING} tabindex="-1" class="text-4xl font-light outline-none">Flow board</h2>
-		<BoardSummary {summary} />
+<main class="flex min-h-0 flex-1 flex-col gap-3">
+	<section class="not-prose flex shrink-0 flex-col gap-2 md:gap-3">
+		<div
+			class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 md:items-end md:gap-x-8 md:gap-y-3"
+		>
+			<h2 id={BOARD_HEADING} tabindex="-1" class="text-xl font-light outline-none md:text-2xl">
+				Flow board
+			</h2>
+			<BoardSummary {summary} />
+		</div>
 		<AttentionStrip
 			attention={attention.ok ? attention.model : null}
 			error={attention.ok ? null : attention.failure.title}
@@ -288,82 +305,91 @@
 		/>
 	</section>
 
-	<section aria-label="Flow board lanes">
-		<FlowBoard lanes={board.lanes} {selectedKey} onselect={(key) => select('ticket', key)}>
-			{#snippet backlog()}
-				<BacklogLane
-					cards={backlogCards}
-					bind:label={backlogState.label}
-					fetchedAt={backlogState.fetchedAt}
-					status={backlogState.status}
-					failure={backlogState.reason}
-					refreshing={backlogState.refreshing}
-					complete={backlogState.complete}
-					selectedId={selectedIssueId}
-					onselect={(id) => select('issue', id)}
-					onrefresh={() => backlogState.refresh()}
-					onretry={() => backlogState.retry()}
-					startFor={coordinator ? startFor : undefined}
-					{onstart}
-					{onresend}
-				/>
-			{/snippet}
-		</FlowBoard>
-	</section>
+	<section aria-label="Flow board lanes" class="relative min-h-0 flex-1 overflow-hidden">
+		<div class="absolute inset-0 overflow-y-auto lg:overflow-hidden">
+			<FlowBoard lanes={board.lanes} {selectedKey} onselect={(key) => select('ticket', key)}>
+				{#snippet backlog()}
+					<BacklogLane
+						cards={backlogCards}
+						bind:label={backlogState.label}
+						fetchedAt={backlogState.fetchedAt}
+						status={backlogState.status}
+						failure={backlogState.reason}
+						refreshing={backlogState.refreshing}
+						complete={backlogState.complete}
+						selectedId={selectedIssueId}
+						onselect={(id) => select('issue', id)}
+						onrefresh={() => backlogState.refresh()}
+						onretry={() => backlogState.retry()}
+						startFor={coordinator ? startFor : undefined}
+						{onstart}
+						{onresend}
+					/>
+				{/snippet}
+			</FlowBoard>
+		</div>
 
-	<!-- One region below the board: the Issue preview for ?issue=, the ticket for ?ticket=. -->
-	<div data-testid="selection" class="contents">
-		{#if selectedIssueId !== null}
-			<section aria-label="Selected issue" data-testid="selected-issue">
-				<IssuePreview
-					issue={selectedIssue}
-					id={selectedIssueId}
-					loading={backlogState.status === 'loading'}
-					start={previewStart?.start}
-					phase={previewStart?.phase}
-					explanation={previewStart?.explanation}
-					{onstart}
-					{onresend}
-				/>
-			</section>
-		{:else if selectedKey !== null}
-			<section
-				bind:this={region}
-				aria-label="Selected ticket"
-				data-testid="selected-ticket"
-				class="flex scroll-mt-4 flex-col gap-3 bg-card p-4 md:px-8"
-			>
-				<!-- Execution links stay on the board: keep the scroll and focus. -->
-				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-				<div
-					data-sveltekit-noscroll
-					data-sveltekit-keepfocus
-					class="contents"
-					onclick={onInspectorClick}
-				>
-					<TicketInspector
-						state={inspectorView}
-						{tab}
-						ontabchange={chooseTab}
-						run={selectedRun}
-						onrunchange={chooseRun}
-						{runDetail}
-						{hrefForExecution}
-						onclose={close}
-						openHref={ticketPageHref(selectedKey, {
-							execution: selectedExecution,
-							tab,
-							run: selectedRun
-						})}
-						onretry={() => inspector.retry()}
-						headingId={INSPECTOR_HEADING}
+		<BoardDrawer
+			open={drawerOpen}
+			labelledBy={selectedIssueId !== null ? PREVIEW_HEADING : INSPECTOR_HEADING}
+			scrollKey={selectedIssueId ?? selectedKey ?? ''}
+			onclose={selectedIssueId !== null ? closeIssue : close}
+		>
+			<div data-testid="selection" class="contents">
+				{#if selectedIssueId !== null}
+					<section aria-label="Selected issue" data-testid="selected-issue">
+						<IssuePreview
+							issue={selectedIssue}
+							id={selectedIssueId}
+							loading={backlogState.status === 'loading'}
+							start={previewStart?.start}
+							phase={previewStart?.phase}
+							explanation={previewStart?.explanation}
+							{onstart}
+							{onresend}
+							onclose={closeIssue}
+							headingId={PREVIEW_HEADING}
+						/>
+					</section>
+				{:else if selectedKey !== null}
+					<section
+						aria-label="Selected ticket"
+						data-testid="selected-ticket"
+						class="flex flex-col gap-3 p-4 md:px-6"
 					>
-						{#snippet commands(detail)}
-							<TicketCommands {detail} onreread={() => void inspector.refresh()} />
-						{/snippet}
-					</TicketInspector>
-				</div>
-			</section>
-		{/if}
-	</div>
+						<!-- Execution links stay on the board: keep the scroll and focus. -->
+						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+						<div
+							data-sveltekit-noscroll
+							data-sveltekit-keepfocus
+							class="contents"
+							onclick={onInspectorClick}
+						>
+							<TicketInspector
+								state={inspectorView}
+								{tab}
+								ontabchange={chooseTab}
+								run={selectedRun}
+								onrunchange={chooseRun}
+								{runDetail}
+								{hrefForExecution}
+								onclose={close}
+								openHref={ticketPageHref(selectedKey, {
+									execution: selectedExecution,
+									tab,
+									run: selectedRun
+								})}
+								onretry={() => inspector.retry()}
+								headingId={INSPECTOR_HEADING}
+							>
+								{#snippet commands(detail)}
+									<TicketCommands {detail} onreread={() => void inspector.refresh()} />
+								{/snippet}
+							</TicketInspector>
+						</div>
+					</section>
+				{/if}
+			</div>
+		</BoardDrawer>
+	</section>
 </main>

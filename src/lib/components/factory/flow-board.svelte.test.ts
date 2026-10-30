@@ -27,9 +27,14 @@ describe('FlowBoard', () => {
 		expect(screen.container.querySelector('[draggable="true"]')).toBeNull();
 
 		// The test iframe starts without focus, so begin on the first card.
+		// See more sits after a lane's cards. These tests do not load the
+		// stylesheet, so `lg:hidden` does not take it out of the tab order.
 		cards[0]!.focus();
 		for (const card of cards.slice(1)) {
 			await userEvent.tab();
+			if (document.activeElement?.getAttribute('data-slot') === 'lane-more') {
+				await userEvent.tab();
+			}
 			expect(document.activeElement).toBe(card);
 		}
 

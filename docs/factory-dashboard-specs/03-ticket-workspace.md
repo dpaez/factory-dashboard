@@ -17,7 +17,7 @@ Extract reusable content from `src/routes/tickets/[slug]/+page.svelte` into prop
 | UsagePanel | Extract existing stage Table and adapt usage-list.svelte |
 | TicketComposer | New component using added Input/Label/Textarea and existing Button |
 
-No Sheet/Drawer dependency is needed for the current below-board inspector. If its placement changes later, wrap the same content rather than rebuilding it.
+The board wraps this same content in a non-modal drawer over the lanes. The ticket page renders it in the document. Do not rebuild the content for either placement.
 
 The existing detail page already handles nullable executions, generation history, real task dependencies and null findings. Preserve these cases. Its “last review” heuristic chooses the highest round across tasks; that is not necessarily the current run's latest review. Replace that heuristic only when authoritative API task/run context is available.
 
@@ -27,7 +27,7 @@ The existing detail page already handles nullable executions, generation history
 
 **Inputs:** selection, ticket query state, run query states, available actions, pending commands. **Outputs:** close, select tab/task/run/execution, command intent.
 
-The baseline placement is the expanded panel below the board, as in the preview. Keep its content independent of placement so a future side panel can reuse it. Opening the inspector scrolls/focuses its heading as needed; closing returns focus to the initiating control. A stats drill-down opens the same component with the relevant tab and retains a route back to the cohort.
+On the board the placement is a drawer over the right side of the lanes: the page does not scroll, the drawer has its own scroll, and the lanes stay in view beside it (or can be scrolled clear of it). Opening does not move focus off the card. Closing, including Escape outside a text field, returns focus to the initiating control. A stats drill-down opens the same component with the relevant tab and retains a route back to the cohort.
 
 Selected execution is explicit. Historical executions are readable; mutating controls target only an eligible current execution. Changing execution clears incompatible task/run selection, but not unrelated page state.
 

@@ -22,6 +22,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import * as Tabs from '$lib/components/ui/tabs';
 	import { CONTRIBUTOR_MEASURES, type ContributorMeasure } from '$lib/factory/stats-tickets';
 	import type { StatsPanelResult } from './+page.server';
 
@@ -79,6 +80,8 @@
 	}
 
 	const retry = () => void invalidateAll();
+
+	let secondary = $state('quality');
 </script>
 
 <svelte:head>
@@ -126,27 +129,37 @@
 
 		<MetricSummaryRow state={summary} onretry={retry} />
 
-		<div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-			<div class="min-w-0 lg:col-span-2">
-				<StageTable state={stages} onretry={retry} />
-			</div>
+		<div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
 			<TokensByStage state={tokens} onretry={retry} />
 			<TimeBreakdown state={time} selected={measure} onselect={select} onretry={retry} />
-			<TicketsQuality
-				state={quality}
-				{noReturnsToWork}
-				selected={measure}
-				onselect={select}
-				onretry={retry}
-			/>
-			<EfficiencySignals state={efficiency} onretry={retry} />
-			<MeasurementNotes definitions={cohort.definitions} />
-			<div class="min-w-0 lg:col-span-2">
-				<ContributingTickets state={contributors} {complete} onretry={retry} />
-			</div>
-			<div class="min-w-0 lg:col-span-2">
-				<ConfigurationComparison state={configurations} onretry={retry} />
-			</div>
 		</div>
+
+		<StageTable state={stages} onretry={retry} />
+
+		<Tabs.Root bind:value={secondary} class="gap-4">
+			<Tabs.List aria-label="Secondary stats">
+				<Tabs.Trigger value="quality">Quality</Tabs.Trigger>
+				<Tabs.Trigger value="efficiency">Efficiency</Tabs.Trigger>
+				<Tabs.Trigger value="configurations">Configurations</Tabs.Trigger>
+			</Tabs.List>
+			<Tabs.Content value="quality">
+				<TicketsQuality
+					state={quality}
+					{noReturnsToWork}
+					selected={measure}
+					onselect={select}
+					onretry={retry}
+				/>
+			</Tabs.Content>
+			<Tabs.Content value="efficiency">
+				<EfficiencySignals state={efficiency} onretry={retry} />
+			</Tabs.Content>
+			<Tabs.Content value="configurations">
+				<ConfigurationComparison state={configurations} onretry={retry} />
+			</Tabs.Content>
+		</Tabs.Root>
+
+		<ContributingTickets state={contributors} {complete} onretry={retry} />
+		<MeasurementNotes definitions={cohort.definitions} />
 	</section>
 </main>

@@ -22,11 +22,14 @@ const ticketPage = (key: string, query = '') => `/tickets/${encodeURIComponent(k
 const WORK = ticketDetailActiveInWork;
 const MULTI = ticketDetailMultiExecution.key;
 
+const drawer = (page: Page) => page.locator('[data-slot="board-drawer"]');
+
 test.describe('opening from the board', () => {
-	test('clicking a card shows the Inspector below the board with ?ticket=<key>', async ({
+	test('clicking a card opens the drawer over the board with ?ticket=<key>', async ({
 		page,
 		shot
 	}) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
 		await page.goto('/');
 		await card(page, WORK.key).click();
 		await expect(page).toHaveURL(board(WORK.key));
@@ -44,15 +47,18 @@ test.describe('opening from the board', () => {
 		);
 		await expect(region.getByTestId('tasks')).toBeVisible();
 
-		// Below the board, and selecting kept focus on the card.
+		// Over the lanes, not below them, and the page did not scroll. Focus stays on the card.
 		const lanes = await page.getByRole('region', { name: 'Flow board lanes' }).boundingBox();
-		const box = await region.boundingBox();
-		expect(box!.y).toBeGreaterThanOrEqual(lanes!.y + lanes!.height);
+		const box = await drawer(page).boundingBox();
+		expect(box!.y).toBeGreaterThanOrEqual(lanes!.y - 1);
+		expect(box!.y).toBeLessThan(lanes!.y + lanes!.height);
+		await expect(drawer(page)).toBeInViewport();
+		await expect(page.evaluate(() => window.scrollY)).resolves.toBe(0);
 		await expect(card(page, WORK.key)).toBeFocused();
 		await shot('inspector-board');
 	});
 
-	test('on a short viewport, opening scrolls the offscreen Inspector into view', async ({
+	test('on a short viewport, the drawer stays on screen and the page does not scroll', async ({
 		page
 	}) => {
 		await page.setViewportSize({ width: 1280, height: 500 });
@@ -61,20 +67,16 @@ test.describe('opening from the board', () => {
 		await expect(inspector(page)).toHaveAttribute('data-state', 'loaded');
 		const heading = inspector(page).getByRole('heading', { level: 2 });
 		await expect(heading).toHaveText(WORK.title);
-		await expect(heading).toBeInViewport({ ratio: 1 });
+		await expect(drawer(page)).toBeInViewport();
+		await expect(page.evaluate(() => window.scrollY)).resolves.toBe(0);
 		await expect(card(page, WORK.key)).toBeFocused();
 	});
 
-	test('when only the top of the region is onscreen, opening still scrolls the heading into view', async ({
+	test('on a tall viewport, opening keeps the drawer and the heading on screen', async ({
 		page
 	}) => {
-		// Size the viewport so the region (24px below the lanes) starts onscreen, but
-		// the heading below its Open ticket row is past the bottom edge.
 		await page.setViewportSize({ width: 1280, height: 900 });
 		await page.goto('/');
-		const lanes = await page.getByRole('region', { name: 'Flow board lanes' }).boundingBox();
-		const height = Math.ceil(lanes!.y + lanes!.height + 24 + 8);
-		await page.setViewportSize({ width: 1280, height });
 		await expect(page.evaluate(() => window.scrollY)).resolves.toBe(0);
 		await expect(card(page, WORK.key)).toBeInViewport();
 
@@ -83,6 +85,8 @@ test.describe('opening from the board', () => {
 		const heading = inspector(page).getByRole('heading', { level: 2 });
 		await expect(heading).toHaveText(WORK.title);
 		await expect(heading).toBeInViewport({ ratio: 1 });
+		await expect(drawer(page)).toBeInViewport();
+		await expect(page.evaluate(() => window.scrollY)).resolves.toBe(0);
 		await expect(card(page, WORK.key)).toBeFocused();
 	});
 });
@@ -196,6 +200,16 @@ test.describe('Open ticket and Close', () => {
 		);
 	});
 
+	test('Escape closes the drawer and focuses the card', async ({ page }) => {
+		await page.goto('/');
+		await card(page, WORK.key).click();
+		await expect(inspector(page)).toHaveAttribute('data-state', 'loaded');
+		await page.keyboard.press('Escape');
+		await expect(page).toHaveURL('/');
+		await expect(inspector(page)).toHaveCount(0);
+		await expect(card(page, WORK.key)).toBeFocused();
+	});
+
 	test("Close removes the Inspector and ticket from the URL and focuses the ticket's card", async ({
 		page,
 		shot
@@ -223,7 +237,9 @@ test.describe('Open ticket and Close', () => {
 
 		await inspector(page).getByRole('button', { name: 'Close inspector' }).click();
 		await expect(page).toHaveURL('/');
-		await expect(page.getByRole('heading', { name: 'Flow board', level: 2 })).toBeFocused();
+		await expect(
+			page.getByRole('heading', { name: 'Flow board', exact: true, level: 2 })
+		).toBeFocused();
 	});
 });
 

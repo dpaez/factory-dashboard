@@ -4,8 +4,6 @@ The operator's command center for one factory: it shows where every ticket is, w
 
 **WIP - The project is in active development**
 
-![dashboard screenshot](./Screenshot.png)
-
 ## Who this is for
 
 This dashboard is planned to be used as an external accessory of GEUT's factory. You can see more [here](https://github.com/geut/sbx-shell-pi) and [here](https://github.com/geut/factory-skills). How it will be shipped into a factory sandbox is described in [sbx-shell-pi kit integration](#sbx-shell-pi-kit-integration-in-progress).
@@ -15,8 +13,6 @@ This dashboard is planned to be used as an external accessory of GEUT's factory.
 The stack is mostly: Svelte with SvelteKit (adapter-node), shadcn-svelte, Tailwind CSS, TypeScript, TanStack Table and `openapi-fetch`.
 
 The dashboard is a client of the factory server API. Its SvelteKit server loads read tickets, executions, runs and agents from `FACTORY_API_URL` with a private token; the browser never sees the token. Commands and live updates over the factory's event stream are planned (see [ADR 0005](./docs/adr/0005-factory-api-client-and-command-center.md)).
-
-![factory integration sketch](./factory-integration-idea.png)
 
 ## sbx-shell-pi kit integration (in progress)
 

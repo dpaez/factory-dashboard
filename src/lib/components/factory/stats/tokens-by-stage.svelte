@@ -22,15 +22,30 @@
 	data-slot="tokens-by-stage"
 	data-state={view.kind}
 	aria-busy={view.kind === 'loading' ? 'true' : undefined}
-	class="not-prose flex min-w-0 flex-col gap-3 text-xs/relaxed"
+	class="not-prose flex h-full min-w-0 flex-col gap-3 bg-card p-4 text-xs/relaxed ring-1 ring-foreground/10"
 >
-	<h2 id={headingId} class="text-base font-light">Tokens by stage</h2>
+	<h2 id={headingId} class="text-lg font-light">Tokens by stage</h2>
 	{#if view.kind !== 'ready'}
 		<StatsPanelState state={view} {onretry} />
 	{:else}
 		{@const model = view.model}
 		{@const coverage = model.coverage}
 		{@const categories = model.categories}
+		<p class="flex flex-wrap items-baseline gap-x-3 gap-y-1" data-testid="tokens-coverage">
+			<span class="font-mono text-2xl font-light text-foreground tabular-nums"
+				>{formatCount(model.knownTotal)}</span
+			>
+			<span class="font-mono text-foreground/75 tabular-nums">
+				tokens · coverage of cohort tokens
+				<span class="text-foreground"
+					>{formatPercent(coverage.value)}{#if coverage.value === null}{' '}<span class="sr-only"
+							>Unavailable</span
+						>{/if}</span
+				>{#if coverage.denominator !== undefined && coverage.value !== null}{' '}({formatCount(
+						coverage.numerator
+					)} of {formatCount(coverage.denominator)}){/if}
+			</span>
+		</p>
 		<ul class="flex flex-col gap-2" aria-label="Total tokens per stage">
 			{#each model.stages as stage (stage.stage)}
 				{@const total = stage.total}
@@ -72,17 +87,7 @@
 			{/each}
 		</ul>
 
-		<p class="font-mono text-foreground/75 tabular-nums" data-testid="tokens-coverage">
-			Stage totals: {formatCount(model.knownTotal)} tokens · coverage of cohort tokens
-			<span class="text-foreground"
-				>{formatPercent(coverage.value)}{#if coverage.value === null}{' '}<span class="sr-only"
-						>Unavailable</span
-					>{/if}</span
-			>{#if coverage.denominator !== undefined && coverage.value !== null}{' '}({formatCount(
-					coverage.numerator
-				)} of {formatCount(coverage.denominator)}){/if}
-		</p>
-		<p class="font-mono text-foreground/75" data-testid="token-categories">
+		<p class="mt-auto font-mono text-foreground/60" data-testid="token-categories">
 			{categories.label}: <span class="text-foreground">Unavailable</span> — input, cache read,
 			cache write and output are {categories.unavailableReason}.
 		</p>

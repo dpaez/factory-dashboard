@@ -48,6 +48,19 @@ const qualityPanel = (page: Page) => panel(page, 'tickets-quality');
 const contributors = (page: Page) => panel(page, 'contributing-tickets');
 const contributorRefs = (page: Page) => contributors(page).locator('tbody tr th');
 const efficiency = (page: Page) => panel(page, 'efficiency-signals');
+
+/** Inactive secondary tabs stay mounted but hidden. Open the tab before asserting one. */
+async function showSecondary(page: Page, slot: Panel) {
+	const tab =
+		slot === 'tickets-quality'
+			? 'Quality'
+			: slot === 'efficiency-signals'
+				? 'Efficiency'
+				: slot === 'configuration-comparison'
+					? 'Configurations'
+					: null;
+	if (tab) await page.getByRole('tab', { name: tab }).click();
+}
 const noReturns = (page: Page) => page.getByTestId('no-returns-to-work-value');
 const shares = (page: Page) =>
 	efficiency(page).locator(
@@ -109,8 +122,10 @@ test.describe('the complete cohort', () => {
 		await expect(page.getByTestId('cohort-definitions')).toHaveText('stats.v1');
 		await expect(page.getByTestId('cohort-mismatch')).toHaveCount(0);
 		await expect(page.getByTestId('window-notice')).toHaveCount(0);
-		for (const slot of PANELS)
+		for (const slot of PANELS) {
+			await showSecondary(page, slot);
 			await expect(panel(page, slot)).toHaveAttribute('data-state', 'ready');
+		}
 		await expect(page.locator('[data-slot="measurement-notes"]')).toBeVisible();
 		await shot('stats-complete');
 	});
@@ -142,6 +157,7 @@ test.describe('the complete cohort', () => {
 		await expect(
 			qualityPanel(page).locator('[data-row="external-changes-requested"]')
 		).toContainText('Unavailable');
+		await showSecondary(page, 'configuration-comparison');
 		await expect(panel(page, 'configuration-comparison').locator('tbody tr')).toHaveCount(2);
 
 		// The default contributors are the time sample.
@@ -151,6 +167,7 @@ test.describe('the complete cohort', () => {
 		);
 		await expect(contributorRefs(page)).toHaveCount(handedOff);
 
+		await showSecondary(page, 'efficiency-signals');
 		const blended = efficiency(page).locator('[data-row="blended-cost-per-merged"]');
 		await expect(blended).toHaveAttribute('data-availability', 'complete');
 		await expect(blended).toContainText('$3.01');
@@ -246,6 +263,7 @@ test.describe('the complete cohort', () => {
 		await expect(page.getByLabel('Started on or after')).toHaveValue('2026-09-01');
 		await expect(page.getByLabel('Started on or before')).toHaveValue('2026-09-30');
 		await expect(page.getByTestId('window-notice')).toHaveCount(0);
+		await showSecondary(page, 'efficiency-signals');
 		await expect(efficiency(page)).toHaveAttribute('data-state', 'ready');
 
 		const reads = statsReads(fake, since);
@@ -426,6 +444,7 @@ for (const { read, options, errored, also } of failingReads) {
 		}) => {
 			await page.goto('/stats');
 			for (const slot of PANELS) {
+				await showSecondary(page, slot);
 				if (errored.includes(slot)) {
 					await expect(panel(page, slot), slot).toHaveAttribute('data-state', 'error');
 					await expect(panel(page, slot).getByTestId('panel-error-title')).toHaveText(
@@ -560,6 +579,7 @@ for (const { name, options, count } of brokenExports) {
 			shot
 		}) => {
 			await page.goto('/stats');
+			await showSecondary(page, 'efficiency-signals');
 			await expect(efficiency(page)).toHaveAttribute('data-state', 'ready');
 			await expect(efficiency(page).getByTestId('export-status')).toContainText(count);
 			await expectNoShareNumbers(page);

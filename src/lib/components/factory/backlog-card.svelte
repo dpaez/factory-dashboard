@@ -43,7 +43,7 @@
 	data-slot="backlog-card"
 	class={cn(
 		'flex w-full min-w-0 flex-col bg-card text-xs/relaxed text-card-foreground ring-1 ring-foreground/10',
-		selected && 'bg-accent ring-2 ring-foreground/60'
+		selected && 'bg-primary/15 ring-2 ring-foreground/60'
 	)}
 >
 	<button
@@ -52,13 +52,20 @@
 		data-issue-id={card.id}
 		aria-pressed={selected}
 		onclick={() => onselect?.(card.id)}
-		class="flex w-full min-w-0 flex-col gap-2 p-3 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset"
+		class={cn(
+			'flex w-full min-w-0 flex-col gap-2 p-3 text-left transition-colors outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset',
+			selected && 'hover:bg-primary/20'
+		)}
 	>
 		<span class="flex min-w-0 flex-col gap-0.5">
 			<span class="font-mono text-[0.625rem] break-all text-foreground/75 tabular-nums"
 				>{card.displayRef}</span
 			>
-			<span class="font-medium wrap-anywhere text-foreground">{card.title}</span>
+			<span
+				data-slot="backlog-title"
+				class="line-clamp-2 text-sm font-medium text-foreground"
+				title={card.title}>{card.title}</span
+			>
 		</span>
 
 		<span class="flex min-w-0 flex-wrap items-center gap-1">
@@ -71,7 +78,8 @@
 				<Badge
 					variant="outline"
 					data-slot="issue-label"
-					class="h-auto max-w-full text-left wrap-anywhere whitespace-normal">{label}</Badge
+					class="h-auto max-w-full bg-muted text-left wrap-anywhere whitespace-normal text-foreground"
+					>{label}</Badge
 				>
 			{/each}
 		</span>

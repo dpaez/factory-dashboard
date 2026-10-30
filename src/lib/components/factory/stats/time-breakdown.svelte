@@ -48,9 +48,9 @@
 	data-slot="time-breakdown"
 	data-state={view.kind}
 	aria-busy={view.kind === 'loading' ? 'true' : undefined}
-	class="not-prose flex min-w-0 flex-col gap-3 text-xs/relaxed"
+	class="not-prose flex h-full min-w-0 flex-col gap-3 bg-card p-4 text-xs/relaxed ring-1 ring-foreground/10"
 >
-	<h2 id={headingId} class="text-base font-light">Time to handoff</h2>
+	<h2 id={headingId} class="text-lg font-light">Time to handoff</h2>
 	{#if view.kind !== 'ready'}
 		<StatsPanelState state={view} {onretry} />
 	{:else}
@@ -65,15 +65,19 @@
 			</p>
 		{/if}
 
-		<dl class="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="start-to-handoff">
-			<div class="flex flex-col gap-1" data-figure="mean">
+		<dl class="grid grid-cols-2 gap-3" data-testid="start-to-handoff">
+			<div class="col-span-2 flex flex-col gap-1" data-figure="mean">
 				<dt class="text-foreground/75">Mean start → handoff</dt>
-				<dd class="text-2xl font-light"><MetricValue metric={head.mean} /></dd>
+				<dd class="font-mono text-3xl font-light tabular-nums">
+					<MetricValue metric={head.mean} />
+				</dd>
 			</div>
 			<div class="flex flex-col gap-1" data-figure="median">
 				<dt class="text-foreground/75">Median</dt>
 				<dd class="flex items-baseline gap-2">
-					<span class="text-lg font-light"><MetricValue metric={head.median} /></span>
+					<span class="font-mono text-lg font-light tabular-nums"
+						><MetricValue metric={head.median} /></span
+					>
 					<span class="font-mono text-foreground/75 tabular-nums" data-testid="median-sample"
 						>n = {formatCount(n)}</span
 					>
@@ -84,7 +88,9 @@
 					P90 <span class="text-foreground/60">(nearest-rank)</span>
 				</dt>
 				<dd class="flex items-baseline gap-2">
-					<span class="text-lg font-light"><MetricValue metric={head.p90} /></span>
+					<span class="font-mono text-lg font-light tabular-nums"
+						><MetricValue metric={head.p90} /></span
+					>
 					<span class="font-mono text-foreground/75 tabular-nums" data-testid="p90-sample"
 						>n = {formatCount(n)}</span
 					>
@@ -118,24 +124,6 @@
 					.join(', ')}){/if}{#if !model.complete}{' '}· partial{/if}
 		</p>
 
-		<dl class="flex flex-col gap-1" data-testid="time-split">
-			<div class="grid grid-cols-[12rem_1fr] gap-3" data-figure="waiting-before-handoff">
-				<dt class="text-foreground/75">Waiting before handoff</dt>
-				<dd><MetricValue metric={model.waitingBeforeHandoff} /> mean</dd>
-			</div>
-			<div class="grid grid-cols-[12rem_1fr] gap-3" data-figure="factory-time">
-				<dt class="text-foreground/75">Factory time</dt>
-				<dd><MetricValue metric={model.factoryTime} /> mean</dd>
-			</div>
-		</dl>
-		{#if model.clampedCount > 0}
-			<p class="font-mono text-foreground/75" data-testid="clamped">
-				{formatCount(model.clampedCount)}
-				{model.clampedCount === 1 ? 'execution has' : 'executions have'} factory time 0: the factory clamps
-				it at 0, so its waiting before handoff may be overstated.
-			</p>
-		{/if}
-
 		<div class="flex flex-col gap-2" data-testid="stage-time">
 			<h3 class="text-sm font-light">Stage time</h3>
 			<ul class="flex flex-col gap-2" aria-label="Mean stage time per execution">
@@ -150,7 +138,7 @@
 								: mean.availability}
 						class="grid grid-cols-[5rem_1fr] items-center gap-x-3 gap-y-1 sm:grid-cols-[5rem_1fr_9rem]"
 					>
-						<span class="font-mono text-foreground/75">{stage.label}</span>
+						<span class="text-foreground/75">{stage.label}</span>
 						<div class="h-4 bg-muted" aria-hidden="true">
 							{#if mean.value !== null && !stage.noRuns}
 								<div
@@ -183,25 +171,51 @@
 						and count as 0.</span
 					>{/if}
 			</p>
-			{#if model.inconsistencyMs !== null}
-				<p class="font-mono text-foreground" data-testid="time-inconsistent" role="note">
-					Inconsistent: mean stage time exceeds mean factory time by {formatSpan(
-						model.inconsistencyMs
-					)} for these executions.
-				</p>
-			{:else}
-				<p class="font-mono text-foreground/75" data-testid="unattributed">
-					Unattributed factory time: <MetricValue metric={model.unattributed} /> mean
-				</p>
-			{/if}
 		</div>
 
-		<p class="font-mono text-foreground/75 tabular-nums" data-testid="agent-overhead">
-			Agent time <span class="text-foreground"><MetricValue metric={model.agentTime} /></span> mean
-			per execution (n = {formatCount(model.agentTime.sampleSize)}; runs can overlap, not wall time)
-			· Overhead <span class="text-foreground"><MetricValue metric={model.overhead} /></span> mean
-			(n = {formatCount(model.overhead.sampleSize)}{#if model.overhead.availability === 'partial'},
-				partial: {formatCount(model.overhead.excludedCount)} without stage timings left out{/if})
-		</p>
+		<details class="mt-auto font-mono text-foreground/75">
+			<summary class="cursor-pointer hover:text-foreground">Time detail</summary>
+			<div class="mt-2 flex flex-col gap-2">
+				<dl class="flex flex-col gap-1" data-testid="time-split">
+					<div class="grid grid-cols-[12rem_1fr] gap-3" data-figure="waiting-before-handoff">
+						<dt class="text-foreground/75">Waiting before handoff</dt>
+						<dd><MetricValue metric={model.waitingBeforeHandoff} /> mean</dd>
+					</div>
+					<div class="grid grid-cols-[12rem_1fr] gap-3" data-figure="factory-time">
+						<dt class="text-foreground/75">Factory time</dt>
+						<dd><MetricValue metric={model.factoryTime} /> mean</dd>
+					</div>
+				</dl>
+				{#if model.clampedCount > 0}
+					<p data-testid="clamped">
+						{formatCount(model.clampedCount)}
+						{model.clampedCount === 1 ? 'execution has' : 'executions have'} factory time 0: the factory
+						clamps it at 0, so its waiting before handoff may be overstated.
+					</p>
+				{/if}
+				{#if model.inconsistencyMs !== null}
+					<p class="text-foreground" data-testid="time-inconsistent" role="note">
+						Inconsistent: mean stage time exceeds mean factory time by {formatSpan(
+							model.inconsistencyMs
+						)} for these executions.
+					</p>
+				{:else}
+					<p data-testid="unattributed">
+						Unattributed factory time: <MetricValue metric={model.unattributed} /> mean
+					</p>
+				{/if}
+				<p class="tabular-nums" data-testid="agent-overhead">
+					Agent time <span class="text-foreground"><MetricValue metric={model.agentTime} /></span>
+					mean per execution (n = {formatCount(model.agentTime.sampleSize)}; runs can overlap, not
+					wall time) · Overhead
+					<span class="text-foreground"><MetricValue metric={model.overhead} /></span>
+					mean (n = {formatCount(
+						model.overhead.sampleSize
+					)}{#if model.overhead.availability === 'partial'}, partial: {formatCount(
+							model.overhead.excludedCount
+						)} without stage timings left out{/if})
+				</p>
+			</div>
+		</details>
 	{/if}
 </article>

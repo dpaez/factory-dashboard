@@ -49,26 +49,28 @@
 <div
 	data-slot="connection-status"
 	data-state={state}
-	class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground"
+	class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground max-md:flex-nowrap"
 >
-	<div data-slot="connection-state" aria-live="polite" class="flex items-center gap-2">
+	<div data-slot="connection-state" aria-live="polite" class="flex min-w-0 items-center gap-2">
 		<Icon class="size-3.5 shrink-0" aria-hidden="true" />
 		<StatusBadge {...signal} />
 		{#if explanation}
-			<span data-slot="connection-explanation">{explanation}</span>
+			<span data-slot="connection-explanation" class="min-w-0 max-md:truncate">{explanation}</span>
 		{/if}
 	</div>
 	{#if state !== 'live'}
-		<span data-slot="last-refresh" class="flex items-center gap-1">
-			<span>Last refresh</span>
-			{#if lastRefreshAt != null && refreshed !== UNAVAILABLE}
-				<time datetime={lastRefreshAt} class="font-mono tabular-nums">{refreshed}</time>
-			{:else}
-				<span>Unavailable</span>
-			{/if}
+		<span data-slot="last-refresh" class="flex min-w-0 items-center gap-1">
+			<span class="min-w-0 max-md:truncate">
+				Last refresh
+				{#if lastRefreshAt != null && refreshed !== UNAVAILABLE}
+					<time datetime={lastRefreshAt} class="font-mono tabular-nums">{refreshed}</time>
+				{:else}
+					Unavailable
+				{/if}
+			</span>
 		</span>
 	{/if}
 	{#if canRetry}
-		<Button variant="outline" size="sm" onclick={onretry}>Retry</Button>
+		<Button variant="outline" size="sm" class="shrink-0" onclick={onretry}>Retry</Button>
 	{/if}
 </div>

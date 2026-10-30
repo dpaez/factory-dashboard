@@ -41,7 +41,7 @@
 	aria-busy={view.kind === 'loading' ? 'true' : undefined}
 	class="not-prose flex min-w-0 flex-col gap-3 text-xs/relaxed"
 >
-	<h2 id={headingId} class="text-base font-light">Tickets quality</h2>
+	<h2 id={headingId} class="sr-only">Tickets quality</h2>
 	{#if view.kind !== 'ready'}
 		<StatsPanelState state={view} {onretry} />
 	{:else}

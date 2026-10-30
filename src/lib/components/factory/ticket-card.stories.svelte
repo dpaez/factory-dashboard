@@ -36,7 +36,7 @@
 			docs: {
 				description: {
 					component:
-						'One current execution. The whole card is a single selection button (aria-pressed). It shows input/output token usage, not USD; usage the factory did not supply reads "Unavailable".'
+						'One current execution, in three tiers: reference and title, status (a Signal Wait edge when it needs attention), then progress, time and tokens under a hairline. The whole card is a single selection button (aria-pressed). Token usage, not USD; usage the factory did not supply reads "Unavailable".'
 				}
 			}
 		}
@@ -83,8 +83,23 @@
 
 <Story name="Paused in Work" args={{ card: cardOf(ticketPaused) }} />
 
-<Story name="Needs attention" args={{ card: cardOf(ticketWaitingForAgentQuestion) }} />
+<Story
+	name="Needs attention"
+	args={{ card: cardOf(ticketWaitingForAgentQuestion) }}
+	play={async ({ canvasElement }) => {
+		const card = firstCard(canvasElement);
+		await expect(card).toHaveAttribute('data-needs-attention', 'true');
+		await expect(card).toHaveTextContent('Needs attention');
+	}}
+/>
 
-<Story name="Long title" args={{ card: cardOf(ticketLongValues) }} />
+<Story
+	name="Long title"
+	args={{ card: cardOf(ticketLongValues) }}
+	play={async ({ canvasElement }) => {
+		const title = firstCard(canvasElement).querySelector('[data-slot="ticket-title"]');
+		await expect(title).toHaveAttribute('title', ticketLongValues.title);
+	}}
+/>
 
 <Story name="Unknown stage" args={{ card: cardOf(ticketUnknownStage), showStage: true }} />

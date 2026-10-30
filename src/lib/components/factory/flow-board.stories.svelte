@@ -104,7 +104,7 @@
 			docs: {
 				description: {
 					component:
-						'Lanes Plan, Work, QA, Review, Handoff and, for unknown stages, Other. Each card is one selection button; nothing is draggable. Lanes keep their heading when empty, loading or failed.'
+						'From lg up, one row of lanes that fits the viewport: Backlog (when given, and foldable), Plan, Work, QA, Review, Handoff and, for unknown stages, Other. Below lg, a phone stacks one column and a tablet two; each column shows one card until See more. Each card is one selection button; nothing is draggable. Lanes keep their heading when empty, loading or failed.'
 				}
 			}
 		}

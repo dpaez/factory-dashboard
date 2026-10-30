@@ -4,6 +4,7 @@
 	import { formatTimestamp } from '$lib/factory/format';
 	import { Button } from '$lib/components/ui/button';
 	import BacklogCard from './backlog-card.svelte';
+	import LaneScroll from './lane-scroll.svelte';
 	import type { StartState } from './start-control.svelte';
 	import { CountFlash } from './count-flash.svelte';
 
@@ -72,6 +73,10 @@
 
 	const showCards = $derived(status === 'ready' || (status === 'failed' && cards.length > 0));
 
+	let opened = $state(false);
+	const selectedPastPeek = $derived(visible.findIndex((card) => card.id === selectedId) > 0);
+	const expanded = $derived(opened || selectedPastPeek);
+
 	function choose(event: Event) {
 		const value = (event.currentTarget as HTMLSelectElement).value;
 		label = value === ALL ? null : value;
@@ -84,143 +89,172 @@
 	data-slot="backlog-lane"
 	data-lane="backlog"
 	data-status={status}
+	data-expanded={expanded ? 'true' : 'false'}
 	aria-labelledby={headingId}
 	aria-busy={status === 'loading' || refreshing}
-	class="flex min-w-0 flex-col gap-2"
+	class={cn(
+		'group/lane flex min-h-0 w-full min-w-0 flex-col bg-muted max-lg:self-start lg:h-full',
+		expanded && 'h-80'
+	)}
 >
-	<div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-border pb-1">
-		<h2 id={headingId} class="flex items-baseline gap-2 text-xs font-medium text-foreground">
-			<span>Backlog</span>
-			{#if showCards}
-				<span
-					data-slot="lane-count"
-					data-filtered={filtered ? 'true' : undefined}
-					data-flash={flash.active ? 'on' : undefined}
-					class={cn(
-						'px-1 font-mono text-foreground/75 tabular-nums transition-colors duration-300',
-						flash.active && 'bg-primary text-primary-foreground'
-					)}
-					>{#if filtered}{count} of {cards.length}<span class="sr-only">, filtered</span
-						>{:else if !complete}at least {count}<span class="sr-only">, partial list</span
-						>{:else}{count}{/if}</span
-				>
-				{#if filtered}
-					<span aria-hidden="true" class="text-[0.625rem] font-normal text-foreground/75"
-						>filtered</span
+	<div class="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2">
+		<div class="flex flex-wrap items-baseline justify-between gap-x-2">
+			<h2 id={headingId} class="flex items-baseline gap-2 text-sm font-medium text-foreground">
+				<span>Backlog</span>
+				{#if showCards}
+					<span
+						data-slot="lane-count"
+						data-filtered={filtered ? 'true' : undefined}
+						data-flash={flash.active ? 'on' : undefined}
+						class={cn(
+							'px-1 font-mono text-lg font-bold text-foreground tabular-nums transition-colors duration-300',
+							flash.active && 'bg-primary text-primary-foreground'
+						)}
+						>{#if filtered}{count} of {cards.length}<span class="sr-only">, filtered</span
+							>{:else if !complete}at least {count}<span class="sr-only">, partial list</span
+							>{:else}{count}{/if}</span
 					>
+					{#if filtered}
+						<span aria-hidden="true" class="text-[0.625rem] font-normal text-foreground/75"
+							>filtered</span
+						>
+					{/if}
 				{/if}
-			{/if}
-		</h2>
-		<Button
-			variant="ghost"
-			size="xs"
-			data-slot="backlog-refresh"
-			disabled={refreshing || status === 'loading'}
-			onclick={() => onrefresh?.()}
-		>
-			{refreshing ? 'Refreshing…' : 'Refresh'}
-		</Button>
-	</div>
-
-	{#if fetchedAt !== null && status !== 'loading'}
-		<p
-			data-slot="backlog-fetched-at"
-			class="font-mono text-[0.625rem] text-foreground/75 tabular-nums"
-		>
-			Updated {formatTimestamp(fetchedAt)}
-		</p>
-	{/if}
-
-	{#if status === 'failed'}
-		<div role="alert" data-slot="backlog-failure" class="flex flex-col gap-2 bg-muted p-3 text-xs">
-			<p class="text-foreground">
-				<span class="font-medium">Backlog unavailable.</span>
-				{failure ?? 'The tracker did not answer.'}
-			</p>
-			{#if cards.length > 0 && fetchedAt !== null}
-				<p class="text-foreground/75">
-					Showing issues from <span class="font-mono tabular-nums"
-						>{formatTimestamp(fetchedAt)}</span
-					>
-				</p>
-			{/if}
+			</h2>
 			<Button
-				variant="outline"
+				variant="ghost"
 				size="xs"
-				class="self-start"
-				data-slot="backlog-retry"
-				disabled={refreshing}
-				onclick={() => onretry?.()}
+				data-slot="backlog-refresh"
+				disabled={refreshing || status === 'loading'}
+				onclick={() => onrefresh?.()}
 			>
-				Retry
+				{refreshing ? 'Refreshing…' : 'Refresh'}
 			</Button>
 		</div>
-	{/if}
 
-	{#if showCards && cards.length > 0}
-		<div class="flex min-w-0 flex-col gap-1">
-			<label for={filterId} class="text-[0.625rem] text-foreground/75">Filter by label</label>
-			<select
-				id={filterId}
-				data-slot="backlog-label-filter"
-				value={label ?? ALL}
-				onchange={choose}
-				class="h-7 w-full min-w-0 border border-border bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-			>
-				<option value={ALL}>All labels</option>
-				{#each options as option (option)}
-					<option value={option}>{option}</option>
-				{/each}
-			</select>
-		</div>
-	{/if}
-
-	{#if status === 'loading'}
-		<div class="flex flex-col gap-2">
-			<span class="sr-only">Loading the backlog</span>
-			{#each [0, 1, 2] as placeholder (placeholder)}
-				<div
-					data-slot="card-placeholder"
-					class="h-24 animate-pulse bg-muted ring-1 ring-foreground/10 motion-reduce:animate-none"
-				></div>
-			{/each}
-		</div>
-	{:else if showCards}
-		{#if cards.length === 0}
-			<p class="p-3 text-xs text-foreground/75 ring-1 ring-foreground/10 ring-inset">
-				Backlog clear.
-			</p>
-		{:else if count === 0}
+		{#if fetchedAt !== null && status !== 'loading'}
 			<p
-				data-slot="backlog-no-match"
-				class="p-3 text-xs text-foreground/75 ring-1 ring-foreground/10 ring-inset"
+				data-slot="backlog-fetched-at"
+				class="font-mono text-[0.625rem] text-foreground/75 tabular-nums"
 			>
-				No issues with this label.
+				Updated {formatTimestamp(fetchedAt)}
 			</p>
-		{:else}
-			<ul class="flex flex-col gap-2">
-				{#each visible as card (card.id)}
-					{@const start = startFor?.(card)}
-					<li class="min-w-0">
-						<BacklogCard
-							{card}
-							selected={card.id === selectedId}
-							start={start?.start}
-							phase={start?.phase}
-							explanation={start?.explanation}
-							{onselect}
-							{onstart}
-							{onresend}
-						/>
-					</li>
+		{/if}
+
+		{#if showCards && cards.length > 0}
+			<div class="flex min-w-0 flex-col gap-1">
+				<label for={filterId} class="text-[0.625rem] text-foreground/75">Filter by label</label>
+				<select
+					id={filterId}
+					data-slot="backlog-label-filter"
+					value={label ?? ALL}
+					onchange={choose}
+					class="h-7 w-full min-w-0 border border-border bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+				>
+					<option value={ALL}>All labels</option>
+					{#each options as option (option)}
+						<option value={option}>{option}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
+	</div>
+
+	<LaneScroll>
+		{#if status === 'failed'}
+			<div
+				role="alert"
+				data-slot="backlog-failure"
+				class="flex flex-col gap-2 bg-background p-3 text-xs"
+			>
+				<p class="text-foreground">
+					<span class="font-medium">Backlog unavailable.</span>
+					{failure ?? 'The tracker did not answer.'}
+				</p>
+				{#if cards.length > 0 && fetchedAt !== null}
+					<p class="text-foreground/75">
+						Showing issues from <span class="font-mono tabular-nums"
+							>{formatTimestamp(fetchedAt)}</span
+						>
+					</p>
+				{/if}
+				<Button
+					variant="outline"
+					size="xs"
+					class="self-start"
+					data-slot="backlog-retry"
+					disabled={refreshing}
+					onclick={() => onretry?.()}
+				>
+					Retry
+				</Button>
+			</div>
+		{/if}
+
+		{#if status === 'loading'}
+			<div class="flex flex-col gap-2">
+				<span class="sr-only">Loading the backlog</span>
+				{#each [0, 1, 2] as placeholder (placeholder)}
+					<div
+						data-slot="card-placeholder"
+						class="h-24 animate-pulse bg-muted ring-1 ring-foreground/10 motion-reduce:animate-none"
+					></div>
 				{/each}
-			</ul>
+			</div>
+		{:else if showCards}
+			{#if cards.length === 0}
+				<p class="p-3 text-xs text-foreground/75 ring-1 ring-foreground/10 ring-inset">
+					Backlog clear.
+				</p>
+			{:else if count === 0}
+				<p
+					data-slot="backlog-no-match"
+					class="p-3 text-xs text-foreground/75 ring-1 ring-foreground/10 ring-inset"
+				>
+					No issues with this label.
+				</p>
+			{:else}
+				<ul class="flex flex-col gap-2">
+					{#each visible as card, index (card.id)}
+						{@const start = startFor?.(card)}
+						<li
+							class={cn('min-w-0', index > 0 && 'max-lg:group-data-[expanded=false]/lane:hidden')}
+						>
+							<BacklogCard
+								{card}
+								selected={card.id === selectedId}
+								start={start?.start}
+								phase={start?.phase}
+								explanation={start?.explanation}
+								{onselect}
+								{onstart}
+								{onresend}
+							/>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if !complete}
+				<p
+					data-slot="backlog-partial"
+					class="text-[0.625rem] text-foreground/75 max-lg:group-data-[expanded=false]/lane:hidden"
+				>
+					Partial list: the backlog has more issues than the board reads. See the tracker for the
+					rest.
+				</p>
+			{/if}
 		{/if}
-		{#if !complete}
-			<p data-slot="backlog-partial" class="text-[0.625rem] text-foreground/75">
-				Partial list: the backlog has more issues than the board reads. See the tracker for the
-				rest.
-			</p>
-		{/if}
+	</LaneScroll>
+	{#if showCards && count > 1}
+		<Button
+			variant="ghost"
+			size="sm"
+			data-slot="lane-more"
+			class="m-2 self-start lg:hidden"
+			aria-expanded={expanded}
+			onclick={() => (opened = !opened)}
+		>
+			{expanded ? 'See less' : 'See more'}
+		</Button>
 	{/if}
 </div>

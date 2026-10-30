@@ -45,6 +45,7 @@ Displays open executions, active agents, and eligible backlog items. Labels are 
 - Repeated activation advances through unresolved items; resolving an item removes it from the queue.
 - Use authoritative needs-user information where available. Add handoffs as a separate attention category rather than pretending they are unanswered questions.
 - Empty state: “No attention needed.” Do not leave an active “Open next” button with no target.
+- Below `md`, the strip shows the headline and See more. Reasons and Open next open from that control. From `md` up, the strip stays open.
 
 **Acceptance:** the summary and destination agree; selection does not jump spontaneously when new events arrive.
 
@@ -71,7 +72,7 @@ Preserve stage/status separately: a paused worker stays in Work. Review-to-Work 
 
 Keep ordering stable within a lane, using entry time where available and a deterministic fallback such as ticket key. Do not reorder on each message or cost update. Unknown stages get a visible “Other” fallback with their raw label until the adapter is updated.
 
-Use the repository grid breakpoints: one lane per row below md, three at md, six at lg. Shared max-width/gutters remain in the existing layout. The backlog divider uses `border-border`; cards and lane headings remain square and shadow-free.
+Below `md`, one column. From `md` until `lg`, two columns, and the rest stack. From `lg` up, every lane shares one row and shrinks to fit. Below `lg`, each column shows one card until See more opens a shared fixed height whose list scrolls. Shared max-width/gutters remain in the existing layout. The backlog divider uses `border-border`; cards and lane headings remain square and shadow-free.
 
 **Acceptance:** one card per current execution; no dragging between lanes; empty lanes remain recognizable; a live move preserves ticket selection and keyboard focus.
 
@@ -79,7 +80,7 @@ Use the repository grid breakpoints: one lane per row below md, three at md, six
 
 **Inputs:** backlog items, freshness, capability, pending starts. **Outputs:** start, inspect sub-issues, refresh backlog.
 
-Lives in the first column, separated by a subtle divider at desktop widths. A failed backlog read is contained to this lane; the rest of the factory remains usable.
+Lives in the first column, separated by a subtle divider, and folds to the left behind an icon button so Plan, Work, QA, Review and Handoff stay on screen. A failed backlog read is contained to this lane; the rest of the factory remains usable.
 
 Empty state: “Backlog clear.” Loading uses card-shaped placeholders. Failure offers retry and preserves stale items with a timestamp when available.
 
@@ -111,7 +112,7 @@ Umbrella detection is documented; child-list availability must be verified. If c
 
 ## IssuePreview
 
-**Placement:** the same region below the board as the TicketInspector; selecting a backlog card or a ticket card behaves identically. Content is a separate component, not an inspector mode.
+**Placement:** the board drawer, the same panel as the TicketInspector, over the right side of the lanes. Selecting a backlog card or a ticket card behaves identically. The board stays usable; Escape or Close dismisses the panel and returns focus to the card. Content is a separate component, not an inspector mode.
 
 **Display model:** display reference, title, labels, tracker link ("Open in tracker", external), blockers and sub-issues as links, start availability and command state. Planned when the API supplies them ([geut/factory-skills#61](https://github.com/geut/factory-skills/issues/61)): author, created/updated time, and the description rendered as markdown. Until then those fields render **Unavailable** with the tracker link; fixtures and stories include them so the full layout is designed.
 

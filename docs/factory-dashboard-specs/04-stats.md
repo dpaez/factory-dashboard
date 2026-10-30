@@ -14,7 +14,7 @@ Add a proposed `src/routes/stats/+page.server.ts` / `+page.svelte` route; no Sta
 | ConfigurationComparison | Local Table for simple rows; existing TanStack v9 feature conventions if sorting/pagination are required |
 | MeasurementNotes | Native details/summary within a square semantic surface; no new accordion dependency needed |
 
-Preserve fixed metric-card widths and the centered `grid-cols-1 md:grid-cols-3` summary layout. Add a documented fluid/class/snippet extension where needed rather than overriding descendants. Detailed panels use `grid-cols-1 lg:grid-cols-2 gap-6`; all inherit `not-prose` where necessary.
+The summary row is a fluid full-width strip (`InfoCard` `fluid`), not the centered fixed-width cards. Other routes keep the fixed metric-card widths. Tokens by stage and Time to handoff share `grid-cols-1 lg:grid-cols-2 gap-6`. All inherit `not-prose` where necessary.
 
 Do not install a chart library for the simple bars in this design. Use the existing `--chart-1`…`--chart-5` tokens, with mono numeric labels and text legends. The prototype's green/purple/gold chart palette and rounded panels are superseded. Beacon Yellow remains reserved for actual activity/progress/actions, not general token or time bars.
 
