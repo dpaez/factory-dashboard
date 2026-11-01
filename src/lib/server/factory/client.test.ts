@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { createFactoryClient } from './client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createFactoryClient, factoryClientFromEnv } from './client';
 import { CONFIGURATION_ERROR, FactoryApiError } from './errors';
 
 // In `serve` mode (which vitest uses), `$env/dynamic/private` is a snapshot
@@ -15,6 +19,12 @@ vi.mock('$env/dynamic/private', () => ({
 		},
 		get FACTORY_OPERATOR_NAME() {
 			return process.env.FACTORY_OPERATOR_NAME;
+		},
+		get FACTORY_DASHBOARD_ENV_FILE() {
+			return process.env.FACTORY_DASHBOARD_ENV_FILE;
+		},
+		get WORKSPACE_DIR() {
+			return process.env.WORKSPACE_DIR;
 		}
 	}
 }));
@@ -33,10 +43,36 @@ function recordingFetch() {
 	return { requests, fetch };
 }
 
+const tempDirs: string[] = [];
+
+function tempDir(): string {
+	const dir = mkdtempSync(join(tmpdir(), 'factory-dashboard-env-'));
+	tempDirs.push(dir);
+	return dir;
+}
+
+function thrownBy(run: () => void): unknown {
+	try {
+		run();
+		return undefined;
+	} catch (error) {
+		return error;
+	}
+}
+
+beforeEach(() => {
+	delete process.env.FACTORY_DASHBOARD_ENV_FILE;
+	delete process.env.WORKSPACE_DIR;
+});
+
 afterEach(() => {
 	delete process.env.FACTORY_API_URL;
 	delete process.env.FACTORY_API_TOKEN;
 	delete process.env.FACTORY_OPERATOR_NAME;
+	delete process.env.FACTORY_DASHBOARD_ENV_FILE;
+	delete process.env.WORKSPACE_DIR;
+	for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+	tempDirs.length = 0;
 });
 
 describe('createFactoryClient', () => {
@@ -159,4 +195,217 @@ describe('factoryClientFromEnv', () => {
 			expect(requests).toHaveLength(0);
 		}
 	);
+
+	it('reads the URL, token and operator name from the env file', async () => {
+		const file = join(tempDir(), 'dashboard.env');
+		writeFileSync(
+			file,
+			[
+				'FACTORY_API_URL=http://from-file.test:7731',
+				`FACTORY_API_TOKEN=${TOKEN}`,
+				'FACTORY_OPERATOR_NAME=Ada'
+			].join('\n')
+		);
+		process.env.FACTORY_DASHBOARD_ENV_FILE = file;
+		const { requests, fetch } = recordingFetch();
+
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+
+		expect(requests[0]?.url).toBe('http://from-file.test:7731/v1/me');
+		expect(requests[0]?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+		expect(requests[0]?.headers.get('x-factory-on-behalf-of')).toBe('Ada');
+	});
+
+	it.each([
+		[
+			'FACTORY_API_URL',
+			{ FACTORY_API_URL: 'http://from-env.test:7731' },
+			'http://from-env.test:7731/v1/me',
+			`Bearer ${TOKEN}`,
+			'Ada'
+		],
+		[
+			'FACTORY_API_TOKEN',
+			{ FACTORY_API_TOKEN: 'env-token' },
+			'http://from-file.test:7731/v1/me',
+			'Bearer env-token',
+			'Ada'
+		],
+		[
+			'FACTORY_OPERATOR_NAME',
+			{ FACTORY_OPERATOR_NAME: 'Diego' },
+			'http://from-file.test:7731/v1/me',
+			`Bearer ${TOKEN}`,
+			'Diego'
+		]
+	] as const)(
+		'a process %s overrides the file and leaves the other keys',
+		async (_key, present, url, authorization, operator) => {
+			const file = join(tempDir(), 'dashboard.env');
+			writeFileSync(
+				file,
+				[
+					'FACTORY_API_URL=http://from-file.test:7731',
+					`FACTORY_API_TOKEN=${TOKEN}`,
+					'FACTORY_OPERATOR_NAME=Ada'
+				].join('\n')
+			);
+			process.env.FACTORY_DASHBOARD_ENV_FILE = file;
+			Object.assign(process.env, present);
+			const { requests, fetch } = recordingFetch();
+
+			await factoryClientFromEnv(fetch).GET('/v1/me');
+
+			expect(requests[0]?.url).toBe(url);
+			expect(requests[0]?.headers.get('authorization')).toBe(authorization);
+			expect(requests[0]?.headers.get('x-factory-on-behalf-of')).toBe(operator);
+		}
+	);
+
+	it('ignores comments, blank lines and unknown keys', async () => {
+		const file = join(tempDir(), 'dashboard.env');
+		writeFileSync(
+			file,
+			[
+				'# comment',
+				'',
+				'FACTORY_API_URL=http://from-file.test:7731',
+				'UNKNOWN=ignored-value',
+				'NOT_A_PAIR',
+				`FACTORY_API_TOKEN=${TOKEN}`,
+				'   # indented comment',
+				'FACTORY_OPERATOR_NAME=Ada'
+			].join('\n')
+		);
+		process.env.FACTORY_DASHBOARD_ENV_FILE = file;
+		const { requests, fetch } = recordingFetch();
+
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+
+		expect(requests[0]?.url).toBe('http://from-file.test:7731/v1/me');
+		expect(requests[0]?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+		expect(requests[0]?.headers.get('x-factory-on-behalf-of')).toBe('Ada');
+		const serialized = JSON.stringify({
+			url: requests[0]?.url,
+			authorization: requests[0]?.headers.get('authorization'),
+			operator: requests[0]?.headers.get('x-factory-on-behalf-of')
+		});
+		expect(serialized).not.toContain('ignored-value');
+	});
+
+	it('uses the token written between two calls', async () => {
+		const file = join(tempDir(), 'dashboard.env');
+		writeFileSync(
+			file,
+			`FACTORY_API_URL=http://from-file.test:7731\nFACTORY_API_TOKEN=token-one\n`
+		);
+		process.env.FACTORY_DASHBOARD_ENV_FILE = file;
+		const { requests, fetch } = recordingFetch();
+
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+		writeFileSync(
+			file,
+			`FACTORY_API_URL=http://from-file.test:7731\nFACTORY_API_TOKEN=token-two\n`
+		);
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+
+		expect(requests.map((request) => request.headers.get('authorization'))).toEqual([
+			'Bearer token-one',
+			'Bearer token-two'
+		]);
+	});
+
+	it('prefers FACTORY_DASHBOARD_ENV_FILE over WORKSPACE_DIR', async () => {
+		const root = tempDir();
+		mkdirSync(join(root, '.factory'));
+		writeFileSync(
+			join(root, '.factory', 'dashboard.env'),
+			'FACTORY_API_URL=http://workspace.test:7731\nFACTORY_API_TOKEN=workspace-token\n'
+		);
+		const explicit = join(root, 'explicit.env');
+		writeFileSync(
+			explicit,
+			'FACTORY_API_URL=http://explicit.test:7731\nFACTORY_API_TOKEN=explicit-token\n'
+		);
+		process.env.WORKSPACE_DIR = root;
+		process.env.FACTORY_DASHBOARD_ENV_FILE = explicit;
+		const { requests, fetch } = recordingFetch();
+
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+
+		expect(requests[0]?.url).toBe('http://explicit.test:7731/v1/me');
+		expect(requests[0]?.headers.get('authorization')).toBe('Bearer explicit-token');
+	});
+
+	it('reads $WORKSPACE_DIR/.factory/dashboard.env when no explicit file is set', async () => {
+		const root = tempDir();
+		mkdirSync(join(root, '.factory'));
+		writeFileSync(
+			join(root, '.factory', 'dashboard.env'),
+			`FACTORY_API_URL=http://workspace.test:7731\nFACTORY_API_TOKEN=${TOKEN}\n`
+		);
+		process.env.WORKSPACE_DIR = root;
+		const { requests, fetch } = recordingFetch();
+
+		await factoryClientFromEnv(fetch).GET('/v1/me');
+
+		expect(requests[0]?.url).toBe('http://workspace.test:7731/v1/me');
+		expect(requests[0]?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+	});
+
+	it('names the missing variables when the env file is missing', () => {
+		const path = join(tempDir(), 'missing.env');
+		process.env.FACTORY_DASHBOARD_ENV_FILE = path;
+		const { requests, fetch } = recordingFetch();
+
+		const thrown = thrownBy(() => factoryClientFromEnv(fetch));
+
+		expect(thrown).toBeInstanceOf(FactoryApiError);
+		const failure = (thrown as FactoryApiError).failure;
+		expect(failure.type).toBe(CONFIGURATION_ERROR);
+		expect(failure.detail).toBe(`Missing FACTORY_API_URL and FACTORY_API_TOKEN. Checked ${path}.`);
+		expect(JSON.stringify(failure) + (thrown as Error).message).not.toContain('ENOENT');
+		expect(requests).toHaveLength(0);
+	});
+
+	it('names the missing variables when no env file is configured', () => {
+		const { requests, fetch } = recordingFetch();
+
+		const thrown = thrownBy(() => factoryClientFromEnv(fetch));
+
+		expect(thrown).toBeInstanceOf(FactoryApiError);
+		const failure = (thrown as FactoryApiError).failure;
+		expect(failure.type).toBe(CONFIGURATION_ERROR);
+		expect(failure.detail).toBe('Missing FACTORY_API_URL and FACTORY_API_TOKEN.');
+		expect(requests).toHaveLength(0);
+	});
+
+	it('names the missing variables when the env file path is a directory', () => {
+		const path = tempDir();
+		process.env.FACTORY_DASHBOARD_ENV_FILE = path;
+		const { fetch } = recordingFetch();
+
+		const thrown = thrownBy(() => factoryClientFromEnv(fetch));
+
+		expect(thrown).toBeInstanceOf(FactoryApiError);
+		const failure = (thrown as FactoryApiError).failure;
+		expect(failure.detail).toBe(`Missing FACTORY_API_URL and FACTORY_API_TOKEN. Checked ${path}.`);
+		const serialized = JSON.stringify(failure) + (thrown as Error).message;
+		expect(serialized).not.toContain('EISDIR');
+		expect(serialized).not.toContain('ENOENT');
+	});
+
+	it('does not reveal a token that the file supplied for a missing URL', () => {
+		const file = join(tempDir(), 'dashboard.env');
+		writeFileSync(file, `FACTORY_API_TOKEN=${TOKEN}\n`);
+		process.env.FACTORY_DASHBOARD_ENV_FILE = file;
+
+		const thrown = thrownBy(() => factoryClientFromEnv(recordingFetch().fetch));
+
+		expect(thrown).toBeInstanceOf(FactoryApiError);
+		const failure = (thrown as FactoryApiError).failure;
+		expect(failure.detail).toContain('FACTORY_API_URL');
+		expect(failure.detail).not.toContain(TOKEN);
+		expect((thrown as Error).message).not.toContain(TOKEN);
+	});
 });

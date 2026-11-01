@@ -84,13 +84,20 @@ in this repo opens factory state files.
    `.factory/dashboard.env`.
 2. **Configure the dashboard** in `.env` (copy `.env.example`):
 
-   | Variable                | Required | Meaning                                                                  |
-   | ----------------------- | -------- | ------------------------------------------------------------------------ |
-   | `FACTORY_API_URL`       | yes      | Factory server base URL, without `/v1` (for example `http://127.0.0.1:7731`). |
-   | `FACTORY_API_TOKEN`     | yes      | An `act`-scoped factory server token.                                    |
-   | `FACTORY_OPERATOR_NAME` | no       | Operator name sent with commands as `X-Factory-On-Behalf-Of`.            |
+   | Variable                     | Required | Meaning                                                                  |
+   | ---------------------------- | -------- | ------------------------------------------------------------------------ |
+   | `FACTORY_API_URL`            | yes      | Factory server base URL, without `/v1` (for example `http://127.0.0.1:7731`). |
+   | `FACTORY_API_TOKEN`          | yes      | An `act`-scoped factory server token.                                    |
+   | `FACTORY_OPERATOR_NAME`      | no       | Operator name sent with commands as `X-Factory-On-Behalf-Of`.            |
+   | `FACTORY_DASHBOARD_ENV_FILE` | no       | Env file read on each request when a process variable is empty.          |
 
    These are private runtime variables: they stay on the SvelteKit server and never reach the browser.
+   A non-empty process variable wins for each key. Otherwise the value is read, on every request, from
+   `FACTORY_DASHBOARD_ENV_FILE` when that is set, or from `$WORKSPACE_DIR/.factory/dashboard.env` when
+   `WORKSPACE_DIR` is set. Nothing is cached, so a token that `factory-up` replaces is picked up without
+   a restart. With neither path set, only the process variables are used. For local development, point
+   `FACTORY_DASHBOARD_ENV_FILE` at a project's `.factory/dashboard.env` instead of copying the values into
+   `.env`.
 3. **Start the dashboard** with `pnpm run dev`.
 
 A missing URL or token, or a token the factory server rejects (unauthorized or insufficient scope), renders

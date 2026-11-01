@@ -52,6 +52,11 @@
 	<Separator />
 	{#if kind === 'configuration'}
 		<p class="max-w-3xl text-sm text-muted-foreground">
+			In the sandbox, run <span class="font-mono">factory-up</span> from the repository root. That
+			writes <span class="font-mono">.factory/dashboard.env</span>. Reload this page once the file
+			exists.
+		</p>
+		<p class="max-w-3xl text-sm text-muted-foreground">
 			Check <span class="font-mono">FACTORY_API_URL</span> and
 			<span class="font-mono">FACTORY_API_TOKEN</span>. The token needs the
 			<span class="font-mono">read</span> and <span class="font-mono">act</span> scopes.
