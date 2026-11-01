@@ -12,7 +12,8 @@ export type ProblemType = Problem['type'];
  * - `network_error`: the request never produced a response (fetch rejected,
  *   connection refused, DNS, abort). Status 502, retryable.
  * - `configuration_error`: the dashboard is missing FACTORY_API_URL or
- *   FACTORY_API_TOKEN. Status 500, not retryable.
+ *   FACTORY_API_TOKEN, from the process or the env file. Status 500, not
+ *   retryable.
  */
 export const CONTRACT_ERROR = 'contract_error';
 export const NETWORK_ERROR = 'network_error';
