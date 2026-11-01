@@ -6,8 +6,10 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 
 export default defineConfig({
+	// Bundle runtime dependencies into the server build. adapter-node leaves every
+	// package.json dependency external, and the release tarball ships no node_modules.
 	ssr: {
-		noExternal: ['@tanstack/svelte-table']
+		noExternal: ['@tanstack/svelte-table', 'marked', 'openapi-fetch']
 	},
 	// Pre-bundle up front: a dependency discovered on first story visit makes the
 	// Storybook dev server re-optimize and reload every open page.

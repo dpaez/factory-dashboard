@@ -61,12 +61,24 @@ describe('README sbx-shell-pi kit integration section', () => {
 		expect(section).toMatch(/run `factory-up`/);
 	});
 
-	it('shows the planned walkthrough', () => {
+	it('documents the release flow', () => {
+		expect(section).toMatch(/\*\*Release\.\*\*/);
+		expect(section).toContain('factory-dashboard-<version>.tgz');
+		expect(section).toContain('factory-dashboard-<version>.tgz.sha256');
+		expect(section).toContain('linux/amd64');
+		expect(section).toContain('linux/arm64');
+		expect(section).toMatch(/no `latest` tag/);
+		expect(section).toContain('kit/factory-dashboard/factory-dashboard.yaml');
+	});
+
+	it('shows the planned walkthrough against the local factory kit', () => {
 		expect(section).toMatch(/\*\*Planned walkthrough\*\*/);
-		expect(section).toContain(
-			'sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project'
-		);
+		expect(section).toContain('dp/migrate-to-kits');
+		expect(section).toContain('ghcr.io/geut/sbx-shell-pi:node-24-factory');
+		expect(section).toMatch(/does not work with this factory/);
+		expect(section).toContain('sbx run --name factory ./factory /path/to/project');
 		expect(section).toContain('--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0');
+		expect(section).toContain('--kit ./kit/factory-dashboard');
 		expect(section).toContain('`.factory/FACTORY.json`');
 		expect(section).toContain('`factory-up`');
 		expect(section).toContain('`sbx ports factory`');
