@@ -1,73 +1,154 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release, for example v0.1.0
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
-  release:
+  verify:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
+      # Check out main first so the CI action below is the copy on main.
+      # The tagged commit is checked out into release-src and is what gets tested.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Check the tag matches the kit version
+      - name: Check the tag
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
-          default="$(grep -A1 '^  version:' kit/factory-dashboard/factory-dashboard.yaml | awk -F'"' '/default:/ { print $2 }')"
+          pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [[ ! "$TAG" =~ $pattern ]]; then
+            echo "Tag ${TAG} is not a version tag." >&2
+            exit 1
+          fi
+          if ! git fetch origin "+refs/tags/${TAG}:refs/tags/${TAG}"; then
+            echo "Tag ${TAG} does not exist." >&2
+            exit 1
+          fi
+          sha="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "$sha" HEAD; then
+            echo "Tag ${TAG} (${sha}) is not on main." >&2
+            exit 1
+          fi
+          manifest="$(git show "${sha}:kit/factory-dashboard/factory-dashboard.yaml")"
+          default="$(printf '%s\n' "$manifest" | grep -A1 '^  version:' | awk -F'"' '/default:/ { print $2 }' || true)"
           if [ -z "$default" ]; then
             echo "Could not read the version default from the kit descriptor." >&2
             exit 1
           fi
-          if [ "$tag" != "$default" ]; then
-            echo "Tag v${tag} does not match the kit version default ${default}." >&2
+          version="${TAG#v}"
+          if [ "$version" != "$default" ]; then
+            echo "Tag ${TAG} does not match the kit version default ${default}." >&2
             exit 1
           fi
-          echo "version=${tag}" >> "$GITHUB_OUTPUT"
-          if [[ "$tag" == *-* ]]; then
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists." >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@v7
         with:
-          version: 12
-      - uses: actions/setup-node@v7
+          ref: ${{ steps.version.outputs.sha }}
+          path: release-src
+
+      - uses: ./.github/actions/ci
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm build:check
-      - run: node scripts/pack-release.mjs "${{ steps.version.outputs.version }}"
-      - run: node scripts/smoke-release.mjs "${{ steps.version.outputs.version }}"
+          working-directory: release-src
+
+      - name: Pack and smoke the release
+        working-directory: release-src
+        run: |
+          set -euo pipefail
+          node scripts/pack-release.mjs "${{ steps.version.outputs.version }}"
+          node scripts/smoke-release.mjs "${{ steps.version.outputs.version }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-dashboard-${{ steps.version.outputs.version }}
+          path: release-src/release/
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: factory-dashboard-${{ needs.verify.outputs.version }}
+          path: release
 
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          SHA: ${{ needs.verify.outputs.sha }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           set -euo pipefail
-          version="${{ steps.version.outputs.version }}"
-          args=(
-            release create "$GITHUB_REF_NAME"
-            "release/factory-dashboard-${version}.tgz"
-            "release/factory-dashboard-${version}.tgz.sha256"
-            --title "$GITHUB_REF_NAME"
-            --notes "factory-dashboard ${version}"
-          )
-          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
-            args+=(--prerelease)
+          tag="v${VERSION}"
+          tarball="release/factory-dashboard-${VERSION}.tgz"
+          checksum="${tarball}.sha256"
+          git fetch origin "+refs/tags/${tag}:refs/tags/${tag}"
+          actual="$(git rev-parse "refs/tags/${tag}^{commit}")"
+          if [ "$actual" != "$SHA" ]; then
+            echo "Tag ${tag} points at ${actual}, not the verified commit ${SHA}." >&2
+            exit 1
           fi
-          gh "${args[@]}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$tarball" "$checksum" --clobber
+          else
+            args=(
+              release create "$tag"
+              "$tarball"
+              "$checksum"
+              --verify-tag
+              --target "$SHA"
+              --title "$tag"
+              --notes "factory-dashboard ${VERSION}"
+            )
+            if [ "$PRERELEASE" = "true" ]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
+          fi
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -76,9 +157,11 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build and push the mixin
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           docker buildx build kit/factory-dashboard \
             -f kit/factory-dashboard/factory-dashboard.yaml \
             --platform linux/amd64,linux/arm64 \
-            -t "ghcr.io/dpaez/sbx-kit-factory-dashboard:${{ steps.version.outputs.version }}" \
+            -t "ghcr.io/dpaez/sbx-kit-factory-dashboard:${VERSION}" \
             --push
