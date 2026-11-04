@@ -6,7 +6,7 @@ The operator's command center for one factory: it shows where every ticket is, w
 
 ## Who this is for
 
-This dashboard is planned to be used as an external accessory of GEUT's factory. You can see more [here](https://github.com/geut/sbx-shell-pi) and [here](https://github.com/geut/factory-skills). How it will be shipped into a factory sandbox is described in [sbx-shell-pi kit integration](#sbx-shell-pi-kit-integration-in-progress).
+This dashboard is planned to be used as an external accessory of GEUT's factory. You can see more [here](https://github.com/geut/sbx-shell-pi) and [here](https://github.com/geut/factory-skills). How it ships into a factory sandbox is described in [sbx-shell-pi kit integration](#sbx-shell-pi-kit-integration).
 
 ## Stack
 
@@ -14,45 +14,38 @@ The stack is mostly: Svelte with SvelteKit (adapter-node), shadcn-svelte, Tailwi
 
 The dashboard is a client of the factory server API. Its SvelteKit server loads read tickets, executions, runs and agents from `FACTORY_API_URL` with a private token; the browser never sees the token. Commands and live updates over the factory's event stream are planned (see [ADR 0005](./docs/adr/0005-factory-api-client-and-command-center.md)).
 
-## sbx-shell-pi kit integration (in progress)
+## sbx-shell-pi kit integration
 
-> **Status: planned** — the mixin kit is not published yet. The shape below is the agreed integration; track it in [sbx-shell-pi PR #6](https://github.com/geut/sbx-shell-pi/pull/6).
+The dashboard ships as a v3 **mixin** kit, because a set has no Dockerfile and can only list published kits, so the dashboard's files need their own kit. [sbx-shell-pi](https://github.com/geut/sbx-shell-pi) may later publish a **set** (the factory workload plus this mixin) as one image to `sbx run`. Until that set exists, add the mixin with `--kit` on the factory workload.
 
-The dashboard ships as a v3 **mixin** kit, because a set has no Dockerfile and can only list published kits, so the dashboard's files need their own kit. [sbx-shell-pi](https://github.com/geut/sbx-shell-pi) then publishes a **set** (the factory workload plus this mixin) as one image to `sbx run`. Until that set exists, the mixin also works on its own with `--kit` on the factory workload.
+Reference: `ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0`. It may move to `ghcr.io/geut` later.
 
-Reference: `ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0`. It may move to `ghcr.io/geut` later.
-
-It requires `node >= 24` and [`io.github.geut/pi-factory >= 1`](https://github.com/geut/sbx-shell-pi#factory-contract). The workload's `pi-factory@1` was renamed into the `io.github.geut/` namespace, because bare names belong to Docker's `com.docker.kit/` vocabulary. It also needs sbx 0.47 or newer, because the factory workload declares `long-running@1`.
+It requires `node >= 24` and [`io.github.geut/pi-factory >= 1`](https://github.com/geut/sbx-shell-pi#factory-contract). The factory workload `ghcr.io/geut/sbx-shell-pi:node-24-factory` provides both. It also needs sbx 0.47 or newer, because the factory workload declares `long-running@1`.
 
 The dashboard relies on that [factory contract](https://github.com/geut/sbx-shell-pi#factory-contract): `factory-up` starts `factory serve` on container port `7731` (`0.0.0.0`) and writes `.factory/dashboard.env` (mode `0600`) with `FACTORY_API_URL` and an `act` `FACTORY_API_TOKEN` for the `dashboard` client.
 
-**Release.** Put the version on `main`, then create a `v*` tag on that commit. The tag must equal `v` plus the `version` default in [`kit/factory-dashboard/factory-dashboard.yaml`](kit/factory-dashboard/factory-dashboard.yaml). That default is `0.1.0-rc.1` until `0.1.0` is published. Pushing the tag does not publish. On `main`, run the [Release workflow](.github/workflows/release.yml) and enter the tag. The workflow checks that the tag points at a commit on `main` and matches that version, runs lint, typecheck, and tests, builds the app, and checks that `build/` imports nothing outside Node. It attaches `factory-dashboard-<version>.tgz` and `factory-dashboard-<version>.tgz.sha256` to the GitHub release, then pushes `ghcr.io/dpaez/sbx-kit-factory-dashboard:<version>` for `linux/amd64` and `linux/arm64`. There is no `latest` tag. After the first push, set the GHCR package to public so `sbx` can pull it without credentials.
+**Release.** Put the version on `main`, then create a `v*` tag on that commit. The tag must equal `v` plus the `version` default in [`kit/factory-dashboard/factory-dashboard.yaml`](kit/factory-dashboard/factory-dashboard.yaml). Pushing the tag does not publish. On `main`, run the [Release workflow](.github/workflows/release.yml) and enter the tag. The workflow checks that the tag points at a commit on `main` and matches that version, runs lint, typecheck, and tests, builds the app, and checks that `build/` imports nothing outside Node. It attaches `factory-dashboard-<version>.tgz` and `factory-dashboard-<version>.tgz.sha256` to the GitHub release, then pushes `ghcr.io/dpaez/sbx-kit-factory-dashboard:<version>` for `linux/amd64` and `linux/arm64`. There is no `latest` tag. After the first push, set the GHCR package to public so `sbx` can pull it without credentials.
 
-**Planned startup.** A background lifecycle startup hook launches the dashboard on every boot, beside Herdr. Herdr stays the entrypoint. The dashboard listens on container port `7732` (`HOST=0.0.0.0`), published as `factory-dashboard`. Until `factory-up` has run, it shows the configuration page telling you to run `factory-up`. After that, it reads `$WORKSPACE_DIR/.factory/dashboard.env` on each request, so a rotated token is picked up without a restart. Real environment variables take precedence.
+**Startup.** A background lifecycle startup hook launches the dashboard on every boot, beside Herdr. Herdr stays the entrypoint. The dashboard listens on container port `7732` (`HOST=0.0.0.0`), published as `factory-dashboard`. Until `factory-up` has run, it shows the configuration page telling you to run `factory-up`. After that, it reads `$WORKSPACE_DIR/.factory/dashboard.env` on each request, so a rotated token is picked up without a restart. Real environment variables take precedence.
 
-**Planned walkthrough**
+**Walkthrough**
 
-`ghcr.io/geut/sbx-shell-pi:node-24-factory` is the previous template image and does not work with this factory. Until [sbx-shell-pi PR #6](https://github.com/geut/sbx-shell-pi/pull/6) republishes the kits, run the workload from a local checkout of `dp/migrate-to-kits`. A local kit directory needs a `docker-container` Buildx builder, or the containerd image store. A published image does not.
-
-1. On the host, from a `geut/sbx-shell-pi` clone on `dp/migrate-to-kits`:
+1. On the host:
 
    ```bash
-   sbx run --name factory ./factory /path/to/project \
-     --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0
+   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
+     --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0
    ```
 
-   Once the set is published, a single image reference replaces this.
-
-   To try a kit change against an existing release, run this from the dashboard repo. The installed dashboard is still the release named in the kit descriptor:
+   To try a kit change against an existing release, run this from the dashboard repo. The installed dashboard is still the release named in the kit descriptor. A local kit directory needs a `docker-container` Buildx builder, or the containerd image store:
 
    ```bash
-   sbx run --name factory /path/to/sbx-shell-pi/factory /path/to/project \
+   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
      --kit ./kit/factory-dashboard
    ```
 
-2. In the sandbox, set up the factory in the repository so that `.factory/FACTORY.json` exists.
-3. In the sandbox, in a Herdr pane at the repository root: `factory-up`.
-4. On the host, run `sbx ports factory` to find the host port for `factory-dashboard`, then open it in a browser.
+2. In the sandbox, in a Herdr pane at the repository root: `factory-up`. It creates a starter `.factory/FACTORY.json` when the repository has none.
+3. On the host, run `sbx ports factory` to find the host port for `factory-dashboard`, then open it in a browser.
 
 The mixin set is fixed when the sandbox is created, so changing it means creating a new sandbox.
 

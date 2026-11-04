@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import readme from '../../../README.md?raw';
 
-// The README section is the shipped artifact for the sbx-shell-pi kit mixin integration, and the
-// integration is not published yet. These assertions keep the documented contract (planned marker,
-// mixin versus set, reference, startup, and walkthrough) from silently drifting.
-const sectionStart = readme.indexOf('## sbx-shell-pi kit integration (in progress)');
+// The README section is the shipped artifact for the sbx-shell-pi kit mixin integration. These
+// assertions keep the documented contract (mixin versus set, reference, startup, and walkthrough)
+// from silently drifting.
+const sectionStart = readme.indexOf('## sbx-shell-pi kit integration\n');
 const developmentStart = readme.indexOf('## Development');
 const section =
 	sectionStart === -1 || developmentStart === -1
@@ -17,23 +17,20 @@ describe('README sbx-shell-pi kit integration section', () => {
 		expect(developmentStart).toBeGreaterThan(sectionStart);
 	});
 
-	it('is marked planned and says the mixin is not published', () => {
-		expect(section).toMatch(/\*\*Status: planned\*\*/);
-		expect(section).toMatch(/not published yet/i);
-	});
-
-	it('links the upstream kits migration PR', () => {
-		expect(section).toContain('https://github.com/geut/sbx-shell-pi/pull/6');
+	it('no longer says the integration is planned or unpublished', () => {
+		expect(section).not.toMatch(/\*\*Status: planned\*\*/);
+		expect(section).not.toMatch(/not published yet/i);
+		expect(section).not.toContain('dp/migrate-to-kits');
 	});
 
 	it('explains mixin versus set', () => {
 		expect(section).toMatch(/v3 \*\*mixin\*\* kit/);
-		expect(section).toMatch(/publishes a \*\*set\*\*/);
+		expect(section).toMatch(/publish a \*\*set\*\*/);
 		expect(section).toMatch(/`--kit` on the factory workload/);
 	});
 
 	it('names the mixin reference and the factory contract', () => {
-		expect(section).toContain('`ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0`');
+		expect(section).toContain('`ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0`');
 		expect(section).toContain('`node >= 24`');
 		expect(section).toContain('`io.github.geut/pi-factory >= 1`');
 		expect(section).toContain('https://github.com/geut/sbx-shell-pi#factory-contract');
@@ -51,8 +48,8 @@ describe('README sbx-shell-pi kit integration section', () => {
 		expect(section).toMatch(/`dashboard` client/);
 	});
 
-	it('describes the planned startup', () => {
-		expect(section).toMatch(/\*\*Planned startup\.\*\*/);
+	it('describes the startup', () => {
+		expect(section).toMatch(/\*\*Startup\.\*\*/);
 		expect(section).toMatch(/Herdr stays the entrypoint/);
 		expect(section).toContain('container port `7732`');
 		expect(section).toContain('`HOST=0.0.0.0`');
@@ -71,13 +68,12 @@ describe('README sbx-shell-pi kit integration section', () => {
 		expect(section).toContain('kit/factory-dashboard/factory-dashboard.yaml');
 	});
 
-	it('shows the planned walkthrough against the local factory kit', () => {
-		expect(section).toMatch(/\*\*Planned walkthrough\*\*/);
-		expect(section).toContain('dp/migrate-to-kits');
-		expect(section).toContain('ghcr.io/geut/sbx-shell-pi:node-24-factory');
-		expect(section).toMatch(/does not work with this factory/);
-		expect(section).toContain('sbx run --name factory ./factory /path/to/project');
-		expect(section).toContain('--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0');
+	it('shows the walkthrough against the published factory kit', () => {
+		expect(section).toMatch(/\*\*Walkthrough\*\*/);
+		expect(section).toContain(
+			'sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project'
+		);
+		expect(section).toContain('--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0');
 		expect(section).toContain('--kit ./kit/factory-dashboard');
 		expect(section).toContain('`.factory/FACTORY.json`');
 		expect(section).toContain('`factory-up`');
@@ -91,6 +87,6 @@ describe('README sbx-shell-pi kit integration section', () => {
 	});
 
 	it('is reachable from the "Who this is for" section', () => {
-		expect(readme).toContain('](#sbx-shell-pi-kit-integration-in-progress)');
+		expect(readme).toContain('](#sbx-shell-pi-kit-integration)');
 	});
 });

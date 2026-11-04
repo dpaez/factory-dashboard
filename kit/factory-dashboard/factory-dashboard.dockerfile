@@ -3,7 +3,7 @@
 # files, so a multi-platform build needs no QEMU.
 FROM --platform=$BUILDPLATFORM debian:trixie-slim AS download
 
-ARG DASHBOARD_VERSION=0.1.0-rc.1
+ARG DASHBOARD_VERSION=0.2.0
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
