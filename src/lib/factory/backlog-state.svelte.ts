@@ -1,8 +1,8 @@
 /**
  * The Flow board page's backlog: seeded from the root load's streamed result,
  * re-read through `/api/factory/backlog` for Refresh and Retry. A failed read
- * keeps the previous issues and their `fetchedAt`; Retry repeats the last
- * attempt. Owned by the page; the lane only receives its values.
+ * keeps the previous issues and their `fetchedAt`; Retry, like Refresh, asks
+ * the tracker again. Owned by the page; the lane only receives its values.
  */
 import {
 	backlogFailureReason,
@@ -65,7 +65,6 @@ export class BacklogState {
 	);
 
 	#fetch: Fetch;
-	#lastRefresh = false;
 	#generation = 0;
 
 	constructor(fetch: Fetch = (input, init) => globalThis.fetch(input, init)) {
@@ -75,7 +74,6 @@ export class BacklogState {
 	/** Apply the root load's streamed result. A newer refresh wins over it. */
 	seed(result: Promise<BacklogResult>): void {
 		const generation = ++this.#generation;
-		this.#lastRefresh = false;
 		result.then(
 			(value) => generation === this.#generation && this.#apply(value),
 			() => generation === this.#generation && this.#apply({ ok: false, failure: UNREADABLE })
@@ -87,14 +85,16 @@ export class BacklogState {
 		return this.#read(true);
 	}
 
-	/** Repeat the last attempt: the initial read or a refresh. */
+	/**
+	 * Ask the tracker again after a failed read, whether the initial load or a
+	 * refresh failed, so a fixed tracker is not answered from the factory's cache.
+	 */
 	retry(): Promise<void> {
-		return this.#read(this.#lastRefresh);
+		return this.#read(true);
 	}
 
 	async #read(refresh: boolean): Promise<void> {
 		const generation = ++this.#generation;
-		this.#lastRefresh = refresh;
 		this.refreshing = true;
 		let result: BacklogResult;
 		try {

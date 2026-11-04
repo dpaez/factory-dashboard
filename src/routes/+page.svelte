@@ -314,7 +314,7 @@
 						bind:label={backlogState.label}
 						fetchedAt={backlogState.fetchedAt}
 						status={backlogState.status}
-						failure={backlogState.reason}
+						failure={backlogState.failure}
 						refreshing={backlogState.refreshing}
 						complete={backlogState.complete}
 						selectedId={selectedIssueId}

@@ -249,8 +249,9 @@ test('an unknown key shows not found while the board keeps working', async ({ pa
 	await expect(inspector(page).getByRole('heading', { name: 'No such ticket' })).toBeVisible();
 	await shot('inspector-not-found');
 
-	// The board still selects.
-	await card(page, WORK.key).click();
+	// The board still selects. The open drawer covers the card, so select it by keyboard.
+	await card(page, WORK.key).focus();
+	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(board(WORK.key));
 	await expect(inspector(page)).toHaveAttribute('data-state', 'loaded');
 });

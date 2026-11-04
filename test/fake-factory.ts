@@ -287,6 +287,8 @@ export type FakeFactoryOptions = {
 	failBacklog?: Problem;
 	/** Answer this problem for `GET /v1/backlog?refresh=true` only. */
 	failBacklogOnRefresh?: Problem;
+	/** Answer this problem for a first `GET /v1/backlog` page without `refresh=true`: a cached failure. */
+	failBacklogCached?: Problem;
 	/** The `fetchedAt` a `?refresh=true` page answers (default: the fixed time). */
 	backlogRefreshedAt?: string;
 	/** Issues a `?refresh=true` read lists, and every read after it (default: `backlog`). */
@@ -770,6 +772,13 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 			if (options.failBacklog) return problem(options.failBacklog);
 			if (options.failBacklogOnRefresh && url.searchParams.get('refresh') === 'true') {
 				return problem(options.failBacklogOnRefresh);
+			}
+			if (
+				options.failBacklogCached &&
+				url.searchParams.get('refresh') !== 'true' &&
+				!url.searchParams.has('cursor')
+			) {
+				return problem(options.failBacklogCached);
 			}
 			const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), FAKE_PAGE_SIZE);
 			const start = Number(url.searchParams.get('cursor') ?? 0);

@@ -6,7 +6,7 @@ import type { RequestHandler } from './$types';
 /**
  * The Backlog lane's Refresh and Retry: the same safe result the root load
  * streams, with status 200 or the normalized failure status. `?refresh=true`
- * asks the tracker again. Read-only: GET is the only verb (ADR 0005).
+ * asks the tracker again; Refresh and Retry both send it. Read-only: GET is the only verb (ADR 0005).
  */
 export const GET: RequestHandler = async ({ fetch, url }) => {
 	const refresh = url.searchParams.get('refresh') === 'true';
