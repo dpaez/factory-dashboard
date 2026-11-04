@@ -194,7 +194,9 @@ test('changing the execution or the ticket clears run; Close clears it too', asy
 	// Another ticket on the board.
 	await page.goto(board(KEY, `&tab=evidence&run=${encodeURIComponent(REVIEW)}`));
 	await expect(evidence(page)).toHaveAttribute('data-state', 'loaded');
-	await card(page, MULTI).click();
+	// The open drawer covers the card, so select it by keyboard.
+	await card(page, MULTI).focus();
+	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(board(MULTI));
 
 	// The board's execution links drop the run, and following one clears it.

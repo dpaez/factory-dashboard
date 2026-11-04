@@ -119,3 +119,135 @@ export type BacklogResult =
 export function backlogFailureReason(failure: BacklogFailure): string {
 	return failure.detail ? `${failure.title}. ${failure.detail}` : `${failure.title}.`;
 }
+
+/**
+ * What a backlog failure means for the operator. The factory sends every
+ * tracker error as `tracker_unavailable` with the raw `gh` output as detail,
+ * so the kind is read from that detail (until geut/factory-skills#103 adds a
+ * reason field). Precedence: no tracker, missing CLI, 401, 403, 404, unknown.
+ */
+export type BacklogFailureKind =
+	'no_tracker' | 'cli_missing' | 'unauthorized' | 'forbidden' | 'not_found' | 'unknown';
+
+/**
+ * The lane's failure display model. `message` and `action` mark inline code
+ * with backticks (see `codeSegments`). `reason` is the one-line fallback for
+ * an unknown failure. `detail` is the raw detail, unescaped and with a JSON
+ * body pretty-printed; null when the failure has none.
+ */
+export type BacklogFailureView = {
+	kind: BacklogFailureKind;
+	message: string;
+	action: string | null;
+	reason: string | null;
+	detail: string | null;
+};
+
+const NO_TRACKER = /FACTORY\.json has no tracker/;
+const CLI_MISSING = /gh: command not found|\bENOENT\b/;
+const UNAUTHORIZED = /\b401\b|Bad credentials/;
+const FORBIDDEN = /\b403\b|rate limit/i;
+const NOT_FOUND = /\b404\b|Could not resolve/;
+
+const KNOWN: Record<Exclude<BacklogFailureKind, 'unknown'>, { message: string; action: string }> = {
+	no_tracker: {
+		message: 'No tracker configured.',
+		action: 'Add `tracker` to `.factory/FACTORY.json`.'
+	},
+	cli_missing: {
+		message: "The factory server can't find `gh`.",
+		action: 'Install the GitHub CLI where the server runs.'
+	},
+	unauthorized: {
+		message: 'GitHub rejected the credentials the factory server uses.',
+		action:
+			'Run `gh api graphql -f query=\'{ viewer { login } }\'` in the sandbox (`gh auth status` says "not logged in" in sbx even when the proxy injects credentials). ' +
+			'If it fails, set the token on the host: `sbx secret set github --sandbox <name> -t "$(gh auth token)"`. ' +
+			'If it works, a stale `gh` cache is replaying an old 401: clear `~/.cache/gh` (`rm -rf ~/.cache/gh`).'
+	},
+	forbidden: {
+		message: 'GitHub refused the request (rate limit or missing scope).',
+		action: 'The token needs `repo` read access. Try again later if rate limited.'
+	},
+	not_found: {
+		message: "The tracker repository wasn't found.",
+		action: 'Check `tracker.owner` / `tracker.repo` in `.factory/FACTORY.json`.'
+	}
+};
+
+function kindOf(failure: BacklogFailure): BacklogFailureKind {
+	const detail = failure.detail;
+	// Only tracker errors carry gh output; a 401 from the factory itself is not GitHub's.
+	if (failure.type !== 'tracker_unavailable' || !detail) return 'unknown';
+	if (NO_TRACKER.test(detail)) return 'no_tracker';
+	if (CLI_MISSING.test(detail)) return 'cli_missing';
+	if (UNAUTHORIZED.test(detail)) return 'unauthorized';
+	if (FORBIDDEN.test(detail)) return 'forbidden';
+	if (NOT_FOUND.test(detail)) return 'not_found';
+	return 'unknown';
+}
+
+const ESCAPES: Record<string, string> = {
+	'r\\n': '\n',
+	n: '\n',
+	r: '\n',
+	t: '\t',
+	'"': '"',
+	'\\': '\\'
+};
+
+/**
+ * A raw tracker detail made readable: Go-quoted escapes (`\r\n`, `\n`, `\"`,
+ * `\\`) become the characters they stand for, and a JSON body after `body: `
+ * is pretty-printed. A body that is not JSON stays as is.
+ */
+export function readableDetail(detail: string): string {
+	const marker = detail.indexOf('body: ');
+	const parsed = marker === -1 ? null : jsonBody(detail.slice(marker + 'body: '.length).trim());
+	if (parsed === null) return unescapeGo(detail);
+	const head = unescapeGo(detail.slice(0, marker)).trimEnd();
+	return `${head}\nbody:\n${JSON.stringify(parsed, null, 2)}`;
+}
+
+/** Go-quoted escapes in display text turned into the characters they stand for. */
+function unescapeGo(text: string): string {
+	return text.replace(/\\(r\\n|n|r|t|"|\\)/g, (_, escape: string) => ESCAPES[escape]!);
+}
+
+/**
+ * A raw body parsed as a JSON object or array, or null. A Go-quoted body is
+ * unquoted once first, so the JSON's own escapes survive until it is parsed.
+ */
+function jsonBody(raw: string): object | null {
+	try {
+		let value: unknown = JSON.parse(raw);
+		if (typeof value === 'string') value = JSON.parse(value);
+		return typeof value === 'object' && value !== null ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Classify a backlog failure into the message, action and detail the lane shows. */
+export function describeBacklogFailure(failure: BacklogFailure): BacklogFailureView {
+	const kind = kindOf(failure);
+	const detail = failure.detail ? readableDetail(failure.detail) : null;
+	if (kind === 'unknown') {
+		return {
+			kind,
+			message: 'Backlog unavailable.',
+			action: null,
+			reason: backlogFailureReason(failure),
+			detail
+		};
+	}
+	return { kind, ...KNOWN[kind], reason: null, detail };
+}
+
+/** Text split on backticks: odd segments are inline code. */
+export function codeSegments(text: string): { text: string; code: boolean }[] {
+	return text
+		.split('`')
+		.map((part, index) => ({ text: part, code: index % 2 === 1 }))
+		.filter((segment) => segment.text !== '');
+}

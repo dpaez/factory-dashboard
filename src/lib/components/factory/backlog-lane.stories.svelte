@@ -2,12 +2,18 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect, fn, userEvent, within } from 'storybook/test';
 	import BacklogLane from './backlog-lane.svelte';
-	import { toBacklogCards } from '$lib/factory/backlog';
+	import { toBacklogCards, type BacklogFailure } from '$lib/factory/backlog';
 	import {
 		backlogIssues,
 		backlogPage,
 		backlogPageLast,
-		problemTrackerUnavailable
+		problemNoTracker,
+		problemTrackerCliMissing,
+		problemTrackerForbidden,
+		problemTrackerNotFound,
+		problemTrackerUnauthorized,
+		problemTrackerUnavailable,
+		problemTrackerUnknown
 	} from '$lib/factory/fixtures';
 
 	// Stories render twice (light and dark panes); queries use the first pane.
@@ -20,7 +26,32 @@
 
 	const cards = toBacklogCards(backlogIssues);
 	const fetchedAt = backlogPage.fetchedAt;
-	const reason = `${problemTrackerUnavailable.title}. ${problemTrackerUnavailable.detail}`;
+	const asFailure = (problem: { type: string; title: string; detail: string }): BacklogFailure => ({
+		type: problem.type,
+		title: problem.title,
+		detail: problem.detail,
+		retryable: true
+	});
+	const reason = asFailure(problemTrackerUnavailable);
+
+	/**
+	 * The failure's Details disclosure: closed, focusable (a native summary is
+	 * keyboard-operable), then opened. Synthetic keys do not run the summary's
+	 * activation, so the story opens it with a click.
+	 */
+	async function openDetails(pane: HTMLElement) {
+		const details = pane.querySelector<HTMLDetailsElement>(
+			'[data-slot="backlog-failure-details"]'
+		)!;
+		await expect(details).not.toHaveAttribute('open');
+		await expect(pane.querySelector('[data-slot="backlog-failure-detail"]')).not.toBeVisible();
+		const summary = within(details).getByText('Details');
+		summary.focus();
+		await expect(summary).toHaveFocus();
+		await userEvent.click(summary);
+		await expect(details).toHaveAttribute('open');
+		return pane.querySelector<HTMLElement>('[data-slot="backlog-failure-detail"]')!;
+	}
 
 	const { Story } = defineMeta({
 		title: 'Components/Factory/BacklogLane',
@@ -215,5 +246,153 @@
 		await expect(pane.querySelector('[data-slot="backlog-partial"]')).toHaveTextContent(
 			'Partial list'
 		);
+	}}
+/>
+
+<Story
+	name="Tracker rejected the credentials"
+	args={{
+		cards: [],
+		fetchedAt: null,
+		status: 'failed',
+		failure: asFailure(problemTrackerUnauthorized)
+	}}
+	play={async ({ canvasElement, args }) => {
+		const pane = firstPane(canvasElement);
+		const alert = within(pane).getByRole('alert');
+		const message = pane.querySelector('[data-slot="backlog-failure-message"]')!;
+		await expect(message).toHaveTextContent(
+			'GitHub rejected the credentials the factory server uses.'
+		);
+		await expect(message).not.toHaveTextContent('non-200');
+		const action = pane.querySelector('[data-slot="backlog-failure-action"]')!;
+		const codes = [...action.querySelectorAll('code')].map((code) => code.textContent);
+		await expect(codes).toContain("gh api graphql -f query='{ viewer { login } }'");
+		await expect(codes).toContain('sbx secret set github --sandbox <name> -t "$(gh auth token)"');
+		await expect(codes).toContain('rm -rf ~/.cache/gh');
+		await expect(action).toHaveTextContent('"not logged in"');
+
+		const detail = await openDetails(pane);
+		await expect(detail).toBeVisible();
+		await expect(detail.textContent).toContain('"message": "Bad credentials",');
+		await expect(detail.textContent).not.toContain('\\r\\n');
+		await expect(detail.textContent).not.toContain('\\"');
+		await expect(detail.textContent).toContain('{\n  "message"');
+
+		await userEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+		await expect(args.onretry).toHaveBeenCalledTimes(1);
+	}}
+/>
+
+<Story
+	name="Tracker refused the request"
+	args={{
+		cards: [],
+		fetchedAt: null,
+		status: 'failed',
+		failure: asFailure(problemTrackerForbidden)
+	}}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-slot="backlog-failure-message"]')).toHaveTextContent(
+			'GitHub refused the request (rate limit or missing scope).'
+		);
+		await expect(pane.querySelector('[data-slot="backlog-failure-action"]')).toHaveTextContent(
+			'The token needs repo read access. Try again later if rate limited.'
+		);
+		const detail = await openDetails(pane);
+		await expect(detail).toHaveTextContent(problemTrackerForbidden.detail);
+		await expect(within(pane).getByRole('button', { name: 'Retry' })).toBeEnabled();
+	}}
+/>
+
+<Story
+	name="Tracker repository not found"
+	args={{
+		cards: [],
+		fetchedAt: null,
+		status: 'failed',
+		failure: asFailure(problemTrackerNotFound)
+	}}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-slot="backlog-failure-message"]')).toHaveTextContent(
+			"The tracker repository wasn't found."
+		);
+		await expect(pane.querySelector('[data-slot="backlog-failure-action"]')).toHaveTextContent(
+			'Check tracker.owner / tracker.repo in .factory/FACTORY.json.'
+		);
+		const detail = await openDetails(pane);
+		await expect(detail).toHaveTextContent(problemTrackerNotFound.detail);
+	}}
+/>
+
+<Story
+	name="gh missing on the factory server"
+	args={{
+		cards: [],
+		fetchedAt: null,
+		status: 'failed',
+		failure: asFailure(problemTrackerCliMissing)
+	}}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(pane.querySelector('[data-slot="backlog-failure-message"]')).toHaveTextContent(
+			"The factory server can't find gh."
+		);
+		await expect(pane.querySelector('[data-slot="backlog-failure-action"]')).toHaveTextContent(
+			'Install the GitHub CLI where the server runs.'
+		);
+		const detail = await openDetails(pane);
+		await expect(detail).toHaveTextContent('spawn gh ENOENT');
+	}}
+/>
+
+<Story
+	name="Unknown tracker failure"
+	args={{ cards: [], fetchedAt: null, status: 'failed', failure: asFailure(problemTrackerUnknown) }}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const message = pane.querySelector('[data-slot="backlog-failure-message"]')!;
+		await expect(message).toHaveTextContent('Backlog unavailable.');
+		await expect(message).toHaveTextContent(problemTrackerUnknown.detail);
+		await expect(pane.querySelector('[data-slot="backlog-failure-action"]')).toBeNull();
+		const detail = await openDetails(pane);
+		await expect(detail).toHaveTextContent(problemTrackerUnknown.detail);
+	}}
+/>
+
+<Story
+	name="No tracker configured"
+	args={{ cards: [], fetchedAt: null, status: 'failed', failure: asFailure(problemNoTracker) }}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		await expect(within(pane).queryByRole('alert')).toBeNull();
+		await expect(pane.querySelector('[data-slot="backlog-failure"]')).toBeNull();
+		await expect(pane.querySelector('[data-slot="backlog-no-tracker"]')).toHaveTextContent(
+			'No tracker configured. Add tracker to .factory/FACTORY.json.'
+		);
+		await expect(pane).not.toHaveTextContent('Backlog unavailable.');
+		await expect(pane).not.toHaveTextContent('FACTORY.json has no tracker');
+		await expect(pane).not.toHaveTextContent('Backlog clear.');
+	}}
+/>
+
+<Story
+	name="Rejected credentials with stale issues"
+	args={{ status: 'failed', failure: asFailure(problemTrackerUnauthorized) }}
+	play={async ({ canvasElement, args }) => {
+		const pane = firstPane(canvasElement);
+		const alert = within(pane).getByRole('alert');
+		await expect(alert).toHaveTextContent(
+			'GitHub rejected the credentials the factory server uses.'
+		);
+		await expect(alert).toHaveTextContent('Showing issues from 2026-10-13 11:00 UTC');
+		await expect(cardIds(pane)).toHaveLength(cards.length);
+		await expect(pane.querySelector('[data-slot="backlog-failure-details"]')).not.toHaveAttribute(
+			'open'
+		);
+		await userEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+		await expect(args.onretry).toHaveBeenCalledTimes(1);
 	}}
 />

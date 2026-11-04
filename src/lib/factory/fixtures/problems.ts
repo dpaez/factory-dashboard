@@ -103,3 +103,59 @@ export const problemReplyValidationError = {
 	type: 'validation_error',
 	errors: [{ path: 'body.answer', message: 'Must not be empty.' }]
 } satisfies Problem;
+
+/*
+ * Backlog read failures as the factory sends them: every tracker error is
+ * `tracker_unavailable` (502) whose `detail` is gh's raw output, Go-quoted
+ * (the backslashes below are literal characters in the detail).
+ */
+
+/** gh's answer to a rejected token (the sample from dpaez/factory-dashboard#65). */
+export const problemTrackerUnauthorized = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail:
+		'non-200 OK status code: 401 Unauthorized body: "{\\r\\n  \\"message\\": \\"Bad credentials\\",\\r\\n  \\"documentation_url\\": \\"https://docs.github.com/rest\\",\\r\\n  \\"status\\": \\"401\\"\\r\\n}"'
+} satisfies Problem;
+
+/** gh rate limited or missing a scope. */
+export const problemTrackerForbidden = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail: 'GraphQL: API rate limit exceeded for user ID 1234. (HTTP 403)'
+} satisfies Problem;
+
+/** The tracker repository does not resolve. */
+export const problemTrackerNotFound = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail:
+		"GraphQL: Could not resolve to a Repository with the name 'dpaez/missing-repo'. (repository)"
+} satisfies Problem;
+
+/** The factory server has no `gh` on its PATH. */
+export const problemTrackerCliMissing = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail: 'spawn gh ENOENT'
+} satisfies Problem;
+
+/** A tracker error the dashboard does not recognize. */
+export const problemTrackerUnknown = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail: 'unexpected EOF while reading the GraphQL response'
+} satisfies Problem;
+
+/** `FACTORY.json` has no `tracker` (factory-skills `src/controller/service.ts`). */
+export const problemNoTracker = {
+	status: 502,
+	title: 'Tracker unavailable',
+	type: 'tracker_unavailable',
+	detail: 'FACTORY.json has no tracker, so there is no backlog.'
+} satisfies Problem;

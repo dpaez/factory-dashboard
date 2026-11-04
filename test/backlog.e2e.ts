@@ -8,7 +8,11 @@ import {
 	backlogIssueWithDetails,
 	backlogIssues
 } from '../src/lib/factory/fixtures/backlog.ts';
-import { problemTrackerUnavailable } from '../src/lib/factory/fixtures/problems.ts';
+import {
+	problemNoTracker,
+	problemTrackerUnauthorized,
+	problemTrackerUnavailable
+} from '../src/lib/factory/fixtures/problems.ts';
 import { agentList, openTickets } from './fake-factory.ts';
 import { expect, gotoLive, test, type FakeFixture } from './fixtures.ts';
 
@@ -121,9 +125,117 @@ test.describe('the backlog read fails', () => {
 		await shot('backlog-lane-failed');
 
 		const before = fake.requests().length;
+		const retried = page.waitForRequest((r) =>
+			new URL(r.url()).pathname.startsWith('/api/factory/backlog')
+		);
 		await failure(page).getByRole('button', { name: 'Retry' }).click();
-		await expect.poll(() => backlogReads(fake, false, before).length).toBeGreaterThan(0);
+		expect(new URL((await retried).url()).search).toBe('?refresh=true');
+		await expect.poll(() => backlogReads(fake, true, before).length).toBeGreaterThan(0);
+		expect(backlogReads(fake, false, before)).toEqual([]);
 		await expect(failure(page)).toBeVisible();
+	});
+});
+
+test.describe('the factory cached a failed backlog read', () => {
+	test.use({
+		fakeOptions: {
+			failBacklogCached: problemTrackerUnavailable,
+			backlogRefreshedAt: '2026-10-15T09:45:00Z'
+		}
+	});
+
+	test('Retry asks the tracker again and replaces the failure with the issues and timestamp', async ({
+		page,
+		fake,
+		shot
+	}) => {
+		await gotoLive(page, '/');
+		await expect(failure(page)).toContainText('Backlog unavailable.');
+		await expect(updated(page)).toHaveCount(0);
+
+		const before = fake.requests().length;
+		await failure(page).getByRole('button', { name: 'Retry' }).click();
+		await expect(failure(page)).toHaveCount(0);
+		await expect(issueCards(page)).toHaveCount(backlogIssues.length);
+		await expect(updated(page)).toHaveText('Updated 2026-10-15 09:45 UTC');
+		await expect(summaryItem(page, 'ready-to-start')).toHaveText(
+			new RegExp(`^\\s*${READY}\\s+ready to start\\s*$`)
+		);
+		expect(backlogReads(fake, true, before).length).toBeGreaterThan(0);
+		await shot('ac3-backlog-retry-recovered');
+	});
+});
+
+test.describe('the tracker rejects the credentials', () => {
+	test.use({ fakeOptions: { failBacklog: problemTrackerUnauthorized } });
+
+	test('the lane says what to do, and Details opens the unescaped gh output', async ({
+		page,
+		request,
+		fake,
+		shot
+	}) => {
+		await gotoLive(page, '/');
+		const message = failure(page).locator('[data-slot="backlog-failure-message"]');
+		await expect(message).toHaveText('GitHub rejected the credentials the factory server uses.');
+		await expect(backlog(page).getByRole('alert')).toBeVisible();
+		const action = failure(page).locator('[data-slot="backlog-failure-action"]');
+		await expect(action).toContainText("gh api graphql -f query='{ viewer { login } }'");
+		await expect(action).toContainText('sbx secret set github');
+		await expect(action).toContainText('rm -rf ~/.cache/gh');
+		await expect(failure(page).getByRole('button', { name: 'Retry' })).toBeVisible();
+
+		const details = failure(page).locator('details');
+		const raw = details.locator('pre');
+		await expect(details).not.toHaveAttribute('open');
+		await expect(raw).toBeHidden();
+		await shot('ac1-backlog-unauthorized');
+
+		await details.getByText('Details', { exact: true }).click();
+		await expect(raw).toBeVisible();
+		const text = (await raw.textContent()) ?? '';
+		expect(text).toContain('401 Unauthorized');
+		expect(text).toContain('{\n  "message": "Bad credentials",\n  "documentation_url"');
+		expect(text).not.toContain('\\r\\n');
+		expect(text).not.toContain('\\"');
+		await shot('ac6-backlog-details-open');
+
+		// Neither the page nor the API names the factory in this failure.
+		const html = await page.content();
+		const api = await (await request.get('/api/factory/backlog')).text();
+		for (const body of [html, api]) {
+			expect(body).not.toContain(fake.token);
+			expect(body).not.toContain(fake.url);
+			expect(body).not.toContain('127.0.0.1');
+		}
+	});
+});
+
+test.describe('the factory has no tracker', () => {
+	test.use({ fakeOptions: { failBacklog: problemNoTracker } });
+
+	test('the lane shows the no-tracker empty state, not an error', async ({
+		page,
+		request,
+		fake,
+		shot
+	}) => {
+		await gotoLive(page, '/');
+		await expect(backlog(page)).toContainText(
+			'No tracker configured. Add tracker to .factory/FACTORY.json.'
+		);
+		await expect(backlog(page).getByRole('alert')).toHaveCount(0);
+		await expect(failure(page)).toHaveCount(0);
+		await expect(backlog(page)).not.toContainText('Backlog unavailable.');
+		await expect(backlog(page)).not.toContainText('FACTORY.json has no tracker');
+		await expect(page.locator('[data-slot="ticket-card"]')).toHaveCount(onBoard.length);
+		await shot('ac7-backlog-no-tracker');
+
+		const api = await (await request.get('/api/factory/backlog')).text();
+		for (const body of [await page.content(), api]) {
+			expect(body).not.toContain(fake.token);
+			expect(body).not.toContain(fake.url);
+		}
 	});
 });
 
@@ -148,8 +260,13 @@ test.describe('a refresh fails after a successful read', () => {
 		await shot('backlog-lane-stale');
 
 		const before = fake.requests().length;
+		const retried = page.waitForRequest((r) =>
+			new URL(r.url()).pathname.startsWith('/api/factory/backlog')
+		);
 		await failure(page).getByRole('button', { name: 'Retry' }).click();
+		expect(new URL((await retried).url()).search).toBe('?refresh=true');
 		await expect.poll(() => backlogReads(fake, true, before).length).toBe(1);
+		await shot('ac2-backlog-retry-after-refresh');
 	});
 });
 

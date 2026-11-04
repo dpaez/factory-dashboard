@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
-	import { backlogLabels, filterByLabel, type BacklogCardModel } from '$lib/factory/backlog';
+	import {
+		backlogLabels,
+		codeSegments,
+		describeBacklogFailure,
+		filterByLabel,
+		type BacklogCardModel,
+		type BacklogFailure
+	} from '$lib/factory/backlog';
 	import { formatTimestamp } from '$lib/factory/format';
 	import { Button } from '$lib/components/ui/button';
 	import BacklogCard from './backlog-card.svelte';
@@ -43,8 +50,8 @@
 		/** When the tracker was last asked. */
 		fetchedAt?: string | null;
 		status: 'loading' | 'ready' | 'failed';
-		/** The reason the latest read failed. */
-		failure?: string | null;
+		/** Why the latest read failed. The lane turns it into a message and an action. */
+		failure?: BacklogFailure | null;
 		refreshing?: boolean;
 		/** False when the pager stopped before the end of the backlog. */
 		complete?: boolean;
@@ -71,6 +78,9 @@
 	const headingId = `${uid}-heading`;
 	const filterId = `${uid}-filter`;
 
+	const failureView = $derived(failure === null ? null : describeBacklogFailure(failure));
+	const noTracker = $derived(failureView?.kind === 'no_tracker');
+
 	const showCards = $derived(status === 'ready' || (status === 'failed' && cards.length > 0));
 
 	let opened = $state(false);
@@ -83,6 +93,21 @@
 		onfilter?.(label);
 	}
 </script>
+
+{#snippet copy(text: string)}
+	{#each codeSegments(text) as segment, index (index)}
+		{#if segment.code}<code class="font-mono break-all text-foreground">{segment.text}</code
+			>{:else}{segment.text}{/if}
+	{/each}
+{/snippet}
+
+{#snippet stale()}
+	{#if cards.length > 0 && fetchedAt !== null}
+		<p class="text-foreground/75">
+			Showing issues from <span class="font-mono tabular-nums">{formatTimestamp(fetchedAt)}</span>
+		</p>
+	{/if}
+{/snippet}
 
 <div
 	role="group"
@@ -161,22 +186,51 @@
 	</div>
 
 	<LaneScroll>
-		{#if status === 'failed'}
+		{#if status === 'failed' && noTracker && failureView}
+			<div
+				data-slot="backlog-no-tracker"
+				class="flex flex-col gap-2 p-3 text-xs text-foreground/75 ring-1 ring-foreground/10 ring-inset"
+			>
+				<p>
+					{failureView.message}
+					{@render copy(failureView.action ?? '')}
+				</p>
+				{@render stale()}
+			</div>
+		{:else if status === 'failed'}
 			<div
 				role="alert"
 				data-slot="backlog-failure"
+				data-kind={failureView?.kind ?? 'unknown'}
 				class="flex flex-col gap-2 bg-background p-3 text-xs"
 			>
-				<p class="text-foreground">
-					<span class="font-medium">Backlog unavailable.</span>
-					{failure ?? 'The tracker did not answer.'}
+				<p data-slot="backlog-failure-message" class="text-foreground">
+					{#if failureView === null}
+						<span class="font-medium">Backlog unavailable.</span>
+						The tracker did not answer.
+					{:else if failureView.reason !== null}
+						<span class="font-medium">{failureView.message}</span>
+						{failureView.reason}
+					{:else}
+						<span class="font-medium">{@render copy(failureView.message)}</span>
+					{/if}
 				</p>
-				{#if cards.length > 0 && fetchedAt !== null}
-					<p class="text-foreground/75">
-						Showing issues from <span class="font-mono tabular-nums"
-							>{formatTimestamp(fetchedAt)}</span
-						>
+				{#if failureView?.action}
+					<p data-slot="backlog-failure-action" class="text-foreground/75">
+						{@render copy(failureView.action)}
 					</p>
+				{/if}
+				{@render stale()}
+				{#if failureView?.detail}
+					<details data-slot="backlog-failure-details" class="text-foreground/75">
+						<summary
+							class="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+							>Details</summary
+						>
+						<pre
+							data-slot="backlog-failure-detail"
+							class="mt-1 max-h-48 overflow-auto bg-muted p-2 font-mono text-[0.625rem] whitespace-pre-wrap text-foreground">{failureView.detail}</pre>
+					</details>
 				{/if}
 				<Button
 					variant="outline"

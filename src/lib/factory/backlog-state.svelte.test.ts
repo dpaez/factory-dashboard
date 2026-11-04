@@ -36,7 +36,7 @@ describe('BacklogState', () => {
 		expect(state.readyToStart).toBe(1);
 	});
 
-	it('keeps stale issues after a failed refresh, and Retry repeats the refresh', async () => {
+	it('keeps stale issues after a failed refresh, and Retry asks the tracker again', async () => {
 		const { fetch, urls } = fakeFetch([failed, ok([backlogIssuePlain])]);
 		const state = new BacklogState(fetch);
 		const seed = Promise.resolve(ok());
@@ -61,7 +61,7 @@ describe('BacklogState', () => {
 		expect(state.refreshing).toBe(false);
 	});
 
-	it('Retry after a failed initial read re-reads without refresh', async () => {
+	it('Retry after a failed initial read asks the tracker again', async () => {
 		const { fetch, urls } = fakeFetch([ok()]);
 		const state = new BacklogState(fetch);
 		const seed = Promise.resolve(failed);
@@ -70,9 +70,14 @@ describe('BacklogState', () => {
 		await Promise.resolve();
 		expect(state.status).toBe('failed');
 		expect(state.cards).toHaveLength(0);
+		expect(state.fetchedAt).toBeNull();
 		await state.retry();
-		expect(urls).toEqual(['/api/factory/backlog']);
+		expect(urls).toEqual(['/api/factory/backlog?refresh=true']);
 		expect(state.status).toBe('ready');
+		expect(state.failure).toBeNull();
+		expect(state.reason).toBeNull();
+		expect(state.cards).toHaveLength(3);
+		expect(state.fetchedAt).toBe('2026-10-13T11:00:00Z');
 	});
 
 	it('a refresh that drops the selected label clears the filter; one that keeps it keeps it', async () => {
