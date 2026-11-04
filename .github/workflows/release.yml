@@ -26,9 +26,16 @@ jobs:
     steps:
       # Check out main first so the CI action below is the copy on main.
       # The tagged commit is checked out into release-src and is what gets tested.
+      # Only .github/ is checked out here: with main's tsconfig.json above
+      # release-src, Vite's tsconfig lookup climbs to it, finds no generated
+      # .svelte-kit/, and the build fails with "Tsconfig not found". The git
+      # checks below read objects, so they need the history but not the files.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          sparse-checkout: |
+            /.github/
+          sparse-checkout-cone-mode: false
 
       - name: Check the tag
         id: version
