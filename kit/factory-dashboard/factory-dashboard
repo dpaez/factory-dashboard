@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Starts the dashboard on port 7732. A startup hook runs this on every boot, so
+# a dashboard that already answers, or one this script already launched, is
+# left alone.
+set -euo pipefail
+
+port=7732
+
+if curl -fsS --max-time 2 "http://127.0.0.1:${port}/" >/dev/null 2>&1; then
+  exit 0
+fi
+
+state="${HOME}/.local/state/factory-dashboard"
+mkdir -p "$state"
+log="${state}/dashboard.log"
+
+exec 9>"${state}/dashboard.lock"
+if ! flock -n 9; then
+  exit 0
+fi
+
+if curl -fsS --max-time 2 "http://127.0.0.1:${port}/" >/dev/null 2>&1; then
+  exit 0
+fi
+
+export HOST=0.0.0.0
+export PORT="${port}"
+# Leave FACTORY_DASHBOARD_ENV_FILE untouched. When it is unset, the app reads
+# $WORKSPACE_DIR/.factory/dashboard.env. Leave ORIGIN unset too: sbx chooses
+# the host port, and adapter-node takes the origin from the request.
+
+while true; do
+  node /opt/factory-dashboard/build >>"$log" 2>&1 || true
+  printf '%s dashboard exited; restarting in 2s\n' "$(date -Is)" >>"$log"
+  sleep 2
+done

@@ -1,0 +1,70 @@
+name: CI suite
+description: Install dependencies, then lint, typecheck, build, and test
+
+inputs:
+  working-directory:
+    description: Directory that contains the project to check
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+      with:
+        version: 12
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        cache: pnpm
+        cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm install --frozen-lockfile
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm lint
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm check
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm build
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm build:check
+
+    - name: Playwright version
+      id: playwright-version
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright browsers
+      id: playwright-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-shell-${{ steps.playwright-version.outputs.version }}
+
+    - name: Install Playwright
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm exec playwright install --with-deps --only-shell chromium
+
+    - name: Save Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
+
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm test

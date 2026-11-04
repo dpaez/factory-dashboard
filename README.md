@@ -26,18 +26,29 @@ It requires `node >= 24` and [`io.github.geut/pi-factory >= 1`](https://github.c
 
 The dashboard relies on that [factory contract](https://github.com/geut/sbx-shell-pi#factory-contract): `factory-up` starts `factory serve` on container port `7731` (`0.0.0.0`) and writes `.factory/dashboard.env` (mode `0600`) with `FACTORY_API_URL` and an `act` `FACTORY_API_TOKEN` for the `dashboard` client.
 
+**Release.** Put the version on `main`, then create a `v*` tag on that commit. The tag must equal `v` plus the `version` default in [`kit/factory-dashboard/factory-dashboard.yaml`](kit/factory-dashboard/factory-dashboard.yaml). That default is `0.1.0-rc.1` until `0.1.0` is published. Pushing the tag does not publish. On `main`, run the [Release workflow](.github/workflows/release.yml) and enter the tag. The workflow checks that the tag points at a commit on `main` and matches that version, runs lint, typecheck, and tests, builds the app, and checks that `build/` imports nothing outside Node. It attaches `factory-dashboard-<version>.tgz` and `factory-dashboard-<version>.tgz.sha256` to the GitHub release, then pushes `ghcr.io/dpaez/sbx-kit-factory-dashboard:<version>` for `linux/amd64` and `linux/arm64`. There is no `latest` tag. After the first push, set the GHCR package to public so `sbx` can pull it without credentials.
+
 **Planned startup.** A background lifecycle startup hook launches the dashboard on every boot, beside Herdr. Herdr stays the entrypoint. The dashboard listens on container port `7732` (`HOST=0.0.0.0`), published as `factory-dashboard`. Until `factory-up` has run, it shows the configuration page telling you to run `factory-up`. After that, it reads `$WORKSPACE_DIR/.factory/dashboard.env` on each request, so a rotated token is picked up without a restart. Real environment variables take precedence.
 
 **Planned walkthrough**
 
-1. On the host:
+`ghcr.io/geut/sbx-shell-pi:node-24-factory` is the previous template image and does not work with this factory. Until [sbx-shell-pi PR #6](https://github.com/geut/sbx-shell-pi/pull/6) republishes the kits, run the workload from a local checkout of `dp/migrate-to-kits`. A local kit directory needs a `docker-container` Buildx builder, or the containerd image store. A published image does not.
+
+1. On the host, from a `geut/sbx-shell-pi` clone on `dp/migrate-to-kits`:
 
    ```bash
-   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
+   sbx run --name factory ./factory /path/to/project \
      --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.1.0
    ```
 
    Once the set is published, a single image reference replaces this.
+
+   To try a kit change against an existing release, run this from the dashboard repo. The installed dashboard is still the release named in the kit descriptor:
+
+   ```bash
+   sbx run --name factory /path/to/sbx-shell-pi/factory /path/to/project \
+     --kit ./kit/factory-dashboard
+   ```
 
 2. In the sandbox, set up the factory in the repository so that `.factory/FACTORY.json` exists.
 3. In the sandbox, in a Herdr pane at the repository root: `factory-up`.

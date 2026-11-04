@@ -1,0 +1,35 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: factory dashboard
+description: Web dashboard for the factory in a geut/sbx-shell-pi factory sandbox
+sourceUrl: https://github.com/dpaez/factory-dashboard
+
+args:
+  version:
+    default: "0.1.0-rc.1"
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+    description: factory-dashboard release to install
+    buildArg: DASHBOARD_VERSION
+
+provides:
+  - "io.github.dpaez/factory-dashboard@${{ kit.args.version }}"
+requires:
+  - "node >= 24"
+  - "io.github.geut/pi-factory >= 1"
+
+capabilities:
+  - type: com.docker.sandbox/port@1
+    config:
+      name: factory-dashboard
+      container: 7732
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      startup:
+        - command: [/usr/local/bin/factory-dashboard]
+          background: true
+          env: [WORKSPACE_DIR]
+          description: Start the factory dashboard on port 7732
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      contentFile: ./context.md

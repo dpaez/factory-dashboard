@@ -6,6 +6,9 @@
 	"scripts": {
 		"dev": "vite dev --host 0.0.0.0 --port 5173",
 		"build": "vite build",
+		"build:check": "node scripts/check-build-self-contained.mjs",
+		"release:pack": "node scripts/pack-release.mjs",
+		"release:smoke": "node scripts/smoke-release.mjs",
 		"start": "node build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
