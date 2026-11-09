@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The README leads with the factory sandbox quickstart, how the dashboard connects to the factory, a usage walkthrough and troubleshooting. Contributor detail moved to `docs/development.md` and the release procedure to `docs/releasing.md` (#57).
+
 ## [0.2.0] - 2026-11-04
 
 ### Added
