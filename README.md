@@ -1,155 +1,173 @@
 # Factory Dashboard
 
-The operator's command center for one factory: it shows where every ticket is, what needs a person, and what it costs. It reads everything from the factory server API.
+A web dashboard for one [factory](https://github.com/geut/factory-skills): see every ticket, how far it has got, its tasks and what blocks them, and what needs a person, without leaving the browser.
 
-**WIP - The project is in active development**
+It ships with the [factory sandbox](https://github.com/geut/sbx-shell-pi) as an optional kit. The factory works without it; the dashboard is a window onto it and a few controls.
 
-## Who this is for
+![The Flow board](./Screenshot.png)
 
-This dashboard is planned to be used as an external accessory of GEUT's factory. You can see more [here](https://github.com/geut/sbx-shell-pi) and [here](https://github.com/geut/factory-skills). How it ships into a factory sandbox is described in [sbx-shell-pi kit integration](#sbx-shell-pi-kit-integration).
+- [Quickstart: the factory sandbox](#quickstart-the-factory-sandbox)
+- [How the dashboard connects to the factory](#how-the-dashboard-connects-to-the-factory)
+- [Using the dashboard](#using-the-dashboard)
+- [Troubleshooting](#troubleshooting)
+- [Local development](#local-development)
 
-## Stack
+## Quickstart: the factory sandbox
 
-The stack is mostly: Svelte with SvelteKit (adapter-node), shadcn-svelte, Tailwind CSS, TypeScript, TanStack Table and `openapi-fetch`.
+You need Docker Desktop and `sbx` 0.47 or newer ([install `sbx`](https://docs.docker.com/ai/sandboxes/)). Each step says where to run it: **host** is your computer, **sandbox** is a Herdr pane inside the sandbox.
 
-The dashboard is a client of the factory server API. Its SvelteKit server loads read tickets, executions, runs and agents from `FACTORY_API_URL` with a private token; the browser never sees the token. Commands and live updates over the factory's event stream are planned (see [ADR 0005](./docs/adr/0005-factory-api-client-and-command-center.md)).
+These steps are the [sbx-shell-pi factory setup](https://github.com/geut/sbx-shell-pi#set-up-the-factory) with the dashboard kit included. That README is the reference for the sandbox itself.
 
-## sbx-shell-pi kit integration
+### 1. Allow the kit sources (host)
 
-The dashboard ships as a v3 **mixin** kit, because a set has no Dockerfile and can only list published kits, so the dashboard's files need their own kit. [sbx-shell-pi](https://github.com/geut/sbx-shell-pi) may later publish a **set** (the factory workload plus this mixin) as one image to `sbx run`. Until that set exists, add the mixin with `--kit` on the factory workload.
+`sbx` only installs kits from sources on its allowlist, and by default that is Docker Hub alone. Allow the factory (`ghcr.io/geut/`) and the dashboard (`ghcr.io/dpaez/`):
 
-Reference: `ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0`. It may move to `ghcr.io/geut` later.
+```bash
+sbx settings set kit.allowedSources '["docker.io/","ghcr.io/geut/","ghcr.io/dpaez/"]'
+```
 
-It requires `node >= 24` and [`io.github.geut/pi-factory >= 1`](https://github.com/geut/sbx-shell-pi#factory-contract). The factory workload `ghcr.io/geut/sbx-shell-pi:node-24-factory` provides both. It also needs sbx 0.47 or newer, because the factory workload declares `long-running@1`.
+This replaces the whole list. If `sbx settings get kit.allowedSources` already shows other sources, keep them in the new list.
 
-The dashboard relies on that [factory contract](https://github.com/geut/sbx-shell-pi#factory-contract): `factory-up` starts `factory serve` on container port `7731` (`0.0.0.0`) and writes `.factory/dashboard.env` (mode `0600`) with `FACTORY_API_URL` and an `act` `FACTORY_API_TOKEN` for the `dashboard` client.
+### 2. Create the sandbox with the dashboard (host)
 
-**Release.** Put the version on `main`, then create a `v*` tag on that commit. The tag must equal `v` plus the `version` default in [`kit/factory-dashboard/factory-dashboard.yaml`](kit/factory-dashboard/factory-dashboard.yaml). Pushing the tag does not publish. On `main`, run the [Release workflow](.github/workflows/release.yml) and enter the tag. The workflow checks that the tag points at a commit on `main` and matches that version, runs lint, typecheck, and tests, builds the app, and checks that `build/` imports nothing outside Node. It attaches `factory-dashboard-<version>.tgz` and `factory-dashboard-<version>.tgz.sha256` to the GitHub release, then pushes `ghcr.io/dpaez/sbx-kit-factory-dashboard:<version>` for `linux/amd64` and `linux/arm64`. There is no `latest` tag. After the first push, set the GHCR package to public so `sbx` can pull it without credentials.
+```bash
+sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
+  --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0
+```
 
-**Startup.** A background lifecycle startup hook launches the dashboard on every boot, beside Herdr. Herdr stays the entrypoint. The dashboard listens on container port `7732` (`HOST=0.0.0.0`), published as `factory-dashboard`. Until `factory-up` has run, it shows the configuration page telling you to run `factory-up`. After that, it reads `$WORKSPACE_DIR/.factory/dashboard.env` on each request, so a rotated token is picked up without a restart. Real environment variables take precedence.
+The `--kit` line adds the dashboard. The kit set is fixed when the sandbox is created, so adding the dashboard later means creating a new sandbox.
 
-**Walkthrough**
+When the sandbox starts, you land in **Herdr**, a terminal multiplexer where the agents run side by side. The agents also need your model provider key: see [step 3 of the sbx-shell-pi setup](https://github.com/geut/sbx-shell-pi#3-add-your-model-provider-key).
 
-1. On the host:
+### 3. Configure and start the factory (sandbox)
+
+In the Herdr pane, from your project's root:
+
+```bash
+cd "$WORKSPACE_DIR"   # your project, if you're not already there
+factory-up
+```
+
+The first time, this creates `.factory/FACTORY.json` with starter settings, then starts the factory server in a Herdr workspace named `factory`. Open `.factory/FACTORY.json` and check the models (`models.work` and `models.review`) before going on. The [factory-skills README](https://github.com/geut/factory-skills#factory-root) explains every setting.
+
+Then start `pi` in a pane and run:
+
+```text
+/factory start
+```
+
+### 4. Open the dashboard (host)
+
+The dashboard is already running: you don't start it. Find its host port:
+
+```bash
+sbx ports factory
+```
+
+Open `http://localhost:<port>` in your browser, where `<port>` is the host port listed for `factory-dashboard`. Don't use the one for `factory-api`: that is the factory server, not the dashboard.
+
+### What runs by itself, and what you run
+
+| Automatic                                                                                                                           | You run                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| The dashboard starts on every boot, on container port `7732`, and restarts if it stops.                                             | `factory-up`, once per project (step 3).          |
+| After a restart (`sbx stop`, then `sbx run factory`), the factory server starts again once Herdr is up, if `factory-up` ran before. | `/factory start` in pi, to process tickets.       |
+| The dashboard picks up a new token without a restart.                                                                               | `sbx ports factory` on the host, to find the URL. |
+
+Before `factory-up` has run, the dashboard shows a page asking you to run it. Reload once you have.
+
+## How the dashboard connects to the factory
+
+`factory-up` writes `.factory/dashboard.env` (mode `0600`) at the project root:
+
+```bash
+FACTORY_API_URL=http://127.0.0.1:7731
+FACTORY_API_TOKEN=...   # an act token for the "dashboard" client
+```
+
+The dashboard reads that file on every request, so when `factory-up` replaces a rejected token, the next page load uses the new one. No restart is needed. A non-empty `FACTORY_API_URL` or `FACTORY_API_TOKEN` environment variable wins over the file.
+
+The dashboard calls the factory from its own server. The token never reaches the browser: your browser only talks to the dashboard.
+
+Two ports, two jobs:
+
+| Name in `sbx ports` | Container port | What it is                                                                                        |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------- |
+| `factory-dashboard` | `7732`         | The dashboard. Open this one in the browser.                                                      |
+| `factory-api`       | `7731`         | The factory server's API. The dashboard reaches it inside the sandbox at `http://127.0.0.1:7731`. |
+
+The dashboard only uses the factory's HTTP API; it never opens the factory's files or database ([ADR 0005](./docs/adr/0005-factory-api-client-and-command-center.md)).
+
+## Using the dashboard
+
+The top bar has **Flow board**, **Tickets**, **Stats** and **New ticket**, plus the live connection status.
+
+- **Flow board** (`/`): one lane per stage (Plan, Work, QA, Review, Handoff), with a card per ticket showing its status and task progress. The backlog lane lists tracker issues you can **Start**; an issue that waits on another says "Blocked by" and which one. Select a card to open the ticket in a side panel; **Open ticket** goes to its full page.
+- **Tickets** (`/tickets`): every ticket in a sortable list.
+- **A ticket's page** (`/tickets/<key>`): the current stage and status, the tasks with their progress and which tasks block them, the run timeline, evidence, and usage. Earlier executions stay readable.
+- **Needs attention**: when an agent asks a question or waits for approval, its card says **Needs attention** and the strip above the board counts those tickets and gives the reasons. **Open next** steps through them. On the ticket, read the question and answer it with **Send reply & resume**.
+- **Ticket actions**, on the current execution, when they apply:
+  - **Stop agent** stops a running agent (choose the run when several are active).
+  - **Retry** relaunches the step that stopped, reusing its context. It is not a new execution.
+  - **Cancel execution** ends the current execution, after you confirm.
+  - **Mark complete** records that the handoff is done. It does not merge the pull request.
+  - **Rerun** starts a new execution from a fresh copy of the source.
+- **New ticket** (`/new`): describe a ticket and **Start planning**.
+- **Stats** (`/stats`): cost, time and outcome figures for executions started in a time window.
+
+**Live updates.** Pages update as the factory reports changes; there's no need to reload. The status in the top bar reads **Live** while connected, **Connecting** or **Reconnecting** while it tries, **Disconnected** when the event stream stopped (data may be out of date), and **Authentication failed** when the factory refused the token. Disconnected and Authentication failed offer **Retry**.
+
+**Go back to pi or Herdr** to start the factory (`/factory start`), to change `FACTORY.json`, to watch an agent work or talk to it beyond a reply, to review diffs, and to merge pull requests. The dashboard doesn't do those.
+
+## Troubleshooting
+
+**"The dashboard cannot reach the factory with its configuration", with "Missing FACTORY_API_URL and FACTORY_API_TOKEN".**
+`.factory/dashboard.env` doesn't exist yet. In the sandbox, run `factory-up` from the project root, then reload the page.
+
+**The same configuration page while `.factory/dashboard.env` exists, or "Authentication failed" in the top bar.**
+The factory rejected the token (unauthorized or missing the `act` scope), for example after it was revoked. In the sandbox, run `factory-up` again: it replaces a token the server rejects. Reload; no restart is needed. If you set `FACTORY_API_TOKEN` in the environment yourself, that value wins over the file, so fix or remove it.
+
+**"The factory server is unreachable or answered unexpectedly", or "Disconnected" in the top bar.**
+The factory server isn't running. After a restart it only comes back once Herdr is up, so attach with `sbx run factory`. Check the `factory` workspace in Herdr; if the server isn't there, run `factory-up` in the sandbox. The restart log is `~/.local/state/factory/autostart.log`.
+
+**The dashboard port can't be opened.**
+
+- `sbx ports factory` lists no `factory-dashboard`: the sandbox was created without `--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0`. Create a new sandbox with it.
+- `sbx run` refused the kit: its source isn't allowed. Repeat [step 1](#1-allow-the-kit-sources-host).
+- The port is listed but the browser can't connect: check that the sandbox is running (`sbx ls`), and that you used the `factory-dashboard` port, not `factory-api`. In the sandbox, `curl -fsS http://127.0.0.1:7732/` shows whether the dashboard answers, and its log is `~/.local/state/factory-dashboard/dashboard.log`.
+
+## Local development
+
+To work on the dashboard itself, run it from a checkout against a running factory. You need Node 24 and `pnpm`.
+
+1. **Install:**
 
    ```bash
-   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
-     --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0
+   pnpm install
    ```
 
-   To try a kit change against an existing release, run this from the dashboard repo. The installed dashboard is still the release named in the kit descriptor. A local kit directory needs a `docker-container` Buildx builder, or the containerd image store:
+2. **Point it at a factory.** The easiest way is the `.factory/dashboard.env` that `factory-up` wrote in the project you want to watch:
 
    ```bash
-   sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
-     --kit ./kit/factory-dashboard
+   export FACTORY_DASHBOARD_ENV_FILE=/path/to/project/.factory/dashboard.env
    ```
 
-2. In the sandbox, in a Herdr pane at the repository root: `factory-up`. It creates a starter `.factory/FACTORY.json` when the repository has none.
-3. On the host, run `sbx ports factory` to find the host port for `factory-dashboard`, then open it in a browser.
+   Or copy `.env.example` to `.env` and set `FACTORY_API_URL` (without `/v1`, for example `http://127.0.0.1:7731`) and `FACTORY_API_TOKEN` (an `act` token). `FACTORY_OPERATOR_NAME` is optional; it's sent with commands. A non-empty variable wins over the env file. These variables stay on the dashboard's server.
 
-The mixin set is fixed when the sandbox is created, so changing it means creating a new sandbox.
+3. **Run:**
 
-## Development
+   ```bash
+   pnpm dev   # http://localhost:5173
+   ```
 
-We are using `pnpm`.
+Tests never need a factory. Before a change is done: `pnpm check && pnpm lint && pnpm test`, and `pnpm test:e2e` for user paths.
 
-### Install
+More for contributors:
 
-```bash
-pnpm i
-```
+- [`docs/development.md`](./docs/development.md): Storybook, the test commands and the factory API contract (`pnpm api:sync`).
+- [`test/README.md`](./test/README.md): test layers, the end-to-end fixture and fake factory.
+- [`docs/factory-dashboard-specs/`](./docs/factory-dashboard-specs/): product and UI specs. [`GLOSSARY.md`](./GLOSSARY.md) and [`DESIGN.md`](./DESIGN.md) hold the vocabulary and visual rules.
+- [ADR 0005](./docs/adr/0005-factory-api-client-and-command-center.md): why the dashboard is a factory API client.
+- [`docs/releasing.md`](./docs/releasing.md): releasing the app and the kit.
 
-### Run local server
-
-```bash
-pnpm run dev
-```
-
-### Storybook
-
-[Storybook](https://storybook.js.org/) renders components in isolation, with the app's real CSS (`src/routes/layout.css`: tokens, Tailwind, Roboto and JetBrains Mono).
-
-```bash
-pnpm storybook        # dev server at http://localhost:6006
-pnpm build-storybook  # static build in storybook-static/ (gitignored)
-```
-
-- **Where stories live:** next to their component, named `<component>.stories.svelte` (for example `src/lib/components/ui/button/button.stories.svelte`). Stories use [Svelte CSF](https://github.com/storybookjs/addon-svelte-csf) (`defineMeta` + `<Story>`). Any `src/**/*.stories.svelte` file is picked up.
-- **Themes:** the **Theme** toolbar button switches between Light, Dark and Light and dark. Light and Dark toggle the `.dark` class on `<html>`, the same way ModeWatcher does in the app. Light and dark renders the story twice, side by side, with the right pane inside a `.dark` wrapper.
-- **Stories are tests:** `pnpm test` runs a `storybook` Vitest project next to `server` and `client`. It renders every story in headless Chromium in the light and dark side-by-side theme, so a story that throws fails the suite. Accessibility checks (`@storybook/addon-a11y`) run too, but are report-only for now. If Chromium is missing, run `pnpm exec playwright install chromium`.
-
-### Factory server setup
-
-The dashboard reads factory state only from a running factory server. No database is needed, and nothing
-in this repo opens factory state files.
-
-1. **Run a factory server** for the project you want to watch: `factory serve`, or `factory-up` from that
-   project's root. `factory-up` starts `factory serve` on `127.0.0.1:7731` and writes the URL and a token to
-   `.factory/dashboard.env`.
-2. **Configure the dashboard** in `.env` (copy `.env.example`):
-
-   | Variable                     | Required | Meaning                                                                  |
-   | ---------------------------- | -------- | ------------------------------------------------------------------------ |
-   | `FACTORY_API_URL`            | yes      | Factory server base URL, without `/v1` (for example `http://127.0.0.1:7731`). |
-   | `FACTORY_API_TOKEN`          | yes      | An `act`-scoped factory server token.                                    |
-   | `FACTORY_OPERATOR_NAME`      | no       | Operator name sent with commands as `X-Factory-On-Behalf-Of`.            |
-   | `FACTORY_DASHBOARD_ENV_FILE` | no       | Env file read on each request when a process variable is empty.          |
-
-   These are private runtime variables: they stay on the SvelteKit server and never reach the browser.
-   A non-empty process variable wins for each key. Otherwise the value is read, on every request, from
-   `FACTORY_DASHBOARD_ENV_FILE` when that is set, or from `$WORKSPACE_DIR/.factory/dashboard.env` when
-   `WORKSPACE_DIR` is set. Nothing is cached, so a token that `factory-up` replaces is picked up without
-   a restart. With neither path set, only the process variables are used. For local development, point
-   `FACTORY_DASHBOARD_ENV_FILE` at a project's `.factory/dashboard.env` instead of copying the values into
-   `.env`.
-3. **Start the dashboard** with `pnpm run dev`.
-
-A missing URL or token, or a token the factory server rejects (unauthorized or insufficient scope), renders
-the configuration error page naming `FACTORY_API_URL` and `FACTORY_API_TOKEN`, never an empty list. If the
-factory server is down or answers unexpectedly, the page says it is unreachable; an unknown ticket key is a
-404.
-
-### Tests
-
-`pnpm test` runs the unit and Storybook tests. Unit tests use fake `fetch` responses and the typed fixtures
-in `src/lib/factory/fixtures`; they never need a factory server.
-
-`pnpm test` runs three vitest projects: `server` (view models, factory client reads, route loads and
-`/api/factory/*` handlers), `client` (rune state modules and component behaviour in a browser) and `storybook`
-(every story renders in light and dark panes, and its `play` function asserts the state). Component states
-are proved there. Playwright never starts Storybook.
-
-`pnpm test:e2e` runs Playwright against a production build, for critical user paths only. It builds once
-per run. Then each worker starts its own fake factory (`test/fake-factory.ts`, plain `node`, typed fixtures,
-bearer token checked) and its own `node build` pointed at it, both on free ports, through the shared fixture
-`test/fixtures.ts`. Tests pick fake options with `test.use({ fakeOptions })`. Each test has 30 s and no
-retries. The whole run takes under a minute (about 16 s of build and 36 s of tests). End-to-end tests never
-send commands to a real factory.
-
-See [`test/README.md`](test/README.md) for the layers, the fixture and how to add a feature spec.
-
-### Factory API contract
-
-The dashboard's types for the factory server API come from a committed OpenAPI snapshot,
-`openapi/factory.openapi.json`, and the TypeScript generated from it,
-`src/lib/factory/generated/factory-api.d.ts` (never hand-edit it; it is excluded from Prettier). Builds,
-`pnpm check` and `pnpm test` read only these committed files and never need a running factory.
-
-To refresh both against the local factory server (`factory-up` from the repo root starts it on
-`127.0.0.1:7731` and writes its URL and token to `.factory/dashboard.env`):
-
-```bash
-FACTORY_API_URL=http://127.0.0.1:7731 pnpm api:sync   # api:pull (snapshot) + api:generate (types)
-```
-
-`api:pull` fetches `GET $FACTORY_API_URL/openapi.json` without a token and rejects anything that is not a
-JSON OpenAPI document exposing `/v1/tickets`. Commit both files together and review the diff.
-
-To check for drift without touching the committed files:
-
-```bash
-FACTORY_API_URL=http://127.0.0.1:7731 pnpm api:check
-```
-
-It exits non-zero and names the file(s) that differ from the live server. It needs the network and is
-not part of `pnpm test`. See `.env.example` for the runtime `FACTORY_API_*` variables.
+Stack: SvelteKit (adapter-node), Svelte 5, shadcn-svelte, Tailwind CSS 4, TypeScript and `openapi-fetch`.
