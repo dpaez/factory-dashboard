@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CommandResponse } from '$lib/factory/commands';
 import {
+	problemCodeHostUnavailable,
+	problemFeedbackRoundNotOpen,
 	problemInsufficientScope,
 	problemInternalError,
 	problemInvalidState,
@@ -132,6 +134,14 @@ describe('POST /api/factory/commands/[command]', () => {
 		['complete', { ticket: KEY }, `/v1/tickets/${KEY}/complete`, undefined],
 		['cancel', { ticket: KEY }, `/v1/tickets/${KEY}/cancel`, undefined],
 		['cancel', { ticket: KEY, reason: 'Dup' }, `/v1/tickets/${KEY}/cancel`, { reason: 'Dup' }],
+		['feedback', { ticket: KEY }, `/v1/tickets/${KEY}/feedback-rounds`, undefined],
+		[
+			'feedback',
+			{ ticket: KEY, note: '  Rename the flag. ' },
+			`/v1/tickets/${KEY}/feedback-rounds`,
+			{ note: 'Rename the flag.' }
+		],
+		['feedback', { ticket: KEY, note: ' \n ' }, `/v1/tickets/${KEY}/feedback-rounds`, undefined],
 		['rerun', { ticket: KEY }, `/v1/tickets/${KEY}/reruns`, undefined],
 		[
 			'stop',
@@ -171,7 +181,9 @@ describe('POST /api/factory/commands/[command]', () => {
 		['reply', { intent: INTENT, ticket: KEY, answer: '' }, 'body.answer'],
 		['reply', { intent: INTENT, ticket: KEY, answer: '   ' }, 'body.answer'],
 		['start', { intent: INTENT, ref: '#1', id: 'a', text: 'b' }, 'body.ref'],
-		['start', { intent: INTENT }, 'body.ref']
+		['start', { intent: INTENT }, 'body.ref'],
+		['feedback', { intent: INTENT, ticket: KEY, note: 3 }, 'body.note'],
+		['feedback', { intent: INTENT, ticket: 'Not A Key' }, 'body.ticket']
 	])('%s %o is a 400 validation_error at %s, sending nothing', async (command, body, path) => {
 		const { status, body: response, cacheControl, fake } = await post(command, body);
 		expect(status).toBe(400);
@@ -299,6 +311,28 @@ describe('POST /api/factory/commands/[command]', () => {
 		expect(result.status).toBe(status);
 		expect(result.cacheControl).toBe('no-store');
 		expect(result.body).toMatchObject({ ok: false, failure: { type, title: problem.title } });
+		expectSafe(result.text, result.headers);
+	});
+
+	it.each([
+		[problemFeedbackRoundNotOpen, 409],
+		[problemCodeHostUnavailable, 502]
+	])('passes a feedback round $type refusal through unchanged', async (problem, status) => {
+		const result = await post(
+			'feedback',
+			{ intent: INTENT, ticket: KEY },
+			{ fakeOptions: { failCommand: { commands: ['feedback'], problem } } }
+		);
+		expect(result.status).toBe(status);
+		expect(result.body).toEqual({
+			ok: false,
+			failure: {
+				type: problem.type,
+				title: problem.title,
+				detail: problem.detail,
+				retryable: problem.type === 'code_host_unavailable'
+			}
+		});
 		expectSafe(result.text, result.headers);
 	});
 

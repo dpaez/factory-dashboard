@@ -4,10 +4,12 @@ import {
 	ticketDetailActiveInQa,
 	ticketDetailAgentQuestion,
 	ticketDetailFailed,
+	ticketDetailFeedbackRound,
 	ticketDetailMultiExecution,
 	ticketDetailPaused,
 	ticketDetailReadyForHandoff
 } from '../src/lib/factory/fixtures/tickets.ts';
+import { problemCodeHostUnavailable } from '../src/lib/factory/fixtures/problems.ts';
 import type { FakeCommandRequest, FakeFactoryOptions } from './fake-factory.ts';
 import { expect, gotoLive, test, type FakeFixture } from './fixtures.ts';
 
@@ -381,4 +383,159 @@ test('every page renders one empty command feedback region below the header, wit
 		await shot(`command-feedback-empty-${path.split('/')[1] || 'root'}`);
 	}
 	expect(errors).toEqual([]);
+});
+
+test.describe('Feedback round', () => {
+	const NOTE_LABEL = 'Note for the round (optional)';
+	const note = (page: Page) => bar(page).getByRole('textbox', { name: NOTE_LABEL });
+	const round = (page: Page) => action(page, 'Feedback round');
+	const ROUND_PATH = `/v1/tickets/${HANDOFF}/feedback-rounds`;
+	/** How many times the fake answered the handoff ticket's detail. */
+	const detailReads = (fake: FakeFixture) =>
+		fake
+			.requests()
+			.filter((r) => r.method === 'GET' && r.path.split('?')[0] === `/v1/tickets/${HANDOFF}`)
+			.length;
+
+	for (const placement of PLACEMENTS) {
+		test(`${placement.name}: a round posts with no note, then with the typed note`, async ({
+			page,
+			app,
+			fake,
+			shot
+		}) => {
+			const { problems } = guard(page, app.url, fake);
+			await gotoLive(page, placement.url(HANDOFF));
+			await expect(round(page)).toBeEnabled();
+			await expect(note(page)).toBeEditable();
+			await expect(note(page)).toHaveValue('');
+			await shot(`ac1-feedback-round-enabled-${slug(placement)}`);
+
+			await round(page).click();
+			const [bare] = await received(fake, 0);
+			expect(bare).toMatchObject({ method: 'POST', path: ROUND_PATH });
+			expect(bare!.body).toBeUndefined();
+			await confirmed(round(page));
+
+			await note(page).fill('Address the naming comments.');
+			await round(page).click();
+			const [noted] = await received(fake, 1);
+			expect(noted).toMatchObject({
+				path: ROUND_PATH,
+				body: { note: 'Address the naming comments.' }
+			});
+			await confirmed(round(page));
+			expect(fake.commands()).toHaveLength(2);
+			expect(problems).toEqual([]);
+		});
+	}
+
+	test.describe('while the round is pending', () => {
+		test.use({ fakeOptions: { commandDelayMs: 1_500 } });
+
+		test('the action is disabled with the pending reason and a second click sends nothing', async ({
+			page,
+			fake,
+			shot
+		}) => {
+			await gotoLive(page, PLACEMENTS[0]!.url(HANDOFF));
+			await round(page).click();
+			await expect(round(page)).toBeDisabled();
+			await expect(bar(page).locator('[data-reason="feedback"]')).toHaveText(
+				/Sending…|Accepted, waiting for the factory\./
+			);
+			await shot('ac6-feedback-round-pending');
+			await round(page).click({ force: true });
+			await received(fake, 0);
+			await confirmed(round(page));
+			expect(fake.commands()).toHaveLength(1);
+		});
+	});
+
+	test.describe('a 409 refusal', () => {
+		const detail =
+			'No new feedback on https://github.com/dpaez/factory-dashboard/pull/42 since the last push (2 skipped: outdated). Add a note to start a round anyway.';
+		test.use({
+			fakeOptions: {
+				failCommand: {
+					commands: ['feedback'],
+					problem: { status: 409, title: 'Invalid state', type: 'invalid_state', detail }
+				}
+			}
+		});
+
+		for (const placement of PLACEMENTS) {
+			test(`${placement.name}: shows the factory's message verbatim, keeps the note and rereads the ticket`, async ({
+				page,
+				fake,
+				shot
+			}) => {
+				await gotoLive(page, placement.url(HANDOFF));
+				await note(page).fill('Look again.');
+				const reads = detailReads(fake);
+				await round(page).click();
+				await received(fake, 0);
+				await expect(bar(page).locator('[data-failure="feedback"]')).toHaveText(detail, {
+					timeout: 15_000
+				});
+				await expect(note(page)).toHaveValue('Look again.');
+				await expect.poll(() => detailReads(fake)).toBeGreaterThan(reads);
+				await shot(`ac7-feedback-round-refused-${slug(placement)}`);
+			});
+		}
+	});
+
+	test.describe('a 502 code host refusal', () => {
+		test.use({
+			fakeOptions: {
+				failCommand: { commands: ['feedback'], problem: problemCodeHostUnavailable }
+			}
+		});
+
+		for (const placement of PLACEMENTS) {
+			test(`${placement.name}: says the code host could not be read, with its detail, and rereads the ticket`, async ({
+				page,
+				fake,
+				shot
+			}) => {
+				await gotoLive(page, placement.url(HANDOFF));
+				const reads = detailReads(fake);
+				await round(page).click();
+				await received(fake, 0);
+				const failure = bar(page).locator('[data-failure="feedback"]');
+				await expect(failure).toContainText('Code host unavailable', { timeout: 15_000 });
+				await expect(failure).toContainText(problemCodeHostUnavailable.detail);
+				await expect.poll(() => detailReads(fake)).toBeGreaterThan(reads);
+				await shot(`ac8-feedback-round-code-host-${slug(placement)}`);
+			});
+		}
+	});
+
+	test.describe('an accepted round', () => {
+		const { stage, status, needsUser, progress, tasks } = ticketDetailFeedbackRound;
+		test.use({
+			fakeOptions: { commandEffects: { feedback: { stage, status, needsUser, progress, tasks } } }
+		});
+
+		for (const placement of PLACEMENTS) {
+			test(`${placement.name}: the ticket reads as in work, with Feedback round 1 after the planned tasks`, async ({
+				page,
+				fake,
+				shot
+			}) => {
+				await gotoLive(page, placement.url(HANDOFF));
+				await round(page).click();
+				await received(fake, 0);
+				await expect(round(page)).toHaveCount(0, { timeout: 15_000 });
+				await expect(inspector(page).getByTestId('stage')).toHaveText('work');
+				const rows = inspector(page).getByTestId('tasks').locator('[data-task]');
+				await expect(rows).toHaveCount(3);
+				await expect(rows.last()).toHaveAttribute('data-task', 'F1');
+				await expect(rows.last()).toContainText('Feedback round 1');
+				await expect(rows.last()).not.toContainText('03.');
+				await expect(rows.first()).toContainText('01. Color tokens');
+				await shot(`ac9-feedback-round-in-work-${slug(placement)}`);
+			});
+		}
+	});
 });

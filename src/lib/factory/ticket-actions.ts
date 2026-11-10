@@ -15,6 +15,9 @@
  * - Cancel: shown while the stage is not `done` and the execution has not ended.
  * - Mark complete: shown at `ready_for_handoff` or in wrapup; enabled at
  *   `ready_for_handoff`.
+ * - Feedback round: shown at `ready_for_handoff` when the ticket has a pull
+ *   request; enabled while that pull request is open, otherwise disabled
+ *   with a reason naming its state.
  * - Rerun: shown when complete, cancelled or failed.
  * - An unknown status offers only Cancel (while the stage is not `done`).
  *
@@ -24,7 +27,15 @@
 import { commandTarget, type CommandAccess, type CommandPhase } from './commands';
 import type { RunStage, TicketDetailView } from './models';
 
-export const TICKET_ACTIONS = ['stop', 'reply', 'retry', 'cancel', 'complete', 'rerun'] as const;
+export const TICKET_ACTIONS = [
+	'stop',
+	'reply',
+	'retry',
+	'cancel',
+	'complete',
+	'feedback',
+	'rerun'
+] as const;
 export type TicketAction = (typeof TICKET_ACTIONS)[number];
 
 export type ActionAvailability =
@@ -71,6 +82,8 @@ export const ACTION_REASONS = {
 	noWaitingRun: 'No agent is waiting for a reply to this pause; retry or cancel instead.',
 	notWaiting: 'The factory is not waiting for a reply.',
 	preparingHandoff: 'Wrapup is still preparing the handoff.',
+	pullRequestMerged: 'The pull request is merged.',
+	pullRequestClosed: 'The pull request is closed.',
 	sending: 'Sending…',
 	stopRequested: 'Stop requested.',
 	accepted: 'Accepted, waiting for the factory.'
@@ -148,6 +161,15 @@ export function ticketActions(input: TicketActionsInput): TicketActions {
 	else if (known && header.stage === 'wrapup') {
 		base.complete = disabled(ACTION_REASONS.preparingHandoff);
 	}
+	if (status === 'ready_for_handoff' && header.pullRequest) {
+		const { state } = header.pullRequest;
+		if (state === 'open') base.feedback = ENABLED;
+		else {
+			base.feedback = disabled(
+				state === 'merged' ? ACTION_REASONS.pullRequestMerged : ACTION_REASONS.pullRequestClosed
+			);
+		}
+	}
 	if (RERUNNABLE.has(status)) base.rerun = ENABLED;
 
 	const targets: Record<TicketAction, string | null> = {
@@ -156,6 +178,7 @@ export function ticketActions(input: TicketActionsInput): TicketActions {
 		retry: commandTarget({ command: 'retry', ticket: header.key }),
 		cancel: commandTarget({ command: 'cancel', ticket: header.key }),
 		complete: commandTarget({ command: 'complete', ticket: header.key }),
+		feedback: commandTarget({ command: 'feedback', ticket: header.key }),
 		rerun: commandTarget({ command: 'rerun', ticket: header.key })
 	};
 

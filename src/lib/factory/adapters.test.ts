@@ -137,6 +137,23 @@ describe('toTasks', () => {
 		expect(task?.summaries.map((summary) => summary.stage)).toEqual(['review', 'qa', 'work']);
 	});
 
+	it('marks F<n> tasks as feedback rounds, after the planned tasks in round order', () => {
+		const planned = ticketDetailActiveInWork.tasks[0]!;
+		const round = (n: number, ordinal: number) => ({
+			...planned,
+			id: `F${n}`,
+			ordinal,
+			title: `Feedback round ${n}`
+		});
+		const result = toTasks([round(2, 3), planned, round(1, 2), { ...planned, id: 'F0' }]);
+		expect(result.map(({ id, feedbackRound }) => ({ id, feedbackRound }))).toEqual([
+			{ id: planned.id, feedbackRound: null },
+			{ id: 'F0', feedbackRound: null },
+			{ id: 'F1', feedbackRound: 1 },
+			{ id: 'F2', feedbackRound: 2 }
+		]);
+	});
+
 	it('keeps task status and stage, with null stage when absent', () => {
 		expect(tasks.map(({ id, status, stage }) => ({ id, status, stage }))).toEqual([
 			{ id: '01', status: 'done', stage: null },

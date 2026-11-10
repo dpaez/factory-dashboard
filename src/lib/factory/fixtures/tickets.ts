@@ -757,3 +757,50 @@ export const ticketDetailTrackerWarnings = {
 	tasks: [],
 	usage: usageInWork
 } satisfies Schemas['TicketDetail'];
+
+/** Ready for handoff, but the pull request was merged outside the factory. */
+export const ticketDetailReadyForHandoffMergedPr = {
+	...ticketDetailReadyForHandoff,
+	pullRequest: { ...pullRequestOpen, mergedAt: '2026-10-14T10:00:00Z', state: 'merged' }
+} satisfies Schemas['TicketDetail'];
+
+/** Ready for handoff, but the pull request was closed without merging. */
+export const ticketDetailReadyForHandoffClosedPr = {
+	...ticketDetailReadyForHandoff,
+	pullRequest: { ...pullRequestOpen, state: 'closed' }
+} satisfies Schemas['TicketDetail'];
+
+/** Ready for handoff with no pull request (code host pull requests off). */
+export const ticketDetailReadyForHandoffNoPr = {
+	...ticketDetailReadyForHandoff,
+	pullRequest: null
+} satisfies Schemas['TicketDetail'];
+
+/**
+ * After an accepted feedback round: back in work, with the factory's round
+ * task `F1` after the planned tasks (factory-skills `src/actions/feedback-round.ts`).
+ */
+export const ticketDetailFeedbackRound = {
+	...ticketDetailReadyForHandoff,
+	stage: 'work',
+	status: 'active',
+	needsUser: false,
+	progress: {
+		current: { label: 'Feedback round 1', step: '03/03' },
+		done: 2,
+		next: null,
+		total: 3
+	},
+	tasks: [
+		...ticketDetailReadyForHandoff.tasks,
+		{
+			blockedBy: [],
+			id: 'F1',
+			ordinal: 3,
+			stage: 'work',
+			status: 'active',
+			summaries: {},
+			title: 'Feedback round 1'
+		}
+	]
+} satisfies Schemas['TicketDetail'];

@@ -11,7 +11,7 @@ import {
 } from '$lib/factory/fixtures';
 
 import { createFactoryClient, type FactoryClient } from './client';
-import { cancel, complete, rerun, reply, retry, start, stop } from './commands';
+import { cancel, complete, feedback, rerun, reply, retry, start, stop } from './commands';
 import type { FactoryResult } from './reads';
 
 const BASE_URL = 'http://127.0.0.1:7731';
@@ -89,6 +89,18 @@ const cases: Case[] = [
 		call: (c) => cancel(c, INTENT, KEY, { reason: 'Duplicate.' }),
 		path: `/v1/tickets/${KEY}/cancel`,
 		body: { reason: 'Duplicate.' }
+	},
+	{
+		name: 'feedback (no note)',
+		call: (c) => feedback(c, INTENT, KEY),
+		path: `/v1/tickets/${KEY}/feedback-rounds`,
+		body: undefined
+	},
+	{
+		name: 'feedback (note)',
+		call: (c) => feedback(c, INTENT, KEY, { note: 'Rename the flag.' }),
+		path: `/v1/tickets/${KEY}/feedback-rounds`,
+		body: { note: 'Rename the flag.' }
 	},
 	{
 		name: 'rerun',

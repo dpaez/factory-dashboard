@@ -4,7 +4,12 @@
 	import TaskList from './task-list.svelte';
 	import { toTasks } from '$lib/factory/adapters';
 	import type { components } from '$lib/factory/generated/factory-api';
-	import { tasksOfEveryStatus, taskPending, ticketDetailActiveInQa } from '$lib/factory/fixtures';
+	import {
+		tasksOfEveryStatus,
+		taskPending,
+		ticketDetailActiveInQa,
+		ticketDetailFeedbackRound
+	} from '$lib/factory/fixtures';
 
 	type Task = components['schemas']['Task'];
 
@@ -95,6 +100,27 @@
 		const missing = firstPane(canvasElement).querySelector('[data-task="06"] [data-blocker="99"]')!;
 		await expect(missing.tagName).toBe('SPAN');
 		await expect(missing).toHaveTextContent('99');
+	}}
+/>
+
+<Story
+	name="Feedback round"
+	args={{ tasks: toTasks(ticketDetailFeedbackRound.tasks), stage: 'work' }}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const rows = [...pane.querySelectorAll<HTMLElement>('[data-task]')];
+		// The round comes after the planned tasks.
+		await expect(rows.map((row) => row.dataset.task)).toEqual(['01', '02', 'F1']);
+		const round = rows.at(-1)!;
+		await expect(round.querySelector('[data-feedback-round="1"]')).toHaveTextContent(
+			'Feedback round 1'
+		);
+		// It is not numbered as a planned task.
+		await expect(round).not.toHaveTextContent('03.');
+		await expect(rows[0]).toHaveTextContent('01. Color tokens');
+		await expect(round.querySelector('[data-slot="status-badge"]')).toHaveTextContent(
+			'Active · work'
+		);
 	}}
 />
 

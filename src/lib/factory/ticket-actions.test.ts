@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { commandTarget, type CommandPhase } from './commands';
-import type { AttentionView, RunView, TicketDetailView } from './models';
+import type { AttentionView, PullRequest, RunView, TicketDetailView } from './models';
 import {
 	ACTION_REASONS,
 	TICKET_ACTIONS,
@@ -54,6 +54,7 @@ type Shape = {
 	current?: boolean;
 	runs?: RunView[];
 	attention?: AttentionView[];
+	pullRequest?: PullRequest | null;
 };
 
 function detail({
@@ -61,7 +62,8 @@ function detail({
 	stage = 'work',
 	current = true,
 	runs = [],
-	attention = []
+	attention = [],
+	pullRequest = null
 }: Shape): TicketDetailView {
 	return {
 		header: {
@@ -76,7 +78,7 @@ function detail({
 			needsUser: false,
 			execution: 1,
 			current,
-			pullRequest: null,
+			pullRequest,
 			trackerWarnings: [],
 			progress: { done: 0, total: 1, current: null },
 			currentTask: null,
@@ -114,52 +116,52 @@ describe('ticketActions by execution status', () => {
 		[
 			'queued',
 			'plan',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'active',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'waiting_for_user',
 			'review',
-			{ stop: 'E', reply: 'E', retry: 'H', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'E', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'paused',
 			'work',
-			{ stop: 'E', reply: 'E', retry: 'E', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'E', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'resuming',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'resume_failed',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'failed',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', rerun: 'E' }
+			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'E' }
 		],
 		[
 			'ready_for_handoff',
 			'wrapup',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'E', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'E', feedback: 'H', rerun: 'H' }
 		],
 		[
 			'complete',
 			'done',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'H', complete: 'H', rerun: 'E' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'H', complete: 'H', feedback: 'H', rerun: 'E' }
 		],
 		[
 			'cancelled',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'H', complete: 'H', rerun: 'E' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'H', complete: 'H', feedback: 'H', rerun: 'E' }
 		]
 	];
 
@@ -193,6 +195,7 @@ describe('ticketActions by execution status', () => {
 			retry: 'H',
 			cancel: 'E',
 			complete: 'H',
+			feedback: 'H',
 			rerun: 'H'
 		});
 		expect(Object.values(codes(select({ ...shape, stage: 'done' }).actions))).toEqual(
@@ -262,6 +265,87 @@ describe('Stop', () => {
 				reason: ACTION_REASONS.stopRequested
 			});
 		}
+	});
+});
+
+function pullRequest(state: PullRequest['state']): PullRequest {
+	return {
+		number: 42,
+		state,
+		url: 'https://github.com/dpaez/factory-dashboard/pull/42',
+		mergedAt: state === 'merged' ? '2026-10-23T00:00:00Z' : null
+	};
+}
+
+describe('Feedback round', () => {
+	const handoff = { status: 'ready_for_handoff', stage: 'wrapup' };
+
+	it('is enabled at ready_for_handoff with an open pull request', () => {
+		const result = select({ ...handoff, pullRequest: pullRequest('open') });
+		expect(result.actions.feedback).toEqual({ kind: 'enabled' });
+		expect(result.actions.complete).toEqual({ kind: 'enabled' });
+	});
+
+	it.each([
+		['merged', ACTION_REASONS.pullRequestMerged],
+		['closed', ACTION_REASONS.pullRequestClosed]
+	] as const)('is disabled with a %s pull request, naming its state', (state, reason) => {
+		const result = select({ ...handoff, pullRequest: pullRequest(state) });
+		expect(result.actions.feedback).toEqual({ kind: 'disabled', reason });
+	});
+
+	it('names the state in its reason', () => {
+		expect(ACTION_REASONS.pullRequestMerged).toBe('The pull request is merged.');
+		expect(ACTION_REASONS.pullRequestClosed).toBe('The pull request is closed.');
+	});
+
+	it('is hidden at ready_for_handoff without a pull request', () => {
+		expect(select(handoff).actions.feedback).toEqual({ kind: 'hidden' });
+	});
+
+	it.each([
+		['active', 'work'],
+		['active', 'wrapup'],
+		['waiting_for_user', 'review'],
+		['paused', 'work'],
+		['failed', 'work'],
+		['complete', 'done'],
+		['cancelled', 'work']
+	])('is hidden at %s (stage %s), even with an open pull request', (status, stage) => {
+		const result = select({ status, stage, pullRequest: pullRequest('open') });
+		expect(result.actions.feedback).toEqual({ kind: 'hidden' });
+	});
+
+	it('is hidden for a past execution', () => {
+		const result = select({ ...handoff, current: false, pullRequest: pullRequest('open') });
+		expect(result.actions.feedback).toEqual({ kind: 'hidden' });
+	});
+
+	it('is disabled with the access reason for a read-only token', () => {
+		const result = select(
+			{ ...handoff, pullRequest: pullRequest('open') },
+			{ access: 'read_only' }
+		);
+		expect(result.actions.feedback).toEqual({ kind: 'disabled', reason: ACTION_REASONS.readOnly });
+	});
+
+	it.each([
+		['submitting', ACTION_REASONS.sending],
+		['accepted', ACTION_REASONS.accepted]
+	] as const)('a %s round disables only Feedback round', (phase, reason) => {
+		const target = commandTarget({ command: 'feedback', ticket: KEY });
+		const result = select(
+			{ ...handoff, pullRequest: pullRequest('open') },
+			{ phaseFor: (t) => (t === target ? phase : 'idle') }
+		);
+		expect(result.actions.feedback).toEqual({ kind: 'disabled', reason });
+		expect(result.actions.complete).toEqual({ kind: 'enabled' });
+	});
+
+	it('targets the ticket whatever the note', () => {
+		expect(commandTarget({ command: 'feedback', ticket: KEY, note: 'look again' })).toBe(
+			commandTarget({ command: 'feedback', ticket: KEY })
+		);
 	});
 });
 

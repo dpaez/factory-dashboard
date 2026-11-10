@@ -110,6 +110,8 @@ export type TaskView = {
 	ordinal: number;
 	id: string;
 	title: string;
+	/** `n` for a feedback round's task (id `F<n>`); null for a planned task. */
+	feedbackRound: number | null;
 	status: TaskStatus;
 	stage: TaskStage | null;
 	blockedBy: TaskBlocker[];

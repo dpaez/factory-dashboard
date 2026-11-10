@@ -21,6 +21,7 @@ import {
 	commandTarget,
 	keysForCommand,
 	parseCommandAccepted,
+	refusalRereads,
 	type CommandAccepted,
 	type CommandAccess,
 	type CommandFailure,
@@ -92,6 +93,7 @@ const LABELS: Record<CommandName, string> = {
 	retry: 'Retry',
 	complete: 'Complete',
 	cancel: 'Cancel ticket',
+	feedback: 'Feedback round',
 	rerun: 'Rerun',
 	stop: 'Stop run'
 };
@@ -179,10 +181,16 @@ function withDetail(text: string, detail: string | undefined): string {
 	return detail ? `${text} ${detail}` : text;
 }
 
-function explain(rejection: CommandRejection, failure: CommandFailure): string {
+function explain(
+	command: CommandName,
+	rejection: CommandRejection,
+	failure: CommandFailure
+): string {
 	if (rejection.outcome === 'unconfirmed') return EXPLANATIONS.unconfirmed;
 	switch (rejection.reason) {
 		case 'stale':
+			// A refused feedback round is not a changed ticket: the factory's message says why.
+			if (command === 'feedback') return failure.detail ?? failure.title;
 			return withDetail(EXPLANATIONS.stale, failure.detail);
 		case 'access':
 			return failure.type === 'insufficient_scope'
@@ -458,12 +466,12 @@ export class CommandCoordinator {
 	): Promise<void> {
 		if (failure.type === 'insufficient_scope') this.access = 'read_only';
 		const rejection = classifyCommandFailure(failure);
-		const explanation = explain(rejection, failure);
+		const explanation = explain(request.command, rejection, failure);
 		if (rejection.outcome === 'unconfirmed') {
 			this.#update(id, { phase: 'unconfirmed', failure, explanation });
 			return;
 		}
-		if (rejection.reason === 'stale') {
+		if (refusalRereads(request.command, rejection, failure)) {
 			await this.#reread(keysForCommand(request));
 			if (signal.aborted) return;
 		}

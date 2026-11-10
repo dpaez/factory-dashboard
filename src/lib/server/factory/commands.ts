@@ -111,6 +111,21 @@ export function cancel(
 	);
 }
 
+/** `POST /v1/tickets/{key}/feedback-rounds`: start a feedback round on the open pull request, with an optional note. */
+export function feedback(
+	client: FactoryClient,
+	key: IdempotencyKey,
+	ticket: TicketKey,
+	body?: Schemas['StartFeedbackRound']
+): Promise<FactoryResult<Accepted>> {
+	return command(() =>
+		client.POST('/v1/tickets/{key}/feedback-rounds', {
+			params: { header: header(key), path: { key: ticket } },
+			...(body !== undefined && { body })
+		})
+	);
+}
+
 /** `POST /v1/tickets/{key}/reruns`: run a finished ticket again. */
 export function rerun(
 	client: FactoryClient,

@@ -439,6 +439,76 @@ describe('failures', () => {
 		expect(t.coordinator.access).toBe('unknown');
 	});
 
+	describe('a refused feedback round', () => {
+		const FEEDBACK: CommandInput = { command: 'feedback', ticket: KEY, note: 'Look again' };
+		const NO_NEW =
+			'No new feedback on https://github.com/dpaez/factory-dashboard/pull/42 since the last push (2 skipped: outdated). Add a note to start a round anyway.';
+
+		it('invalid_state shows the factory detail alone and rereads the ticket', async () => {
+			const t = setup();
+			t.holdInvalidates();
+			t.answers.push({ status: 409, body: failureBody('invalid_state', { detail: NO_NEW }) });
+			const intent = t.coordinator.submit(FEEDBACK);
+			await settle();
+			expect(t.invalidations).toEqual([ticketKeys]);
+			expect(intent.phase).toBe('submitting');
+			t.releaseInvalidate();
+			await settle();
+			expect(intent.phase).toBe('rejected');
+			expect(intent.explanation).toBe(NO_NEW);
+			expect(intent.explanation).not.toContain(EXPLANATIONS.stale);
+			expect(intent.request).toMatchObject({ note: 'Look again' });
+		});
+
+		it('invalid_state without a detail falls back to the title', async () => {
+			const t = setup();
+			t.answers.push({ status: 409, body: failureBody('invalid_state') });
+			const intent = t.coordinator.submit(FEEDBACK);
+			await settle();
+			expect(intent.explanation).toBe('Title of invalid_state');
+		});
+
+		it('code_host_unavailable shows the title and detail and rereads the ticket', async () => {
+			const t = setup();
+			t.answers.push({
+				status: 502,
+				body: failureBody('code_host_unavailable', {
+					title: 'Code host unavailable',
+					detail: 'Cannot read the pull request: HTTP 502',
+					retryable: true
+				})
+			});
+			const intent = t.coordinator.submit(FEEDBACK);
+			await settle();
+			expect(t.invalidations).toEqual([ticketKeys]);
+			expect(intent.phase).toBe('rejected');
+			expect(intent.outcome).toBe('other');
+			expect(intent.explanation).toBe(
+				'Code host unavailable Cannot read the pull request: HTTP 502'
+			);
+		});
+
+		it('another command refused by the code host does not reread', async () => {
+			const t = setup();
+			t.answers.push({ status: 502, body: failureBody('code_host_unavailable') });
+			const intent = t.coordinator.submit(RETRY);
+			await settle();
+			expect(intent.phase).toBe('rejected');
+			expect(t.invalidations).toEqual([]);
+		});
+
+		it('another command keeps the stale copy', async () => {
+			const t = setup();
+			t.answers.push({
+				status: 409,
+				body: failureBody('invalid_state', { detail: 'It is done.' })
+			});
+			const intent = t.coordinator.submit(RETRY);
+			await settle();
+			expect(intent.explanation).toBe(`${EXPLANATIONS.stale} It is done.`);
+		});
+	});
+
 	it('another failure is rejected with its title and detail', async () => {
 		const t = setup();
 		t.answers.push({

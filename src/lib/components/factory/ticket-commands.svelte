@@ -11,6 +11,7 @@
 	import { untrack } from 'svelte';
 	import ReplyComposer from './reply-composer.svelte';
 	import TicketActionsBar, { type TicketActionsFeedback } from './ticket-actions.svelte';
+	import { classifyCommandFailure, refusalRereads } from '$lib/factory/commands';
 	import {
 		commandTarget,
 		getCommandContext,
@@ -31,9 +32,11 @@
 	 * It holds the chosen stop run and the cancel dialog's open state, both
 	 * reset when the ticket or execution changes, and the reply draft, kept per
 	 * ticket, execution and question in `sessionStorage` and cleared only when
-	 * the reply is confirmed. `onreread` is called once per intent of this
-	 * ticket that confirms or comes back stale, for a placement whose read is
-	 * not a SvelteKit load (the board's Inspector).
+	 * the reply is confirmed, and the Feedback round note, kept for the shown
+	 * ticket until the round confirms. `onreread` is called once per intent of
+	 * this ticket that confirms or comes back with a refusal that rereads
+	 * (`refusalRereads`), for a placement whose read is not a SvelteKit load
+	 * (the board's Inspector).
 	 */
 	let {
 		detail,
@@ -51,13 +54,16 @@
 
 	let stopRun: string | null = $state(null);
 	let cancelOpen = $state(false);
-	// A new ticket or execution starts with no run chosen and the dialog closed.
+	// The Feedback round note: kept after a refusal, cleared once the round confirms.
+	let feedbackNote = $state('');
+	// A new ticket or execution starts with no run chosen, the dialog closed and no note.
 	$effect.pre(() => {
 		void ticket;
 		void execution;
 		untrack(() => {
 			stopRun = null;
 			cancelOpen = false;
+			feedbackNote = '';
 		});
 	});
 
@@ -96,6 +102,13 @@
 	function send(input: CommandInput) {
 		coordinator?.submit(input);
 	}
+
+	// A confirmed round empties the note it was sent with.
+	const feedbackPhase = $derived(intentOf('feedback')?.phase);
+	$effect(() => {
+		if (feedbackPhase !== 'confirmed') return;
+		untrack(() => (feedbackNote = ''));
+	});
 
 	// Reply: the open question, its draft and its intent.
 	const question = $derived(view?.reply ?? null);
@@ -148,7 +161,9 @@
 			(intent): intent is CommandIntent =>
 				intent !== undefined &&
 				(intent.phase === 'confirmed' ||
-					(intent.phase === 'rejected' && intent.outcome === 'stale'))
+					(intent.phase === 'rejected' &&
+						intent.failure !== undefined &&
+						refusalRereads(intent.command, classifyCommandFailure(intent.failure), intent.failure)))
 		);
 		untrack(() => {
 			const fresh = due.filter((intent) => !settled.has(`${intent.id}:${intent.phase}`));
@@ -186,6 +201,7 @@
 			{execution}
 			{feedback}
 			bind:cancelOpen
+			bind:feedbackNote
 			oncommand={send}
 			onstoprunchange={(run) => (stopRun = run)}
 		/>

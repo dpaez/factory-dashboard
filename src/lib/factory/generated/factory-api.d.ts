@@ -192,6 +192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tracker/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the Linear workspace's teams, workflow states, labels, and projects */
+        get: operations["trackerInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/events": {
         parameters: {
             query?: never;
@@ -362,6 +379,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tickets/{key}/feedback-rounds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the open pull request's new feedback back through work, review, and wrap-up on the same branch. Only at ready_for_handoff. */
+        post: operations["startFeedbackRound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tickets/{key}/reruns": {
         parameters: {
             query?: never;
@@ -439,6 +473,10 @@ export interface components {
             /** @description Why, for the issue. */
             reason?: string;
         };
+        StartFeedbackRound: {
+            /** @description The operator's own feedback, addressed as the last item. */
+            note?: string;
+        };
         Health: {
             /** @description The server instance holding the lease. It changes on every start. */
             instanceId: string;
@@ -455,7 +493,7 @@ export interface components {
              * @description A stable code clients can switch on.
              * @enum {string}
              */
-            type: "insufficient_scope" | "internal_error" | "invalid_state" | "method_not_allowed" | "not_found" | "not_waiting_for_reply" | "ticket_not_found" | "tracker_unavailable" | "umbrella_issue" | "unauthorized" | "unsupported_media_type" | "validation_error";
+            type: "code_host_unavailable" | "insufficient_scope" | "internal_error" | "invalid_state" | "method_not_allowed" | "not_found" | "not_waiting_for_reply" | "ticket_not_found" | "tracker_unavailable" | "umbrella_issue" | "unauthorized" | "unsupported_media_type" | "validation_error";
         };
         FieldError: {
             message: string;
@@ -785,6 +823,33 @@ export interface components {
             displayRef: string;
             title: string;
             url: string | null;
+        };
+        TrackerInventory: {
+            /** @constant */
+            kind: "linear";
+            /** @description Workspace labels, which every team can use. */
+            labels: components["schemas"]["TrackerLabel"][];
+            projects: {
+                name: string;
+            }[];
+            teams: {
+                /** @description The key tracker.team takes, such as ENG. */
+                key: string;
+                /** @description The team's own labels. */
+                labels: components["schemas"]["TrackerLabel"][];
+                name: string;
+                /** @description Workflow states in workflow order: tracker.status maps names, tracker.backlog.states takes types. */
+                states: {
+                    name: string;
+                    type: string;
+                }[];
+            }[];
+        };
+        TrackerLabel: {
+            /** @description The label group it sits in, if any. */
+            group: string | null;
+            /** @description The name tracker.backlog.labels takes. */
+            name: string;
         };
         StatsSummary: {
             /** @constant */
@@ -1450,6 +1515,35 @@ export interface operations {
             };
         };
     };
+    trackerInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the Linear workspace has. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackerInventory"];
+                };
+            };
+            /** @description A problem: the request was refused or failed. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     streamEvents: {
         parameters: {
             query?: {
@@ -1792,6 +1886,47 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": components["schemas"]["CancelTicket"];
+            };
+        };
+        responses: {
+            /** @description The command is committed. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandAccepted"];
+                };
+            };
+            /** @description A problem: the request was refused or failed. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startFeedbackRound: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Repeating a command with the same key returns the first result instead of applying it again. */
+                "idempotency-key"?: string;
+                /** @description Who the client acts for, such as a dashboard user. Stored, never verified. */
+                "x-factory-on-behalf-of"?: string;
+            };
+            path: {
+                /** @description A ticket key: the name of its factory directory, `<slug>-<hash8>`. */
+                key: components["schemas"]["TicketKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartFeedbackRound"];
             };
         };
         responses: {
