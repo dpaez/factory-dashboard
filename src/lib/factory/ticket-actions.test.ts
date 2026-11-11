@@ -82,6 +82,7 @@ function detail({
 			trackerWarnings: [],
 			progress: { done: 0, total: 1, current: null },
 			currentTask: null,
+			feedbackRound: null,
 			updatedAt: '2026-10-23T00:00:00Z'
 		},
 		tasks: [],

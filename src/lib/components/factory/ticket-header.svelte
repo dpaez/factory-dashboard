@@ -11,8 +11,8 @@
 	/**
 	 * The Inspector's header: the ticket's identity, the shown execution with
 	 * its history, the status and why, the current task and round, the pull
-	 * request, tracker warnings (apart from failures), the lifecycle locator and
-	 * the Source section. Links come from `hrefFor`, so the header works on the
+	 * request, a feedback round in progress, tracker warnings (apart from
+	 * failures), the lifecycle locator and the Source section. Links come from `hrefFor`, so the header works on the
 	 * board and on the ticket page. `onclose` adds a Close control.
 	 */
 	const uid = $props.id();
@@ -109,6 +109,21 @@
 			</a>
 		{/if}
 	</div>
+
+	{#if header.feedbackRound !== null}
+		<p
+			class="flex flex-wrap items-center gap-2 border-l-2 border-l-signal-run bg-card p-3 font-mono tabular-nums"
+			data-testid="feedback-round"
+			data-round={header.feedbackRound}
+		>
+			<span class="font-medium">Feedback round {header.feedbackRound}</span>
+			<span class="text-foreground/75"
+				>Addressing review feedback on {header.pullRequest
+					? `PR #${header.pullRequest.number}`
+					: 'the pull request'}.</span
+			>
+		</p>
+	{/if}
 
 	{#if header.statusReason}
 		<p class="font-mono text-foreground/75" data-testid="status-reason">{header.statusReason}</p>

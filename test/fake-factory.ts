@@ -165,10 +165,16 @@ const runsById = new Map<string, Schemas['Run']>(
 	].flatMap((page) => page.items.map((run): [string, Schemas['Run']] => [run.id, run]))
 );
 
-/** A ticket's executions: the fixture list for the multi-execution ticket, else its current one. */
-export function executionsFor(key: string): Schemas['ExecutionList'] {
+/**
+ * A ticket's executions: the fixture list for the multi-execution ticket, else
+ * its current one, from `current` when given (a detail a command changed).
+ */
+export function executionsFor(
+	key: string,
+	current?: Schemas['TicketDetail']
+): Schemas['ExecutionList'] {
 	if (key === ticketDetailMultiExecution.key) return executionList;
-	const detail = ticketDetails.get(key);
+	const detail = current ?? ticketDetails.get(key);
 	if (!detail) return { items: [] };
 	return {
 		items: [
@@ -833,7 +839,9 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				});
 			}
 			if (match[2] === '/executions') {
-				return options.failExecutions ? problem(options.failExecutions) : json(executionsFor(key));
+				return options.failExecutions
+					? problem(options.failExecutions)
+					: json(executionsFor(key, changedDetails.get(key)));
 			}
 
 			// `?execution=n`: the current execution, a past one, or 404 `not_found`.

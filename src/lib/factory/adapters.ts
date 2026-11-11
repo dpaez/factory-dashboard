@@ -106,6 +106,20 @@ export function toTasks(tasks: Schemas['Task'][]): TaskView[] {
 	return [...planned, ...rounds];
 }
 
+/**
+ * The feedback round in progress: the highest round whose task (`F<n>`) is
+ * neither done nor cancelled; null outside a round.
+ */
+export function currentFeedbackRound(tasks: Schemas['Task'][]): number | null {
+	let round: number | null = null;
+	for (const task of tasks) {
+		if (task.status === 'done' || task.status === 'cancelled') continue;
+		const n = feedbackRoundOf(task.id);
+		if (n !== null && (round === null || n > round)) round = n;
+	}
+	return round;
+}
+
 export function toAttention(attention: Schemas['Attention'][]): AttentionView[] {
 	return attention.map((request) => ({
 		id: request.id,
@@ -284,6 +298,7 @@ export function toTicketDetail(input: TicketDetailInput): TicketDetailView {
 			trackerWarnings: [...detail.trackerWarnings],
 			progress: toProgress(detail.progress),
 			currentTask: toCurrentTask(detail.progress, detail.tasks),
+			feedbackRound: currentFeedbackRound(detail.tasks),
 			updatedAt: detail.updatedAt
 		},
 		tasks: toTasks(detail.tasks),

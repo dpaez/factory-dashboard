@@ -390,6 +390,11 @@ test.describe('Feedback round', () => {
 	const note = (page: Page) => bar(page).getByRole('textbox', { name: NOTE_LABEL });
 	const round = (page: Page) => action(page, 'Feedback round');
 	const ROUND_PATH = `/v1/tickets/${HANDOFF}/feedback-rounds`;
+	const lifecycle = (page: Page) =>
+		inspector(page).getByTestId('timeline').getByRole('progressbar');
+	/** The lifecycle bar's value read once, without retrying, so a bar still animating up from Plan fails. */
+	const lifecycleNow = (page: Page) => lifecycle(page).getAttribute('aria-valuenow');
+	const banner = (page: Page) => inspector(page).getByTestId('feedback-round');
 	/** How many times the fake answered the handoff ticket's detail. */
 	const detailReads = (fake: FakeFixture) =>
 		fake
@@ -409,6 +414,10 @@ test.describe('Feedback round', () => {
 			await expect(round(page)).toBeEnabled();
 			await expect(note(page)).toBeEditable();
 			await expect(note(page)).toHaveValue('');
+			// Wrapup is step 5 of 6 from the first render, not a bar animating up from Plan.
+			expect(await lifecycleNow(page)).toBe(String(Math.round((5 / 6) * 100)));
+			await expect(lifecycle(page)).toHaveAccessibleName('Lifecycle: wrapup');
+			await expect(banner(page)).toHaveCount(0);
 			await shot(`ac1-feedback-round-enabled-${slug(placement)}`);
 
 			await round(page).click();
@@ -534,6 +543,15 @@ test.describe('Feedback round', () => {
 				await expect(rows.last()).toContainText('Feedback round 1');
 				await expect(rows.last()).not.toContainText('03.');
 				await expect(rows.first()).toContainText('01. Color tokens');
+				// Back to work, the bar jumps to step 2 of 6 at once.
+				expect(await lifecycleNow(page)).toBe(String(Math.round((2 / 6) * 100)));
+				await expect(lifecycle(page)).toHaveAccessibleName('Lifecycle: work');
+				await expect(banner(page)).toBeVisible();
+				await expect(banner(page)).toHaveAttribute('data-round', '1');
+				await expect(banner(page)).toContainText('Feedback round 1');
+				await expect(banner(page)).toContainText('Addressing review feedback on PR #');
+				await banner(page).scrollIntoViewIfNeeded();
+				await expect(banner(page)).toBeInViewport();
 				await shot(`ac9-feedback-round-in-work-${slug(placement)}`);
 			});
 		}
