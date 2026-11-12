@@ -12,6 +12,7 @@
 		ticketDetailCancelled,
 		ticketDetailComplete,
 		ticketDetailFailed,
+		ticketDetailFeedbackRound,
 		ticketDetailMultiExecution,
 		ticketDetailMultiExecutionFirst,
 		ticketDetailPaused,
@@ -162,6 +163,24 @@
 		await expect(pane.querySelector('[data-testid="pull-request"]')).toHaveTextContent(
 			'PR #42 · open'
 		);
+		await expect(pane.querySelector('[data-testid="feedback-round"]')).toBeNull();
+	}}
+/>
+
+<Story
+	name="Feedback round in progress"
+	args={args(single(ticketDetailFeedbackRound))}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const round = pane.querySelector('[data-testid="feedback-round"]')!;
+		await expect(round).toHaveTextContent('Feedback round 1');
+		await expect(round).toHaveTextContent('Addressing review feedback on PR #42.');
+		await expect(round).toHaveAttribute('data-round', '1');
+		await expect(pane.querySelector('[data-testid="stage"]')).toHaveTextContent('work');
+		// The lifecycle locator is at Work from the first render, not animating up from Plan.
+		await expect(
+			pane.querySelector('[data-testid="timeline"] [role="progressbar"]')
+		).toHaveAttribute('aria-valuenow', String(Math.round((2 / 6) * 100)));
 	}}
 />
 

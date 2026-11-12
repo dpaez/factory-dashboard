@@ -49,6 +49,7 @@ const problemCases: Array<{ type: ProblemType; status: number; retryable: boolea
 	{ type: 'invalid_state', status: 409, retryable: false },
 	{ type: 'not_waiting_for_reply', status: 409, retryable: false },
 	{ type: 'tracker_unavailable', status: 503, retryable: true },
+	{ type: 'code_host_unavailable', status: 502, retryable: true },
 	{ type: 'internal_error', status: 500, retryable: true },
 	{ type: 'method_not_allowed', status: 405, retryable: false },
 	{ type: 'umbrella_issue', status: 422, retryable: false },

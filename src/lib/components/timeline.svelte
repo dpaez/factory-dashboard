@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cubicInOut } from 'svelte/easing';
-	import { Tween } from 'svelte/motion';
+	import { untrack } from 'svelte';
+	import { prefersReducedMotion, Tween } from 'svelte/motion';
 
 	import { cn } from '$lib/utils';
 	import { Progress } from '$lib/components/ui/progress';
@@ -12,10 +13,17 @@
 		label?: string;
 	};
 	const { steps, currentStep, totalSteps, label }: TimelineProps = $props();
-	const tween = new Tween(0, { duration: 800, easing: cubicInOut });
 	const value = $derived((currentStep / totalSteps) * 100);
+	// The first render shows the current step as is. Only a later move forward
+	// animates (800ms), and not under reduced motion; a move back (a ticket
+	// returned to an earlier stage) jumps there at once.
+	const tween = new Tween(
+		untrack(() => value),
+		{ duration: 800, easing: cubicInOut }
+	);
 	$effect(() => {
-		tween.set(value);
+		const back = value < untrack(() => tween.target);
+		tween.set(value, back || prefersReducedMotion.current ? { duration: 0 } : undefined);
 	});
 </script>
 

@@ -74,18 +74,50 @@ function toSummaries(summaries: Schemas['Task']['summaries']): StageSummary[] {
 	}));
 }
 
-/** Tasks in API order. A blocker is open unless a task with that id in this execution is done. */
+const FEEDBACK_ROUND_ID = /^F([1-9][0-9]*)$/;
+
+/** The round number of a feedback round's task id (`F<n>`); null for a planned task. */
+export function feedbackRoundOf(id: string): number | null {
+	const match = FEEDBACK_ROUND_ID.exec(id);
+	return match ? Number(match[1]) : null;
+}
+
+/**
+ * Tasks in API order, with feedback rounds (`F<n>`) after the planned tasks
+ * in round order. A blocker is open unless a task with that id in this
+ * execution is done.
+ */
 export function toTasks(tasks: Schemas['Task'][]): TaskView[] {
 	const statusById = new Map(tasks.map((task) => [task.id, task.status as string]));
-	return tasks.map((task) => ({
+	const views: TaskView[] = tasks.map((task) => ({
 		ordinal: task.ordinal,
 		id: task.id,
 		title: task.title,
+		feedbackRound: feedbackRoundOf(task.id),
 		status: task.status,
 		stage: task.stage ?? null,
 		blockedBy: task.blockedBy.map((id) => ({ id, open: statusById.get(id) !== 'done' })),
 		summaries: toSummaries(task.summaries)
 	}));
+	const planned = views.filter((task) => task.feedbackRound === null);
+	const rounds = views
+		.filter((task) => task.feedbackRound !== null)
+		.sort((a, b) => a.feedbackRound! - b.feedbackRound!);
+	return [...planned, ...rounds];
+}
+
+/**
+ * The feedback round in progress: the highest round whose task (`F<n>`) is
+ * neither done nor cancelled; null outside a round.
+ */
+export function currentFeedbackRound(tasks: Schemas['Task'][]): number | null {
+	let round: number | null = null;
+	for (const task of tasks) {
+		if (task.status === 'done' || task.status === 'cancelled') continue;
+		const n = feedbackRoundOf(task.id);
+		if (n !== null && (round === null || n > round)) round = n;
+	}
+	return round;
 }
 
 export function toAttention(attention: Schemas['Attention'][]): AttentionView[] {
@@ -266,6 +298,7 @@ export function toTicketDetail(input: TicketDetailInput): TicketDetailView {
 			trackerWarnings: [...detail.trackerWarnings],
 			progress: toProgress(detail.progress),
 			currentTask: toCurrentTask(detail.progress, detail.tasks),
+			feedbackRound: currentFeedbackRound(detail.tasks),
 			updatedAt: detail.updatedAt
 		},
 		tasks: toTasks(detail.tasks),

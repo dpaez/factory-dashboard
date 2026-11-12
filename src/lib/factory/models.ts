@@ -90,6 +90,8 @@ export type TicketHeader = {
 	progress: TicketProgress;
 	/** Null when the factory names no current task. */
 	currentTask: CurrentTaskView | null;
+	/** `n` while feedback round `n` (task `F<n>`) is in progress; null otherwise. */
+	feedbackRound: number | null;
 	updatedAt: string;
 };
 
@@ -110,6 +112,8 @@ export type TaskView = {
 	ordinal: number;
 	id: string;
 	title: string;
+	/** `n` for a feedback round's task (id `F<n>`); null for a planned task. */
+	feedbackRound: number | null;
 	status: TaskStatus;
 	stage: TaskStage | null;
 	blockedBy: TaskBlocker[];

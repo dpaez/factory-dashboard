@@ -8,6 +8,7 @@ import {
 	keysForCommand,
 	parseCommandAccepted,
 	parseCommandBody,
+	refusalRereads,
 	type CommandFailure,
 	type CommandRequest
 } from './commands';
@@ -42,8 +43,17 @@ describe('isIntentId', () => {
 });
 
 describe('isCommandName', () => {
-	it('knows the seven commands and nothing else', () => {
-		for (const name of ['start', 'reply', 'retry', 'complete', 'cancel', 'rerun', 'stop']) {
+	it('knows the eight commands and nothing else', () => {
+		for (const name of [
+			'start',
+			'reply',
+			'retry',
+			'complete',
+			'cancel',
+			'feedback',
+			'rerun',
+			'stop'
+		]) {
 			expect(isCommandName(name)).toBe(true);
 		}
 		for (const name of ['delete', 'toString', '', 'START', undefined]) {
@@ -100,6 +110,27 @@ describe('classifyCommandFailure', () => {
 	});
 });
 
+describe('refusalRereads', () => {
+	const read = (command: Parameters<typeof refusalRereads>[0], type: string) =>
+		refusalRereads(command, classifyCommandFailure(failure(type)), failure(type));
+
+	it.each(['retry', 'reply', 'feedback'] as const)('every stale %s refusal rereads', (command) => {
+		expect(read(command, 'invalid_state')).toBe(true);
+	});
+
+	it('a feedback round the code host could not answer rereads; other commands do not', () => {
+		expect(read('feedback', 'code_host_unavailable')).toBe(true);
+		expect(read('retry', 'code_host_unavailable')).toBe(false);
+	});
+
+	it.each(['ticket_not_found', 'insufficient_scope', 'validation_error', 'internal_error'])(
+		'a feedback %s does not reread',
+		(type) => {
+			expect(read('feedback', type)).toBe(false);
+		}
+	);
+});
+
 describe('commandFieldName', () => {
 	it.each([
 		['body.answer', 'answer'],
@@ -139,6 +170,21 @@ describe('parseCommandBody', () => {
 			{ intent: INTENT, ticket: KEY, reason: 'Dup' },
 			{ command: 'cancel', intent: INTENT, ticket: KEY, reason: 'Dup' }
 		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY },
+			{ command: 'feedback', intent: INTENT, ticket: KEY }
+		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY, note: '  Rename the flag.\n' },
+			{ command: 'feedback', intent: INTENT, ticket: KEY, note: 'Rename the flag.' }
+		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY, note: '  \n\t ' },
+			{ command: 'feedback', intent: INTENT, ticket: KEY }
+		],
 		['stop', { intent: INTENT, run: 'run_1' }, { command: 'stop', intent: INTENT, run: 'run_1' }],
 		[
 			'retry',
@@ -161,6 +207,10 @@ describe('parseCommandBody', () => {
 		['reply', { intent: INTENT, ticket: KEY, answer: '   ' }, 'body.answer'],
 		['reply', { intent: INTENT, ticket: KEY }, 'body.answer'],
 		['cancel', { intent: INTENT, ticket: KEY, reason: 3 }, 'body.reason'],
+		['feedback', { intent: INTENT, ticket: KEY, note: 3 }, 'body.note'],
+		['feedback', { intent: INTENT, ticket: KEY, note: null }, 'body.note'],
+		['feedback', { intent: INTENT, ticket: 'Bad Key' }, 'body.ticket'],
+		['feedback', { intent: INTENT }, 'body.ticket'],
 		['stop', { intent: INTENT }, 'body.run'],
 		['stop', { intent: INTENT, run: '' }, 'body.run'],
 		['start', { intent: INTENT }, 'body.ref'],
@@ -209,7 +259,7 @@ describe('keysForCommand', () => {
 		]);
 	});
 
-	it.each(['reply', 'retry', 'complete', 'cancel', 'rerun'] as const)(
+	it.each(['reply', 'retry', 'complete', 'cancel', 'feedback', 'rerun'] as const)(
 		'a %s invalidates the board and its ticket',
 		(command) => {
 			const request = { command, intent: INTENT, ticket: KEY, answer: 'x' } as CommandRequest;

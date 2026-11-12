@@ -17,6 +17,7 @@ export const COMMAND_NAMES = [
 	'retry',
 	'complete',
 	'cancel',
+	'feedback',
 	'rerun',
 	'stop'
 ] as const;
@@ -34,6 +35,7 @@ export type CommandFields = {
 	retry: { ticket: string };
 	complete: { ticket: string };
 	cancel: { ticket: string; reason?: string };
+	feedback: { ticket: string; note?: string };
 	rerun: { ticket: string };
 	stop: { run: string };
 };
@@ -178,6 +180,16 @@ export function parseCommandBody(command: CommandName, body: unknown): ParsedCom
 			};
 			break;
 		}
+		case 'feedback': {
+			// `StartFeedbackRound.note` has minLength 1: send it trimmed, drop a blank one.
+			const key = ticket();
+			if (input.note !== undefined && typeof input.note !== 'string') {
+				fail('note', 'Must be text.');
+			}
+			const note = typeof input.note === 'string' ? input.note.trim() : '';
+			request = { command, intent, ticket: key, ...(note !== '' && { note }) };
+			break;
+		}
 		case 'stop': {
 			if (!nonEmpty(input.run)) fail('run', 'Must be a run id.');
 			request = { command, intent, run: input.run as string };
@@ -226,6 +238,21 @@ export function classifyCommandFailure(failure: CommandFailure): CommandRejectio
 		return { outcome: 'rejected', reason: 'validation', fieldErrors };
 	}
 	return { outcome: 'rejected', reason: 'other' };
+}
+
+/**
+ * Whether a refused command rereads its keys: every stale refusal, and a
+ * feedback round the code host could not answer (the pull request may have
+ * moved on while the factory was asking).
+ */
+export function refusalRereads(
+	command: CommandName,
+	rejection: CommandRejection,
+	failure: Pick<CommandFailure, 'type'>
+): boolean {
+	if (rejection.outcome !== 'rejected') return false;
+	if (rejection.reason === 'stale') return true;
+	return command === 'feedback' && failure.type === 'code_host_unavailable';
 }
 
 function ticketKeys(key: string): string[] {

@@ -7,7 +7,9 @@
 	 * An execution's tasks in API order: ordinal, title and the status · stage
 	 * badge, the blockers as in-page links that move focus to the blocking
 	 * task's row (open ones apart from done ones), and one line per review and
-	 * QA summary. With no tasks it shows the planning state at stage `plan`.
+	 * QA summary. A feedback round's task (`F<n>`) reads "Feedback round n",
+	 * without a planned task's number. With no tasks it shows the planning
+	 * state at stage `plan`.
 	 */
 	let { tasks, stage }: { tasks: TaskView[]; stage: Stage } = $props();
 
@@ -51,10 +53,16 @@
 			data-task={task.id}
 		>
 			<div class="flex items-center justify-between gap-2">
-				<p class="tabular-nums">
-					<span class="text-foreground/75">{String(task.ordinal).padStart(2, '0')}.</span>
-					{task.title}
-				</p>
+				{#if task.feedbackRound !== null}
+					<p class="tabular-nums" data-feedback-round={task.feedbackRound}>
+						Feedback round {task.feedbackRound}
+					</p>
+				{:else}
+					<p class="tabular-nums">
+						<span class="text-foreground/75">{String(task.ordinal).padStart(2, '0')}.</span>
+						{task.title}
+					</p>
+				{/if}
 				<TasksTableStatusCell status={task.status} stage={task.stage} />
 			</div>
 			{#if open.length > 0}

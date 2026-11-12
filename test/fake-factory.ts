@@ -165,10 +165,16 @@ const runsById = new Map<string, Schemas['Run']>(
 	].flatMap((page) => page.items.map((run): [string, Schemas['Run']] => [run.id, run]))
 );
 
-/** A ticket's executions: the fixture list for the multi-execution ticket, else its current one. */
-export function executionsFor(key: string): Schemas['ExecutionList'] {
+/**
+ * A ticket's executions: the fixture list for the multi-execution ticket, else
+ * its current one, from `current` when given (a detail a command changed).
+ */
+export function executionsFor(
+	key: string,
+	current?: Schemas['TicketDetail']
+): Schemas['ExecutionList'] {
 	if (key === ticketDetailMultiExecution.key) return executionList;
-	const detail = ticketDetails.get(key);
+	const detail = current ?? ticketDetails.get(key);
 	if (!detail) return { items: [] };
 	return {
 		items: [
@@ -325,7 +331,8 @@ export type FakeFactoryOptions = {
 };
 
 /** The factory command an upstream `POST` route names. */
-export type FakeCommand = 'start' | 'reply' | 'retry' | 'complete' | 'cancel' | 'rerun' | 'stop';
+export type FakeCommand =
+	'start' | 'reply' | 'retry' | 'complete' | 'cancel' | 'feedback' | 'rerun' | 'stop';
 
 /** One command the fake received, with what it saw of the headers that matter. */
 export type FakeCommandRequest = {
@@ -391,6 +398,7 @@ const TICKET_COMMANDS: Record<string, FakeCommand> = {
 	retries: 'retry',
 	complete: 'complete',
 	cancel: 'cancel',
+	'feedback-rounds': 'feedback',
 	reruns: 'rerun'
 };
 
@@ -399,7 +407,9 @@ function commandRoute(
 	path: string
 ): { command: FakeCommand; ticket?: string; run?: string } | null {
 	if (path === '/v1/tickets') return { command: 'start' };
-	const ticket = path.match(/^\/v1\/tickets\/([^/]+)\/(replies|retries|complete|cancel|reruns)$/);
+	const ticket = path.match(
+		/^\/v1\/tickets\/([^/]+)\/(replies|retries|complete|cancel|feedback-rounds|reruns)$/
+	);
 	if (ticket) {
 		return {
 			command: TICKET_COMMANDS[ticket[2] ?? ''] as FakeCommand,
@@ -829,7 +839,9 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 				});
 			}
 			if (match[2] === '/executions') {
-				return options.failExecutions ? problem(options.failExecutions) : json(executionsFor(key));
+				return options.failExecutions
+					? problem(options.failExecutions)
+					: json(executionsFor(key, changedDetails.get(key)));
 			}
 
 			// `?execution=n`: the current execution, a past one, or 404 `not_found`.

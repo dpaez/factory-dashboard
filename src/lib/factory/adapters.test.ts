@@ -19,15 +19,18 @@ import {
 	ticketDetailAgentQuestion,
 	ticketDetailCancelled,
 	ticketDetailFailed,
+	ticketDetailFeedbackRound,
 	ticketDetailPaused,
 	ticketDetailManualApproval,
 	ticketDetailMultiExecution,
 	ticketDetailQueued,
+	ticketDetailReadyForHandoff,
 	ticketSummaries
 } from '$lib/factory/fixtures';
 import type { components } from '$lib/factory/generated/factory-api';
 
 import {
+	currentFeedbackRound,
 	toAttention,
 	toCurrentTask,
 	toExecutions,
@@ -135,6 +138,23 @@ describe('toTasks', () => {
 			}
 		]);
 		expect(task?.summaries.map((summary) => summary.stage)).toEqual(['review', 'qa', 'work']);
+	});
+
+	it('marks F<n> tasks as feedback rounds, after the planned tasks in round order', () => {
+		const planned = ticketDetailActiveInWork.tasks[0]!;
+		const round = (n: number, ordinal: number) => ({
+			...planned,
+			id: `F${n}`,
+			ordinal,
+			title: `Feedback round ${n}`
+		});
+		const result = toTasks([round(2, 3), planned, round(1, 2), { ...planned, id: 'F0' }]);
+		expect(result.map(({ id, feedbackRound }) => ({ id, feedbackRound }))).toEqual([
+			{ id: planned.id, feedbackRound: null },
+			{ id: 'F0', feedbackRound: null },
+			{ id: 'F1', feedbackRound: 1 },
+			{ id: 'F2', feedbackRound: 2 }
+		]);
 	});
 
 	it('keeps task status and stage, with null stage when absent', () => {
@@ -397,6 +417,38 @@ describe('toTicketDetail', () => {
 		expect(view.tasks).toHaveLength(5);
 		expect(view.attention).toEqual([]);
 		expect(view.usage?.costUsd).toBe(3.42);
+	});
+});
+
+describe('currentFeedbackRound', () => {
+	const task = (id: string, status: Schemas['Task']['status']): Schemas['Task'] => ({
+		blockedBy: [],
+		id,
+		ordinal: 1,
+		stage: null,
+		status,
+		summaries: {},
+		title: id
+	});
+
+	it('is the open F<n> task with the highest round', () => {
+		expect(
+			currentFeedbackRound([task('01', 'done'), task('F1', 'done'), task('F2', 'active')])
+		).toBe(2);
+		expect(currentFeedbackRound([task('F2', 'pending'), task('F3', 'blocked')])).toBe(3);
+	});
+
+	it('is null with no round task, or when every round is done or cancelled', () => {
+		expect(currentFeedbackRound([task('01', 'active')])).toBeNull();
+		expect(currentFeedbackRound([task('F1', 'done'), task('F2', 'cancelled')])).toBeNull();
+		expect(currentFeedbackRound([task('Fix', 'active'), task('F0', 'active')])).toBeNull();
+	});
+
+	it('reaches the header: the accepted round reads as round 1, the handoff as none', () => {
+		const header = (detail: Schemas['TicketDetail']) =>
+			toTicketDetail({ detail, executions: { items: [] }, runs: [] }).header;
+		expect(header(ticketDetailFeedbackRound)).toMatchObject({ stage: 'work', feedbackRound: 1 });
+		expect(header(ticketDetailReadyForHandoff).feedbackRound).toBeNull();
 	});
 });
 

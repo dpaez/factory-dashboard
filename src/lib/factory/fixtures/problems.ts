@@ -159,3 +159,19 @@ export const problemNoTracker = {
 	type: 'tracker_unavailable',
 	detail: 'FACTORY.json has no tracker, so there is no backlog.'
 } satisfies Problem;
+
+/** A feedback round on a pull request that is not open (factory-skills `src/actions/feedback-round.ts`). */
+export const problemFeedbackRoundNotOpen = {
+	status: 409,
+	title: 'Invalid state',
+	type: 'invalid_state',
+	detail: 'https://github.com/dpaez/factory-dashboard/pull/42 is merged, not open.'
+} satisfies Problem;
+
+/** A feedback round whose pull request the factory could not read. */
+export const problemCodeHostUnavailable = {
+	status: 502,
+	title: 'Code host unavailable',
+	type: 'code_host_unavailable',
+	detail: 'Cannot read https://github.com/dpaez/factory-dashboard/pull/42: HTTP 502'
+} satisfies Problem;

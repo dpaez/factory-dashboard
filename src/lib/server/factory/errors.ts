@@ -54,6 +54,7 @@ const PROBLEM_RETRYABLE: Record<ProblemType, boolean> = {
 	invalid_state: false,
 	not_waiting_for_reply: false,
 	tracker_unavailable: true,
+	code_host_unavailable: true,
 	internal_error: true,
 	method_not_allowed: false,
 	umbrella_issue: false,
