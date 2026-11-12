@@ -303,7 +303,9 @@
 	name="Queued"
 	args={build(ticketDetailQueued)}
 	play={async ({ canvasElement }) => {
-		await expectActions(firstPane(canvasElement), { cancel: 'enabled' });
+		const pane = firstPane(canvasElement);
+		await expectActions(pane, { cancel: 'enabled', feedback: 'disabled' });
+		await expectReason(pane, 'feedback', ACTION_REASONS.notAtHandoff);
 	}}
 />
 
@@ -312,7 +314,7 @@
 	args={active}
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { stop: 'enabled', cancel: 'enabled' });
+		await expectActions(pane, { stop: 'enabled', cancel: 'enabled', feedback: 'disabled' });
 		const note = pane.querySelector('[data-note="stop"]')!;
 		await expect(note).toHaveTextContent(`#${runWorkRunning.sequence}`);
 		await expect(note).toHaveTextContent(runWorkRunning.id);
@@ -331,7 +333,7 @@
 	args={build(ticketDetailAgentQuestion)}
 	play={async ({ canvasElement }) => {
 		// Reply lives in its own composer; the bar offers Cancel.
-		await expectActions(firstPane(canvasElement), { cancel: 'enabled' });
+		await expectActions(firstPane(canvasElement), { cancel: 'enabled', feedback: 'disabled' });
 	}}
 />
 
@@ -340,8 +342,9 @@
 	args={build(ticketDetailManualApproval)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { cancel: 'enabled', complete: 'disabled' });
+		await expectActions(pane, { cancel: 'enabled', complete: 'disabled', feedback: 'disabled' });
 		await expectReason(pane, 'complete', ACTION_REASONS.preparingHandoff);
+		await expectReason(pane, 'feedback', ACTION_REASONS.preparingHandoff);
 	}}
 />
 
@@ -350,7 +353,7 @@
 	args={paused}
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { retry: 'enabled', cancel: 'enabled' });
+		await expectActions(pane, { retry: 'enabled', cancel: 'enabled', feedback: 'disabled' });
 		await expect(pane.querySelector('[data-note="retry"]')).toHaveTextContent(ACTION_NOTES.retry);
 		await expect(pane.querySelector('[data-note="retry"]')).toHaveTextContent(
 			'It is not a new execution.'
@@ -368,7 +371,7 @@
 	name="Resuming"
 	args={build(ticketDetailResuming)}
 	play={async ({ canvasElement }) => {
-		await expectActions(firstPane(canvasElement), { cancel: 'enabled' });
+		await expectActions(firstPane(canvasElement), { cancel: 'enabled', feedback: 'disabled' });
 	}}
 />
 
@@ -376,7 +379,11 @@
 	name="Resume failed"
 	args={build(ticketDetailTrackerWarnings)}
 	play={async ({ canvasElement }) => {
-		await expectActions(firstPane(canvasElement), { retry: 'enabled', cancel: 'enabled' });
+		await expectActions(firstPane(canvasElement), {
+			retry: 'enabled',
+			cancel: 'enabled',
+			feedback: 'disabled'
+		});
 	}}
 />
 
@@ -387,6 +394,7 @@
 		await expectActions(firstPane(canvasElement), {
 			retry: 'enabled',
 			cancel: 'enabled',
+			feedback: 'disabled',
 			rerun: 'enabled'
 		});
 	}}
@@ -410,7 +418,7 @@
 	}}
 />
 
-<!-- Feedback round: at ready_for_handoff with a pull request. -->
+<!-- Feedback round: enabled only at ready_for_handoff with an open pull request. -->
 
 <Story
 	name="Feedback round, no note"
@@ -476,8 +484,9 @@
 	args={build(ticketDetailReadyForHandoffNoPr)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { complete: 'enabled', cancel: 'enabled' });
-		await expect(within(pane).queryByRole('textbox')).toBeNull();
+		await expectActions(pane, { complete: 'enabled', feedback: 'disabled', cancel: 'enabled' });
+		await expectReason(pane, 'feedback', ACTION_REASONS.noPullRequest);
+		await expect(noteField(pane)).toBeDisabled();
 	}}
 />
 
@@ -636,7 +645,12 @@
 		await expect(explanation).toHaveLength(1);
 		await expect(explanation[0]).toBeVisible();
 		await expect(explanation[0]).toHaveTextContent(ACTION_REASONS.readOnly);
-		await expectActions(pane, { stop: 'disabled', retry: 'disabled', cancel: 'disabled' });
+		await expectActions(pane, {
+			stop: 'disabled',
+			retry: 'disabled',
+			cancel: 'disabled',
+			feedback: 'disabled'
+		});
 		for (const button of within(pane).getAllByRole('button')) {
 			await expect(button).toBeDisabled();
 			await expect(button.getAttribute('aria-describedby')).toContain(explanation[0]!.id);

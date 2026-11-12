@@ -117,42 +117,42 @@ describe('ticketActions by execution status', () => {
 		[
 			'queued',
 			'plan',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'active',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'waiting_for_user',
 			'review',
-			{ stop: 'E', reply: 'E', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'E', retry: 'H', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'paused',
 			'work',
-			{ stop: 'E', reply: 'E', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'E', retry: 'E', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'resuming',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'resume_failed',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'failed',
 			'work',
-			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'H', rerun: 'E' }
+			{ stop: 'E', reply: 'D', retry: 'E', cancel: 'E', complete: 'H', feedback: 'D', rerun: 'E' }
 		],
 		[
 			'ready_for_handoff',
 			'wrapup',
-			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'E', feedback: 'H', rerun: 'H' }
+			{ stop: 'E', reply: 'D', retry: 'H', cancel: 'E', complete: 'E', feedback: 'D', rerun: 'H' }
 		],
 		[
 			'complete',
@@ -300,21 +300,49 @@ describe('Feedback round', () => {
 		expect(ACTION_REASONS.pullRequestClosed).toBe('The pull request is closed.');
 	});
 
-	it('is hidden at ready_for_handoff without a pull request', () => {
-		expect(select(handoff).actions.feedback).toEqual({ kind: 'hidden' });
+	it('is disabled at ready_for_handoff without a pull request', () => {
+		expect(select(handoff).actions.feedback).toEqual({
+			kind: 'disabled',
+			reason: ACTION_REASONS.noPullRequest
+		});
+	});
+
+	it('is disabled in wrapup while the handoff is still being prepared', () => {
+		const result = select({ status: 'active', stage: 'wrapup', pullRequest: pullRequest('open') });
+		expect(result.actions.feedback).toEqual({
+			kind: 'disabled',
+			reason: ACTION_REASONS.preparingHandoff
+		});
 	});
 
 	it.each([
+		['queued', 'plan'],
 		['active', 'work'],
-		['active', 'wrapup'],
 		['waiting_for_user', 'review'],
 		['paused', 'work'],
-		['failed', 'work'],
+		['resuming', 'qa'],
+		['resume_failed', 'work'],
+		['failed', 'work']
+	])('is disabled at %s (stage %s), even with an open pull request', (status, stage) => {
+		const result = select({ status, stage, pullRequest: pullRequest('open') });
+		expect(result.actions.feedback).toEqual({
+			kind: 'disabled',
+			reason: ACTION_REASONS.notAtHandoff
+		});
+	});
+
+	it.each([
 		['complete', 'done'],
 		['cancelled', 'work']
-	])('is hidden at %s (stage %s), even with an open pull request', (status, stage) => {
+	])('is hidden once the execution has ended (%s)', (status, stage) => {
 		const result = select({ status, stage, pullRequest: pullRequest('open') });
 		expect(result.actions.feedback).toEqual({ kind: 'hidden' });
+	});
+
+	it('names why a round must wait for handoff', () => {
+		expect(ACTION_REASONS.notAtHandoff).toBe(
+			'A feedback round starts at handoff, while its pull request is open.'
+		);
 	});
 
 	it('is hidden for a past execution', () => {
@@ -417,7 +445,7 @@ describe('read-only access', () => {
 });
 
 describe('pending intents', () => {
-	const ticketTarget = (command: 'retry' | 'cancel' | 'complete' | 'rerun') =>
+	const ticketTarget = (command: 'retry' | 'cancel' | 'complete' | 'feedback' | 'rerun') =>
 		commandTarget({ command, ticket: KEY });
 
 	it.each([
@@ -474,6 +502,7 @@ describe('pending intents', () => {
 				`reply:${KEY}`,
 				ticketTarget('retry'),
 				ticketTarget('cancel'),
+				ticketTarget('feedback'),
 				ticketTarget('rerun')
 			].sort()
 		);

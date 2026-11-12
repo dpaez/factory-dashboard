@@ -5,6 +5,7 @@ import {
 	ticketDetailAgentQuestion,
 	ticketDetailFailed,
 	ticketDetailFeedbackRound,
+	ticketDetailManualApproval,
 	ticketDetailMultiExecution,
 	ticketDetailPaused,
 	ticketDetailReadyForHandoff
@@ -439,6 +440,29 @@ test.describe('Feedback round', () => {
 		});
 	}
 
+	for (const [label, key, reason] of [
+		['in work', PAUSED, 'A feedback round starts at handoff, while its pull request is open.'],
+		[
+			'in wrapup before handoff',
+			ticketDetailManualApproval.key,
+			'Wrapup is still preparing the handoff.'
+		]
+	] as const) {
+		test(`${label}: the round is disabled with its reason and a click sends nothing`, async ({
+			page,
+			fake,
+			shot
+		}) => {
+			await gotoLive(page, PLACEMENTS[0]!.url(key));
+			await expect(round(page)).toBeDisabled();
+			await expect(bar(page).locator('[data-reason="feedback"]')).toHaveText(reason);
+			await round(page).click({ force: true });
+			await page.waitForTimeout(500);
+			expect(fake.commands()).toHaveLength(0);
+			await shot(`f1-feedback-round-disabled-${label.replaceAll(' ', '-')}`);
+		});
+	}
+
 	test.describe('while the round is pending', () => {
 		test.use({ fakeOptions: { commandDelayMs: 1_500 } });
 
@@ -535,8 +559,12 @@ test.describe('Feedback round', () => {
 				await gotoLive(page, placement.url(HANDOFF));
 				await round(page).click();
 				await received(fake, 0);
-				await expect(round(page)).toHaveCount(0, { timeout: 15_000 });
-				await expect(inspector(page).getByTestId('stage')).toHaveText('work');
+				await expect(inspector(page).getByTestId('stage')).toHaveText('work', { timeout: 15_000 });
+				// Back in work, the round waits for the next handoff.
+				await expect(round(page)).toBeDisabled();
+				await expect(bar(page).locator('[data-reason="feedback"]')).toHaveText(
+					'A feedback round starts at handoff, while its pull request is open.'
+				);
 				const rows = inspector(page).getByTestId('tasks').locator('[data-task]');
 				await expect(rows).toHaveCount(3);
 				await expect(rows.last()).toHaveAttribute('data-task', 'F1');
