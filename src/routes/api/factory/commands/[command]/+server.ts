@@ -60,7 +60,12 @@ function send(client: FactoryClient, request: CommandRequest) {
 				client,
 				key,
 				request.ticket,
-				request.note === undefined ? undefined : { note: request.note }
+				request.note === undefined && request.only === undefined
+					? undefined
+					: {
+							...(request.only !== undefined && { only: request.only }),
+							...(request.note !== undefined && { note: request.note })
+						}
 			);
 		case 'rerun':
 			return commands.rerun(client, key, request.ticket);

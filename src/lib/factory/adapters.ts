@@ -11,6 +11,8 @@ import type { components } from '$lib/factory/generated/factory-api';
 import {
 	type AttentionView,
 	type CurrentTaskView,
+	type EarlierRoundView,
+	type FeedbackRoundRecord,
 	type SourceView,
 	type ExecutionView,
 	type ReviewView,
@@ -94,6 +96,7 @@ export function toTasks(tasks: Schemas['Task'][]): TaskView[] {
 		id: task.id,
 		title: task.title,
 		feedbackRound: feedbackRoundOf(task.id),
+		feedback: toFeedbackRecord(task.feedback),
 		status: task.status,
 		stage: task.stage ?? null,
 		blockedBy: task.blockedBy.map((id) => ({ id, open: statusById.get(id) !== 'done' })),
@@ -104,6 +107,48 @@ export function toTasks(tasks: Schemas['Task'][]): TaskView[] {
 		.filter((task) => task.feedbackRound !== null)
 		.sort((a, b) => a.feedbackRound! - b.feedbackRound!);
 	return [...planned, ...rounds];
+}
+
+/** A round's record as the view carries it; null for a planned task. */
+export function toFeedbackRecord(
+	feedback: Schemas['Task']['feedback']
+): FeedbackRoundRecord | null {
+	if (!feedback) return null;
+	return {
+		round: feedback.round,
+		items: feedback.items.map((item) => ({
+			id: item.id,
+			ref: item.ref,
+			kind: item.kind,
+			author: item.author,
+			location: item.location,
+			summary: item.summary,
+			url: item.url
+		}))
+	};
+}
+
+/**
+ * The execution's feedback rounds with their items, in round order, for the
+ * Feedback rounds box. Only round tasks (`F<n>`) whose record is present count;
+ * a task with `feedback: null` contributes nothing.
+ */
+export function earlierRounds(tasks: readonly TaskView[]): EarlierRoundView[] {
+	return tasks
+		.flatMap((task) =>
+			task.feedback && task.feedbackRound !== null
+				? [
+						{
+							taskId: task.id,
+							round: task.feedbackRound,
+							status: task.status,
+							stage: task.stage,
+							items: task.feedback.items
+						}
+					]
+				: []
+		)
+		.sort((a, b) => a.round - b.round);
 }
 
 /**

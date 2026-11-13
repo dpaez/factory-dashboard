@@ -494,6 +494,7 @@ export const ticketUnknownStage = {
 const qaTicketTasks: Schemas['Task'][] = [
 	{
 		blockedBy: [],
+		feedback: null,
 		id: '01',
 		ordinal: 1,
 		stage: null,
@@ -506,6 +507,7 @@ const qaTicketTasks: Schemas['Task'][] = [
 	},
 	{
 		blockedBy: ['01'],
+		feedback: null,
 		id: '02',
 		ordinal: 2,
 		stage: 'qa',
@@ -517,6 +519,7 @@ const qaTicketTasks: Schemas['Task'][] = [
 	},
 	{
 		blockedBy: ['01', '02'],
+		feedback: null,
 		id: '03',
 		ordinal: 3,
 		stage: null,
@@ -593,6 +596,7 @@ export const ticketDetailMultiExecutionFirst = {
 	tasks: [
 		{
 			blockedBy: [],
+			feedback: null,
 			id: '01',
 			ordinal: 1,
 			stage: null,
@@ -630,6 +634,7 @@ export const ticketDetailPlanning = {
 const pausedTicketTasks: Schemas['Task'][] = [
 	{
 		blockedBy: [],
+		feedback: null,
 		id: '01',
 		ordinal: 1,
 		stage: null,
@@ -641,6 +646,7 @@ const pausedTicketTasks: Schemas['Task'][] = [
 	},
 	{
 		blockedBy: ['01'],
+		feedback: null,
 		id: '02',
 		ordinal: 2,
 		stage: 'work',
@@ -685,6 +691,7 @@ export const ticketDetailReadyForHandoff = {
 	tasks: [
 		{
 			blockedBy: [],
+			feedback: null,
 			id: '01',
 			ordinal: 1,
 			stage: null,
@@ -696,6 +703,7 @@ export const ticketDetailReadyForHandoff = {
 		},
 		{
 			blockedBy: ['01'],
+			feedback: null,
 			id: '02',
 			ordinal: 2,
 			stage: null,
@@ -717,6 +725,7 @@ export const ticketDetailComplete = {
 	tasks: [
 		{
 			blockedBy: [],
+			feedback: null,
 			id: '01',
 			ordinal: 1,
 			stage: null,
@@ -738,6 +747,7 @@ export const ticketDetailCancelled = {
 	tasks: [
 		{
 			blockedBy: [],
+			feedback: null,
 			id: '01',
 			ordinal: 1,
 			stage: 'work',
@@ -777,6 +787,47 @@ export const ticketDetailReadyForHandoffNoPr = {
 } satisfies Schemas['TicketDetail'];
 
 /**
+ * Round 1's items: two pull request comments it took, and the operator's
+ * note, whose `ref` is null (factory-skills `src/actions/feedback-round.ts`).
+ */
+export const feedbackRoundOne = {
+	dismissed: [],
+	items: [
+		{
+			author: 'dpaez',
+			id: 'F1',
+			kind: 'thread',
+			location: 'src/lib/tokens.css:12',
+			ref: 'r2804117301',
+			summary: 'Use the surface token here instead of a raw hex value.',
+			url: 'https://github.com/dpaez/factory-dashboard/pull/42#discussion_r2804117301'
+		},
+		{
+			author: 'kai',
+			id: 'F2',
+			kind: 'review',
+			location: null,
+			ref: 'p3301245',
+			summary: 'The type scale reads well; please add the 2xs step.',
+			url: 'https://github.com/dpaez/factory-dashboard/pull/42#pullrequestreview-3301245'
+		},
+		{
+			author: 'operator',
+			id: 'F3',
+			kind: 'note',
+			location: null,
+			ref: null,
+			summary: 'Keep the dark theme contrast at AA.',
+			url: null
+		}
+	],
+	pullRequestUrl: pullRequestOpen.url,
+	round: 1,
+	skipped: [],
+	taken: ['2804117301', '3301245']
+} satisfies Schemas['FeedbackRound'];
+
+/**
  * After an accepted feedback round: back in work, with the factory's round
  * task `F1` after the planned tasks (factory-skills `src/actions/feedback-round.ts`).
  */
@@ -795,6 +846,7 @@ export const ticketDetailFeedbackRound = {
 		...ticketDetailReadyForHandoff.tasks,
 		{
 			blockedBy: [],
+			feedback: feedbackRoundOne,
 			id: 'F1',
 			ordinal: 3,
 			stage: 'work',
@@ -803,4 +855,64 @@ export const ticketDetailFeedbackRound = {
 			title: 'Feedback round 1'
 		}
 	]
+} satisfies Schemas['TicketDetail'];
+
+/** Round 2's items: one pull request comment, after round 1's were taken. */
+export const feedbackRoundTwo = {
+	dismissed: [],
+	items: [
+		{
+			author: 'kai',
+			id: 'F1',
+			kind: 'comment',
+			location: null,
+			ref: 'c4410982',
+			summary: 'The 2xs step looks cramped in the board cards.',
+			url: 'https://github.com/dpaez/factory-dashboard/pull/42#issuecomment-4410982'
+		}
+	],
+	pullRequestUrl: pullRequestOpen.url,
+	round: 2,
+	skipped: [],
+	taken: ['4410982']
+} satisfies Schemas['FeedbackRound'];
+
+/** Round 1 done, round 2 in work: two earlier rounds, read-only. */
+export const ticketDetailTwoFeedbackRounds = {
+	...ticketDetailFeedbackRound,
+	progress: {
+		current: { label: 'Feedback round 2', step: '04/04' },
+		done: 3,
+		next: null,
+		total: 4
+	},
+	tasks: [
+		...ticketDetailReadyForHandoff.tasks,
+		{ ...ticketDetailFeedbackRound.tasks[2]!, stage: null, status: 'done' },
+		{
+			blockedBy: [],
+			feedback: feedbackRoundTwo,
+			id: 'F2',
+			ordinal: 4,
+			stage: 'work',
+			status: 'active',
+			summaries: {},
+			title: 'Feedback round 2'
+		}
+	]
+} satisfies Schemas['TicketDetail'];
+
+/** Back at handoff after round 1, with the pull request still open. */
+export const ticketDetailReadyForHandoffAfterRound = {
+	...ticketDetailReadyForHandoff,
+	tasks: [
+		...ticketDetailReadyForHandoff.tasks,
+		{ ...ticketDetailFeedbackRound.tasks[2]!, stage: null, status: 'done' }
+	]
+} satisfies Schemas['TicketDetail'];
+
+/** Round 1 done, then the pull request was merged: the earlier round only, read-only. */
+export const ticketDetailFeedbackRoundMergedPr = {
+	...ticketDetailReadyForHandoffAfterRound,
+	pullRequest: { ...pullRequestOpen, mergedAt: '2026-10-15T10:00:00Z', state: 'merged' }
 } satisfies Schemas['TicketDetail'];

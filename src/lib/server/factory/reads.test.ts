@@ -6,6 +6,7 @@ import {
 	executionList,
 	factory,
 	meWithOperator,
+	pendingFeedback,
 	problemTicketNotFound,
 	problemValidationError,
 	runPage,
@@ -32,6 +33,7 @@ import {
 	getTicket,
 	listAgents,
 	listExecutions,
+	listPendingFeedback,
 	listRuns,
 	listTickets,
 	type FactoryResult
@@ -151,6 +153,13 @@ const cases: ReadCase[] = [
 		path: '/v1/tickets/a%2Fb/executions',
 		query: [],
 		fixture: executionList
+	},
+	{
+		name: 'listPendingFeedback',
+		call: (c) => listPendingFeedback(c, KEY),
+		path: `/v1/tickets/${KEY}/feedback`,
+		query: [],
+		fixture: pendingFeedback
 	},
 	{
 		name: 'listRuns',

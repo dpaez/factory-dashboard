@@ -103,6 +103,18 @@ const cases: Case[] = [
 		body: { note: 'Rename the flag.' }
 	},
 	{
+		name: 'feedback (only)',
+		call: (c) => feedback(c, INTENT, KEY, { only: ['r1', 'c2'] }),
+		path: `/v1/tickets/${KEY}/feedback-rounds`,
+		body: { only: ['r1', 'c2'] }
+	},
+	{
+		name: 'feedback (only and note)',
+		call: (c) => feedback(c, INTENT, KEY, { only: ['r1'], note: 'Rename the flag.' }),
+		path: `/v1/tickets/${KEY}/feedback-rounds`,
+		body: { only: ['r1'], note: 'Rename the flag.' }
+	},
+	{
 		name: 'rerun',
 		call: (c) => rerun(c, INTENT, KEY),
 		path: `/v1/tickets/${KEY}/reruns`,

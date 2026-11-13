@@ -142,6 +142,19 @@ describe('POST /api/factory/commands/[command]', () => {
 			{ note: 'Rename the flag.' }
 		],
 		['feedback', { ticket: KEY, note: ' \n ' }, `/v1/tickets/${KEY}/feedback-rounds`, undefined],
+		[
+			'feedback',
+			{ ticket: KEY, only: ['r1', 'c2'] },
+			`/v1/tickets/${KEY}/feedback-rounds`,
+			{ only: ['r1', 'c2'] }
+		],
+		[
+			'feedback',
+			{ ticket: KEY, only: ['r1'], note: ' Also the README. ' },
+			`/v1/tickets/${KEY}/feedback-rounds`,
+			{ only: ['r1'], note: 'Also the README.' }
+		],
+		['feedback', { ticket: KEY, only: [] }, `/v1/tickets/${KEY}/feedback-rounds`, undefined],
 		['rerun', { ticket: KEY }, `/v1/tickets/${KEY}/reruns`, undefined],
 		[
 			'stop',
@@ -183,7 +196,10 @@ describe('POST /api/factory/commands/[command]', () => {
 		['start', { intent: INTENT, ref: '#1', id: 'a', text: 'b' }, 'body.ref'],
 		['start', { intent: INTENT }, 'body.ref'],
 		['feedback', { intent: INTENT, ticket: KEY, note: 3 }, 'body.note'],
-		['feedback', { intent: INTENT, ticket: 'Not A Key' }, 'body.ticket']
+		['feedback', { intent: INTENT, ticket: 'Not A Key' }, 'body.ticket'],
+		['feedback', { intent: INTENT, ticket: KEY, only: 'r1' }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: ['r1', ' '] }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: ['r1', 7] }, 'body.only']
 	])('%s %o is a 400 validation_error at %s, sending nothing', async (command, body, path) => {
 		const { status, body: response, cacheControl, fake } = await post(command, body);
 		expect(status).toBe(400);

@@ -74,6 +74,18 @@ export function listExecutions(
 	return read(() => client.GET('/v1/tickets/{key}/executions', { params: { path: { key } } }));
 }
 
+/**
+ * `GET /v1/tickets/{key}/feedback`: the open pull request's comments no round
+ * took or dismissed. The factory refuses with 409 when the ticket has no open
+ * pull request, and 502 `code_host_unavailable` when it cannot read it.
+ */
+export function listPendingFeedback(
+	client: FactoryClient,
+	key: TicketKey
+): Promise<FactoryResult<Schemas['PendingFeedback']>> {
+	return read(() => client.GET('/v1/tickets/{key}/feedback', { params: { path: { key } } }));
+}
+
 /** `GET /v1/tickets/{key}/runs`. */
 export function listRuns(
 	client: FactoryClient,

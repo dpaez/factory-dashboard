@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	classifyCommandFailure,
 	commandFieldName,
+	commandTarget,
 	isCommandName,
 	isIntentId,
 	keysForCommand,
@@ -185,6 +186,21 @@ describe('parseCommandBody', () => {
 			{ intent: INTENT, ticket: KEY, note: '  \n\t ' },
 			{ command: 'feedback', intent: INTENT, ticket: KEY }
 		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY, only: ['r1', 'c2'] },
+			{ command: 'feedback', intent: INTENT, ticket: KEY, only: ['r1', 'c2'] }
+		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY, only: ['r1'], note: 'Also the README.' },
+			{ command: 'feedback', intent: INTENT, ticket: KEY, only: ['r1'], note: 'Also the README.' }
+		],
+		[
+			'feedback',
+			{ intent: INTENT, ticket: KEY, only: [] },
+			{ command: 'feedback', intent: INTENT, ticket: KEY }
+		],
 		['stop', { intent: INTENT, run: 'run_1' }, { command: 'stop', intent: INTENT, run: 'run_1' }],
 		[
 			'retry',
@@ -209,6 +225,13 @@ describe('parseCommandBody', () => {
 		['cancel', { intent: INTENT, ticket: KEY, reason: 3 }, 'body.reason'],
 		['feedback', { intent: INTENT, ticket: KEY, note: 3 }, 'body.note'],
 		['feedback', { intent: INTENT, ticket: KEY, note: null }, 'body.note'],
+		['feedback', { intent: INTENT, ticket: KEY, only: 'r1' }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: null }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: { r1: true } }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: ['r1', ''] }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: ['  '] }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: ['r1', 2] }, 'body.only'],
+		['feedback', { intent: INTENT, ticket: KEY, only: [null] }, 'body.only'],
 		['feedback', { intent: INTENT, ticket: 'Bad Key' }, 'body.ticket'],
 		['feedback', { intent: INTENT }, 'body.ticket'],
 		['stop', { intent: INTENT }, 'body.run'],
@@ -223,6 +246,15 @@ describe('parseCommandBody', () => {
 		expect(result.ok).toBe(false);
 		if (result.ok) return;
 		expect(result.fieldErrors.map((e) => e.path)).toContain(path);
+	});
+});
+
+describe('commandTarget', () => {
+	it('a feedback round is one target per ticket, whatever it takes', () => {
+		expect(commandTarget({ command: 'feedback', ticket: KEY })).toBe(`feedback:${KEY}`);
+		expect(commandTarget({ command: 'feedback', ticket: KEY, only: ['r1'], note: 'x' })).toBe(
+			`feedback:${KEY}`
+		);
 	});
 });
 

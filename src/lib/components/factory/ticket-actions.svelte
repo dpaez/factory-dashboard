@@ -10,8 +10,6 @@
 	export const ACTION_NOTES = {
 		retry: 'Relaunches the step that stopped, reusing its context. It is not a new execution.',
 		complete: 'Records that the handoff is done. It does not merge the pull request.',
-		feedback:
-			"Sends the pull request's new review comments back through work, review and wrap-up as one more task.",
 		rerun: (next: number) =>
 			`Starts a new execution (${next}) from a fresh copy of the source. Earlier executions stay readable.`
 	} as const;
@@ -19,8 +17,6 @@
 
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Label } from '$lib/components/ui/label';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import CancelExecutionDialog, { DESTRUCTIVE_TEXT } from './cancel-execution-dialog.svelte';
 	import { stageLabel } from '$lib/factory/format';
 	import {
@@ -31,16 +27,13 @@
 
 	/**
 	 * The current execution's action bar: Stop agent, Retry, Cancel execution,
-	 * Mark complete, Feedback round and Rerun (Reply has its own composer).
-	 * Presentational: it
+	 * Mark complete and Rerun (Reply has its own composer, Feedback round its
+	 * own box). Presentational: it
 	 * renders the selector's availability and each action's phase, and emits
 	 * typed command inputs through `oncommand`. Hidden actions are not
 	 * rendered; a disabled one shows its reason, tied to the control. Stop
 	 * names its run and, with several active runs, asks for one first through
 	 * `onstoprunchange`. Cancel opens a confirmation and never sends directly.
-	 * Feedback round carries an optional note, bound through `feedbackNote` so
-	 * the owner keeps it after a refusal and clears it once the round confirms;
-	 * it is sent trimmed, and only when non-blank.
 	 */
 	const uid = $props.id();
 
@@ -51,7 +44,6 @@
 		execution,
 		feedback = {},
 		cancelOpen = $bindable(false),
-		feedbackNote = $bindable(''),
 		oncommand,
 		onstoprunchange
 	}: {
@@ -66,8 +58,6 @@
 		feedback?: TicketActionsFeedback;
 		/** Whether the cancel confirmation is open. */
 		cancelOpen?: boolean;
-		/** The Feedback round's optional note. */
-		feedbackNote?: string;
 		oncommand: (input: CommandInput) => void;
 		/** The operator chose (or cleared) the run Stop targets. */
 		onstoprunchange?: (run: string | null) => void;
@@ -76,7 +66,7 @@
 	const actions = $derived(view.actions);
 	const shown = (availability: ActionAvailability) => availability.kind !== 'hidden';
 	const visible = $derived(
-		(['stop', 'retry', 'cancel', 'complete', 'feedback', 'rerun'] as const).some((action) =>
+		(['stop', 'retry', 'cancel', 'complete', 'rerun'] as const).some((action) =>
 			shown(actions[action])
 		)
 	);
@@ -106,12 +96,6 @@
 		]
 			.filter(Boolean)
 			.join(' ') || undefined;
-
-	function sendFeedback() {
-		if (actions.feedback.kind !== 'enabled') return;
-		const note = feedbackNote.trim();
-		oncommand({ command: 'feedback', ticket, ...(note !== '' && { note }) });
-	}
 
 	const stopTarget = $derived(view.stoppableRuns.find((run) => run.id === view.stopRun) ?? null);
 	const choosing = $derived(view.stoppableRuns.length > 1);
@@ -239,39 +223,6 @@
 					</Button>
 				</div>
 				{@render details('complete', ACTION_NOTES.complete)}
-			</div>
-		{/if}
-
-		{#if shown(actions.feedback)}
-			<div class={ROW} data-action="feedback">
-				<div class="flex flex-col gap-1">
-					<Label for="{uid}-feedback-note">Note for the round (optional)</Label>
-					<Textarea
-						id="{uid}-feedback-note"
-						name="note"
-						rows={2}
-						bind:value={feedbackNote}
-						disabled={actions.feedback.kind !== 'enabled'}
-						aria-describedby="{uid}-feedback-note-hint"
-						class="rounded-none"
-						data-testid="feedback-note"
-					/>
-					<p id="{uid}-feedback-note-hint" class={NOTE}>
-						Starts a round even when the pull request has no new comments.
-					</p>
-				</div>
-				<div>
-					<Button
-						variant="outline"
-						class="rounded-none"
-						disabled={actions.feedback.kind !== 'enabled'}
-						aria-describedby={describedBy('feedback', true)}
-						onclick={sendFeedback}
-					>
-						Feedback round
-					</Button>
-				</div>
-				{@render details('feedback', ACTION_NOTES.feedback)}
 			</div>
 		{/if}
 

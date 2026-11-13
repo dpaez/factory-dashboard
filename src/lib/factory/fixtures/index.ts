@@ -6,6 +6,7 @@ export * from './backlog';
 export * from './commands';
 export * from './events';
 export * from './factory';
+export * from './feedback';
 export * from './me';
 export * from './problems';
 export * from './runs';

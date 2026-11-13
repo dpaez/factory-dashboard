@@ -20,6 +20,13 @@ import { backlogIssues, backlogPage } from '../src/lib/factory/fixtures/backlog.
 import { factory as factoryFixture } from '../src/lib/factory/fixtures/factory.ts';
 import { eventFrame } from '../src/lib/factory/fixtures/events.ts';
 import {
+	pendingFeedback,
+	pendingFeedbackMany,
+	pendingFeedbackNone,
+	pendingFeedbackNoUrl,
+	pendingFeedbackSkippedTruncated
+} from '../src/lib/factory/fixtures/feedback.ts';
+import {
 	statsCompleteStages,
 	statsCompleteSummary,
 	statsConfigurations,
@@ -241,6 +248,16 @@ export const FAKE_STATS_EXPORT_CHUNKS = 5;
  */
 export const FAKE_STATS_TICKETS_PAGE_SIZE = 5;
 
+/** The pending-feedback cohorts the fake can serve for `GET /v1/tickets/{key}/feedback`. */
+export const FAKE_PENDING_FEEDBACK_COHORTS = {
+	few: pendingFeedback,
+	many: pendingFeedbackMany,
+	none: pendingFeedbackNone,
+	noUrl: pendingFeedbackNoUrl,
+	skippedTruncated: pendingFeedbackSkippedTruncated
+} satisfies Record<string, Schemas['PendingFeedback']>;
+export type FakePendingFeedbackCohort = keyof typeof FAKE_PENDING_FEEDBACK_COHORTS;
+
 export type FakeFactoryOptions = {
 	token?: string;
 	/** The cohort `/v1/stats/summary` and `/v1/stats/stages` serve (default `complete`). */
@@ -266,8 +283,17 @@ export type FakeFactoryOptions = {
 	statsExportMalformed?: boolean;
 	/** Cut the export body in the middle of its last line and end it cleanly. */
 	statsExportTruncate?: boolean;
+	/**
+	 * Serve these details for `GET /v1/tickets/{key}` in place of the fixture
+	 * detail of the same key, such as a later state of the handoff ticket.
+	 */
+	details?: Schemas['TicketDetail'][];
 	/** Answer this problem for `GET /v1/tickets/{key}` of these keys. */
 	failDetail?: { keys: string[]; problem: Problem };
+	/** The comments `GET /v1/tickets/{key}/feedback` lists (default `few`: one of each kind). */
+	pendingFeedbackCohort?: FakePendingFeedbackCohort;
+	/** Answer this problem for `GET /v1/tickets/{key}/feedback` (409 no open pull request, 502, ...). */
+	failPendingFeedback?: Problem;
 	/** Answer this problem for `GET /v1/agents`. */
 	failAgents?: Problem;
 	/**
@@ -454,7 +480,12 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 	const addedDetails = new Map<string, Schemas['TicketDetail']>();
 	const encoder = new TextEncoder();
 	/** Details changed by `commandEffects`, by ticket key. */
-	const changedDetails = new Map<string, Schemas['TicketDetail']>();
+	const changedDetails = new Map<string, Schemas['TicketDetail']>(
+		(options.details ?? []).map((detail) => [
+			detail.key,
+			{ ...detail, usage: ticketDetails.get(detail.key)?.usage ?? detail.usage }
+		])
+	);
 	const detailOf = (key: string) =>
 		changedDetails.get(key) ?? addedDetails.get(key) ?? ticketDetails.get(key);
 
@@ -826,7 +857,7 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 			return json(run);
 		}
 
-		const match = path.match(/^\/v1\/tickets\/([^/]+)(\/executions|\/runs)?$/);
+		const match = path.match(/^\/v1\/tickets\/([^/]+)(\/executions|\/runs|\/feedback)?$/);
 		if (match) {
 			const key = decodeURIComponent(match[1] ?? '');
 			const detail = detailOf(key);
@@ -837,6 +868,15 @@ export function createFakeFactory(options: FakeFactoryOptions = {}) {
 					type: 'ticket_not_found',
 					detail: `No ticket has the key ${key}.`
 				});
+			}
+			if (match[2] === '/feedback') {
+				if (options.failPendingFeedback) return problem(options.failPendingFeedback);
+				const cohort = FAKE_PENDING_FEEDBACK_COHORTS[options.pendingFeedbackCohort ?? 'few'];
+				return json({
+					...cohort,
+					pullRequestUrl: detail.pullRequest?.url ?? cohort.pullRequestUrl,
+					ticket: key
+				} satisfies Schemas['PendingFeedback']);
 			}
 			if (match[2] === '/executions') {
 				return options.failExecutions
