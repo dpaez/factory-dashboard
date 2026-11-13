@@ -666,6 +666,28 @@ test.describe('Feedback rounds box: the pending comments', () => {
 		});
 	}
 
+	for (const placement of PLACEMENTS) {
+		test(`${placement.name}: the box is a subpanel, with its heading and Refresh in a header band and its content in a body`, async ({
+			page,
+			shot
+		}) => {
+			await gotoLive(page, placement.url(HANDOFF));
+			const header = box(page).locator('[data-slot="feedback-rounds-header"]');
+			const body = box(page).locator('[data-slot="feedback-rounds-body"]');
+			await expect(header.getByRole('heading', { name: 'Feedback rounds' })).toBeVisible();
+			await expect(header.getByRole('button', { name: 'Refresh' })).toBeVisible();
+			await expect(body.getByTestId('pending-feedback-list')).toBeVisible();
+			await expect(body.getByTestId('feedback-start')).toBeVisible();
+			// Signalled as its own panel: a ring around the box and a tinted header band.
+			const style = (el: Element, prop: string) => getComputedStyle(el).getPropertyValue(prop);
+			expect(await box(page).evaluate(style, 'box-shadow')).not.toBe('none');
+			const band = await header.evaluate(style, 'background-color');
+			expect(band).not.toBe('rgba(0, 0, 0, 0)');
+			expect(band).not.toBe(await body.evaluate(style, 'background-color'));
+			await shot(`f2-subpanel-${slug(placement)}`);
+		});
+	}
+
 	test.describe('a comment without a link', () => {
 		test.use({ fakeOptions: { pendingFeedbackCohort: 'noUrl' } });
 

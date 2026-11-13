@@ -371,6 +371,14 @@
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
 		await expect(within(pane).getByRole('heading', { name: 'Feedback rounds' })).toBeVisible();
+		// A subpanel: the heading sits in the box's own header band, the content in its body.
+		const box = pane.querySelector('[data-slot="feedback-rounds"]');
+		await expect(box?.querySelector('[data-slot="feedback-rounds-header"] h3')).toHaveTextContent(
+			'Feedback rounds'
+		);
+		await expect(
+			box?.querySelector('[data-slot="feedback-rounds-body"] [data-testid="feedback-start"]')
+		).not.toBeNull();
 		await expect(pane.querySelector('[data-testid="pending-feedback"]')).toBeNull();
 		await expect(within(pane).queryByRole('button', { name: 'Refresh' })).toBeNull();
 		await expect(start(pane)).toBeDisabled();

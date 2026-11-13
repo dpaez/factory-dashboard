@@ -216,6 +216,7 @@ Borders are always 1px, always Hairline or a semantic token (`border-t-primary` 
 - **Lane:** Recess Grey well. Header is the stage name in `text-sm` medium sans and the count in mono `text-lg` 700. Only the card list scrolls.
 - **Ticket card:** three tiers on Panel White with a 1px ring. Identity is the mono reference and a `text-sm` title (clamped to two lines). Signal is the status chip; a ticket that needs attention carries a 2px Signal Wait leading edge and the words "Needs attention". Telemetry (progress, updated time, tokens) sits under a hairline. Selected is a Beacon wash (`bg-primary/15`) plus a 2px foreground ring. The attention block is a Signal Wait wash behind its 2px edge.
 - **Drawer:** Panel White, 1px leading hairline, no shadow and no scrim. It overlays the lanes and does not trap focus. Enter and exit are a 150ms translate, dropped under reduced motion.
+- **Inspector subpanel:** a block with its own controls inside the Inspector, such as Feedback rounds, is a subpanel: a 1px ring (`ring-1 ring-foreground/10`), a Recess Grey header band (`bg-muted`, hairline below) holding the heading and the panel's own controls, and a `p-3` body. Sections inside the body divide with a hairline.
 
 ### Timeline / Progress (signature)
 - **Style:** 4px `bg-muted` track, `bg-primary` fill tweened over 800ms with `cubicInOut`; step dots ride the track (`-mt-4.5`), beacon-filled when reached, grey before, labels below in light xs mono. Current step index maps the pipeline plan→work→review→wrapup→done.
