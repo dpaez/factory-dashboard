@@ -1013,7 +1013,7 @@ test.describe('Feedback rounds box: earlier rounds', () => {
 			const link = row.getByRole('link', { name: `Open ${it.ref} on GitHub` });
 			await expect.soft(link).toHaveAttribute('href', it.url!);
 			await expect.soft(link).toHaveAttribute('target', '_blank');
-			await expect.soft(link).toHaveText(it.ref);
+			await expect.soft(link).toHaveText(it.ref!);
 		}
 		await expect
 			.soft(item(page, 1, thread!.id).getByTestId('location'))
