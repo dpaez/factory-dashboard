@@ -108,12 +108,47 @@ export type StageSummary = {
 	counts: Record<string, number>;
 };
 
+export type FeedbackRoundItemKind = Open<Schemas['FeedbackRoundItem']['kind']>;
+
+/** One item a feedback round took: a pull request comment, or the operator's note. */
+export type FeedbackRoundItemView = {
+	/** `F1`..`Fn`, within the round. */
+	id: string;
+	/** The comment's ref; null for the operator's note. */
+	ref: string | null;
+	kind: FeedbackRoundItemKind;
+	author: string;
+	/** `path:line` of a review thread; null otherwise. */
+	location: string | null;
+	summary: string;
+	/** The comment on GitHub; null for the note. */
+	url: string | null;
+};
+
+/** What a feedback round's task (`F<n>`) took. */
+export type FeedbackRoundRecord = {
+	round: number;
+	items: FeedbackRoundItemView[];
+};
+
+/** One earlier feedback round of the shown execution, as the Feedback rounds box lists it. */
+export type EarlierRoundView = {
+	/** The round's task id, `F<n>`. */
+	taskId: string;
+	round: number;
+	status: TaskStatus;
+	stage: TaskStage | null;
+	items: FeedbackRoundItemView[];
+};
+
 export type TaskView = {
 	ordinal: number;
 	id: string;
 	title: string;
 	/** `n` for a feedback round's task (id `F<n>`); null for a planned task. */
 	feedbackRound: number | null;
+	/** The round's record (`Task.feedback`); null for a planned task. */
+	feedback: FeedbackRoundRecord | null;
 	status: TaskStatus;
 	stage: TaskStage | null;
 	blockedBy: TaskBlocker[];

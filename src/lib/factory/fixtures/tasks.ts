@@ -5,6 +5,7 @@ type Task = components['schemas']['Task'];
 
 export const taskDone = {
 	blockedBy: [],
+	feedback: null,
 	id: '01',
 	ordinal: 1,
 	stage: null,
@@ -18,6 +19,7 @@ export const taskDone = {
 
 export const taskActive = {
 	blockedBy: ['01'],
+	feedback: null,
 	id: '02',
 	ordinal: 2,
 	stage: 'review',
@@ -31,6 +33,7 @@ export const taskActive = {
 
 export const taskPending = {
 	blockedBy: ['02'],
+	feedback: null,
 	id: '03',
 	ordinal: 3,
 	stage: null,
@@ -41,6 +44,7 @@ export const taskPending = {
 
 export const taskBlocked = {
 	blockedBy: ['02', '03'],
+	feedback: null,
 	id: '04',
 	ordinal: 4,
 	stage: 'qa',
@@ -53,6 +57,7 @@ export const taskBlocked = {
 
 export const taskCancelled = {
 	blockedBy: [],
+	feedback: null,
 	id: '05',
 	ordinal: 5,
 	stage: 'work',

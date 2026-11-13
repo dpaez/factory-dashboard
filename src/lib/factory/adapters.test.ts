@@ -19,7 +19,10 @@ import {
 	ticketDetailAgentQuestion,
 	ticketDetailCancelled,
 	ticketDetailFailed,
+	feedbackRoundOne,
+	feedbackRoundTwo,
 	ticketDetailFeedbackRound,
+	ticketDetailTwoFeedbackRounds,
 	ticketDetailPaused,
 	ticketDetailManualApproval,
 	ticketDetailMultiExecution,
@@ -31,6 +34,7 @@ import type { components } from '$lib/factory/generated/factory-api';
 
 import {
 	currentFeedbackRound,
+	earlierRounds,
 	toAttention,
 	toCurrentTask,
 	toExecutions,
@@ -423,6 +427,7 @@ describe('toTicketDetail', () => {
 describe('currentFeedbackRound', () => {
 	const task = (id: string, status: Schemas['Task']['status']): Schemas['Task'] => ({
 		blockedBy: [],
+		feedback: null,
 		id,
 		ordinal: 1,
 		stage: null,
@@ -449,6 +454,55 @@ describe('currentFeedbackRound', () => {
 			toTicketDetail({ detail, executions: { items: [] }, runs: [] }).header;
 		expect(header(ticketDetailFeedbackRound)).toMatchObject({ stage: 'work', feedbackRound: 1 });
 		expect(header(ticketDetailReadyForHandoff).feedbackRound).toBeNull();
+	});
+});
+
+describe('earlierRounds', () => {
+	const view = (detail: Schemas['TicketDetail']) =>
+		toTicketDetail({ detail, executions: { items: [] }, runs: [] });
+
+	it("carries a round task's items, the note with no ref and no link", () => {
+		const [round] = earlierRounds(view(ticketDetailFeedbackRound).tasks);
+		expect(round).toEqual({
+			taskId: 'F1',
+			round: 1,
+			status: 'active',
+			stage: 'work',
+			items: feedbackRoundOne.items.map((item) => ({ ...item }))
+		});
+		const note = round!.items.find((item) => item.kind === 'note');
+		expect(note).toMatchObject({ id: 'F3', ref: null, url: null, author: 'operator' });
+		expect(round!.items[0]).toMatchObject({
+			id: 'F1',
+			author: 'dpaez',
+			location: 'src/lib/tokens.css:12',
+			url: feedbackRoundOne.items[0]!.url
+		});
+	});
+
+	it('lists every round in round order, each with its own items', () => {
+		const rounds = earlierRounds(view(ticketDetailTwoFeedbackRounds).tasks);
+		expect(rounds.map(({ taskId, round, status }) => ({ taskId, round, status }))).toEqual([
+			{ taskId: 'F1', round: 1, status: 'done' },
+			{ taskId: 'F2', round: 2, status: 'active' }
+		]);
+		expect(rounds[0]!.items).toHaveLength(feedbackRoundOne.items.length);
+		expect(rounds[1]!.items.map((item) => item.ref)).toEqual(
+			feedbackRoundTwo.items.map((item) => item.ref)
+		);
+	});
+
+	it('takes nothing from a planned task or a round task with feedback null', () => {
+		expect(earlierRounds(view(ticketDetailReadyForHandoff).tasks)).toEqual([]);
+		const bare = { ...ticketDetailFeedbackRound.tasks[2]!, feedback: null };
+		expect(earlierRounds(toTasks([...ticketDetailReadyForHandoff.tasks, bare]))).toEqual([]);
+	});
+
+	it('leaves the task view of a planned task with feedback null', () => {
+		expect(toTasks(ticketDetailReadyForHandoff.tasks).map((task) => task.feedback)).toEqual([
+			null,
+			null
+		]);
 	});
 });
 

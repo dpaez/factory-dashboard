@@ -15,11 +15,9 @@
  * - Cancel: shown while the stage is not `done` and the execution has not ended.
  * - Mark complete: shown at `ready_for_handoff` or in wrapup; enabled at
  *   `ready_for_handoff`.
- * - Feedback round: shown while the execution has not ended; enabled only at
- *   `ready_for_handoff` while the pull request is open. Otherwise disabled
- *   with a reason: a merged or closed pull request names its state; wrapup
- *   still preparing the handoff says so; before that, or without a pull
- *   request, it says a round needs an open pull request at handoff.
+ * - Feedback round is not an action of the bar: the Feedback rounds box
+ *   decides it (`feedbackRoundAvailability` in `feedback-rounds.ts`), with
+ *   the reasons below.
  * - Rerun: shown when complete, cancelled or failed.
  * - An unknown status offers only Cancel (while the stage is not `done`).
  *
@@ -29,15 +27,7 @@
 import { commandTarget, type CommandAccess, type CommandPhase } from './commands';
 import type { RunStage, TicketDetailView } from './models';
 
-export const TICKET_ACTIONS = [
-	'stop',
-	'reply',
-	'retry',
-	'cancel',
-	'complete',
-	'feedback',
-	'rerun'
-] as const;
+export const TICKET_ACTIONS = ['stop', 'reply', 'retry', 'cancel', 'complete', 'rerun'] as const;
 export type TicketAction = (typeof TICKET_ACTIONS)[number];
 
 export type ActionAvailability =
@@ -131,21 +121,6 @@ function pendingReason(action: TicketAction, phase: CommandPhase): string | null
 	return null;
 }
 
-/** Feedback round: enabled only at handoff with an open pull request. */
-function feedbackAvailability(
-	status: string,
-	header: TicketDetailView['header']
-): ActionAvailability {
-	const state = header.pullRequest?.state ?? null;
-	if (state === 'merged') return disabled(ACTION_REASONS.pullRequestMerged);
-	if (state === 'closed') return disabled(ACTION_REASONS.pullRequestClosed);
-	if (status === 'ready_for_handoff') {
-		return state === 'open' ? ENABLED : disabled(ACTION_REASONS.noPullRequest);
-	}
-	if (header.stage === 'wrapup') return disabled(ACTION_REASONS.preparingHandoff);
-	return disabled(ACTION_REASONS.notAtHandoff);
-}
-
 export function ticketActions(input: TicketActionsInput): TicketActions {
 	const { detail, access, phaseFor } = input;
 	const { header } = detail;
@@ -180,7 +155,6 @@ export function ticketActions(input: TicketActionsInput): TicketActions {
 	else if (known && header.stage === 'wrapup') {
 		base.complete = disabled(ACTION_REASONS.preparingHandoff);
 	}
-	if (known && !ENDED.has(status)) base.feedback = feedbackAvailability(status, header);
 	if (RERUNNABLE.has(status)) base.rerun = ENABLED;
 
 	const targets: Record<TicketAction, string | null> = {
@@ -189,7 +163,6 @@ export function ticketActions(input: TicketActionsInput): TicketActions {
 		retry: commandTarget({ command: 'retry', ticket: header.key }),
 		cancel: commandTarget({ command: 'cancel', ticket: header.key }),
 		complete: commandTarget({ command: 'complete', ticket: header.key }),
-		feedback: commandTarget({ command: 'feedback', ticket: header.key }),
 		rerun: commandTarget({ command: 'rerun', ticket: header.key })
 	};
 

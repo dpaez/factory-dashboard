@@ -10,7 +10,6 @@
 	import { ACTION_REASONS, ticketActions, type TicketAction } from '$lib/factory/ticket-actions';
 	import {
 		executionList,
-		problemCodeHostUnavailable,
 		problemInvalidState,
 		runWorkRunning,
 		runsTwoActive,
@@ -24,9 +23,6 @@
 		ticketDetailPaused,
 		ticketDetailQueued,
 		ticketDetailReadyForHandoff,
-		ticketDetailReadyForHandoffClosedPr,
-		ticketDetailReadyForHandoffMergedPr,
-		ticketDetailReadyForHandoffNoPr,
 		ticketDetailResuming,
 		ticketDetailTrackerWarnings
 	} from '$lib/factory/fixtures';
@@ -89,22 +85,14 @@
 	};
 
 	type Expected = Partial<Record<TicketAction, 'enabled' | 'disabled'>>;
-	const BAR_ACTIONS = ['stop', 'retry', 'cancel', 'complete', 'feedback', 'rerun'] as const;
+	const BAR_ACTIONS = ['stop', 'retry', 'cancel', 'complete', 'rerun'] as const;
 	const LABELS: Record<(typeof BAR_ACTIONS)[number], string> = {
 		stop: 'Stop agent',
 		retry: 'Retry',
 		cancel: 'Cancel execution',
 		complete: 'Mark complete',
-		feedback: 'Feedback round',
 		rerun: 'Rerun'
 	};
-
-	const noteField = (pane: HTMLElement) =>
-		within(pane).getByRole('textbox', { name: 'Note for the round (optional)' });
-
-	/** The factory's refusal of a round with nothing new, shown verbatim. */
-	const NO_NEW_FEEDBACK =
-		'No new feedback on https://github.com/dpaez/factory-dashboard/pull/42 since the last push (2 skipped: outdated). Add a note to start a round anyway.';
 
 	const control = (pane: HTMLElement, action: (typeof BAR_ACTIONS)[number]) =>
 		within(pane).getByRole('button', { name: LABELS[action] });
@@ -267,7 +255,7 @@
 			docs: {
 				description: {
 					component:
-						"The current execution's action bar: Stop agent, Retry, Mark complete, Feedback round (with an optional note), Rerun and Cancel execution. It renders the availability from `ticketActions` and each action's `feedback` (phase and explanation), and emits typed command inputs through `oncommand`. Hidden actions are absent; a disabled one shows its reason. Stop names its run, and with several active runs asks for one through `onstoprunchange`. Cancel opens a confirmation and never sends directly. A past execution renders nothing."
+						"The current execution's action bar: Stop agent, Retry, Mark complete, Rerun and Cancel execution (Feedback round has its own box). It renders the availability from `ticketActions` and each action's `feedback` (phase and explanation), and emits typed command inputs through `oncommand`. Hidden actions are absent; a disabled one shows its reason. Stop names its run, and with several active runs asks for one through `onstoprunchange`. Cancel opens a confirmation and never sends directly. A past execution renders nothing."
 				}
 			}
 		}
@@ -304,8 +292,7 @@
 	args={build(ticketDetailQueued)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { cancel: 'enabled', feedback: 'disabled' });
-		await expectReason(pane, 'feedback', ACTION_REASONS.notAtHandoff);
+		await expectActions(pane, { cancel: 'enabled' });
 	}}
 />
 
@@ -314,7 +301,7 @@
 	args={active}
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { stop: 'enabled', cancel: 'enabled', feedback: 'disabled' });
+		await expectActions(pane, { stop: 'enabled', cancel: 'enabled' });
 		const note = pane.querySelector('[data-note="stop"]')!;
 		await expect(note).toHaveTextContent(`#${runWorkRunning.sequence}`);
 		await expect(note).toHaveTextContent(runWorkRunning.id);
@@ -333,7 +320,7 @@
 	args={build(ticketDetailAgentQuestion)}
 	play={async ({ canvasElement }) => {
 		// Reply lives in its own composer; the bar offers Cancel.
-		await expectActions(firstPane(canvasElement), { cancel: 'enabled', feedback: 'disabled' });
+		await expectActions(firstPane(canvasElement), { cancel: 'enabled' });
 	}}
 />
 
@@ -342,9 +329,8 @@
 	args={build(ticketDetailManualApproval)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { cancel: 'enabled', complete: 'disabled', feedback: 'disabled' });
+		await expectActions(pane, { cancel: 'enabled', complete: 'disabled' });
 		await expectReason(pane, 'complete', ACTION_REASONS.preparingHandoff);
-		await expectReason(pane, 'feedback', ACTION_REASONS.preparingHandoff);
 	}}
 />
 
@@ -353,7 +339,7 @@
 	args={paused}
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { retry: 'enabled', cancel: 'enabled', feedback: 'disabled' });
+		await expectActions(pane, { retry: 'enabled', cancel: 'enabled' });
 		await expect(pane.querySelector('[data-note="retry"]')).toHaveTextContent(ACTION_NOTES.retry);
 		await expect(pane.querySelector('[data-note="retry"]')).toHaveTextContent(
 			'It is not a new execution.'
@@ -371,7 +357,7 @@
 	name="Resuming"
 	args={build(ticketDetailResuming)}
 	play={async ({ canvasElement }) => {
-		await expectActions(firstPane(canvasElement), { cancel: 'enabled', feedback: 'disabled' });
+		await expectActions(firstPane(canvasElement), { cancel: 'enabled' });
 	}}
 />
 
@@ -381,8 +367,7 @@
 	play={async ({ canvasElement }) => {
 		await expectActions(firstPane(canvasElement), {
 			retry: 'enabled',
-			cancel: 'enabled',
-			feedback: 'disabled'
+			cancel: 'enabled'
 		});
 	}}
 />
@@ -394,7 +379,6 @@
 		await expectActions(firstPane(canvasElement), {
 			retry: 'enabled',
 			cancel: 'enabled',
-			feedback: 'disabled',
 			rerun: 'enabled'
 		});
 	}}
@@ -405,7 +389,7 @@
 	args={handoff}
 	play={async ({ args, canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { complete: 'enabled', feedback: 'enabled', cancel: 'enabled' });
+		await expectActions(pane, { complete: 'enabled', cancel: 'enabled' });
 		await expect(pane.querySelector('[data-note="complete"]')).toHaveTextContent(
 			'It does not merge the pull request.'
 		);
@@ -418,152 +402,16 @@
 	}}
 />
 
-<!-- Feedback round: enabled only at ready_for_handoff with an open pull request. -->
+<!-- Feedback round lives in the Feedback rounds box (feedback-rounds-box.stories.svelte). -->
 
 <Story
-	name="Feedback round, no note"
+	name="No Feedback round in the bar"
 	args={handoff}
-	play={async ({ args, canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expect(control(pane, 'feedback')).toBeEnabled();
-		const note = noteField(pane);
-		await expect(note).toBeEnabled();
-		await expect(note).not.toBeRequired();
-		await expect(pane.querySelector('[data-note="feedback"]')).toHaveTextContent(
-			ACTION_NOTES.feedback
-		);
-		// Blank text is no note.
-		await userEvent.type(note, '   ');
-		await userEvent.click(control(pane, 'feedback'));
-		await expect(args.oncommand).toHaveBeenCalledOnce();
-		await expect(args.oncommand).toHaveBeenCalledWith({
-			command: 'feedback',
-			ticket: ticketDetailReadyForHandoff.key
-		});
-	}}
-/>
-
-<Story
-	name="Feedback round, with a note"
-	args={handoff}
-	play={async ({ args, canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await userEvent.type(noteField(pane), '  Address the naming comments.  ');
-		await userEvent.click(control(pane, 'feedback'));
-		await expect(args.oncommand).toHaveBeenCalledWith({
-			command: 'feedback',
-			ticket: ticketDetailReadyForHandoff.key,
-			note: 'Address the naming comments.'
-		});
-	}}
-/>
-
-<Story
-	name="Feedback round, merged pull request"
-	args={build(ticketDetailReadyForHandoffMergedPr)}
-	play={async ({ args, canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expectActions(pane, { complete: 'enabled', feedback: 'disabled', cancel: 'enabled' });
-		await expectReason(pane, 'feedback', 'The pull request is merged.');
-		await expect(noteField(pane)).toBeDisabled();
-		await userEvent.click(control(pane, 'feedback'), { pointerEventsCheck: 0 });
-		await expect(args.oncommand).not.toHaveBeenCalled();
-	}}
-/>
-
-<Story
-	name="Feedback round, closed pull request"
-	args={build(ticketDetailReadyForHandoffClosedPr)}
-	play={async ({ canvasElement }) => {
-		await expectReason(firstPane(canvasElement), 'feedback', 'The pull request is closed.');
-	}}
-/>
-
-<Story
-	name="Feedback round, no pull request"
-	args={build(ticketDetailReadyForHandoffNoPr)}
 	play={async ({ canvasElement }) => {
 		const pane = firstPane(canvasElement);
-		await expectActions(pane, { complete: 'enabled', feedback: 'disabled', cancel: 'enabled' });
-		await expectReason(pane, 'feedback', ACTION_REASONS.noPullRequest);
-		await expect(noteField(pane)).toBeDisabled();
-	}}
-/>
-
-<Story
-	name="Feedback round, read-only"
-	args={build(ticketDetailReadyForHandoff, { access: 'read_only' })}
-	play={async ({ args, canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expectActions(pane, { complete: 'disabled', feedback: 'disabled', cancel: 'disabled' });
-		const explanation = pane.querySelector<HTMLElement>('[data-testid="access-explanation"]')!;
-		await expect(explanation).toHaveTextContent(ACTION_REASONS.readOnly);
-		await expect(control(pane, 'feedback').getAttribute('aria-describedby')).toContain(
-			explanation.id
-		);
-		await expect(noteField(pane)).toBeDisabled();
-		await userEvent.click(control(pane, 'feedback'), { pointerEventsCheck: 0 });
-		await expect(args.oncommand).not.toHaveBeenCalled();
-	}}
-/>
-
-<Story
-	name="Feedback round pending"
-	args={build(ticketDetailReadyForHandoff, { feedback: { feedback: submitting } })}
-	play={async ({ args, canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expect(control(pane, 'feedback')).toBeDisabled();
-		await expectReason(pane, 'feedback', 'Sending…');
-		await userEvent.click(control(pane, 'feedback'), { pointerEventsCheck: 0 });
-		await expect(args.oncommand).not.toHaveBeenCalled();
-	}}
-/>
-
-<Story
-	name="Feedback round accepted"
-	args={build(ticketDetailReadyForHandoff, { feedback: { feedback: accepted } })}
-	play={async ({ canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expect(control(pane, 'feedback')).toBeDisabled();
-		await expectReason(pane, 'feedback', ACTION_REASONS.accepted);
-	}}
-/>
-
-<Story
-	name="Feedback round refused"
-	args={{
-		...build(ticketDetailReadyForHandoff, {
-			feedback: { feedback: { phase: 'rejected', explanation: NO_NEW_FEEDBACK } }
-		}),
-		feedbackNote: 'Address the naming comments.'
-	}}
-	play={async ({ canvasElement }) => {
-		const pane = firstPane(canvasElement);
-		await expectFailure(pane, 'feedback', NO_NEW_FEEDBACK);
-		await expect(pane.querySelector('[data-failure="feedback"]')).not.toHaveTextContent(
-			EXPLANATIONS.stale
-		);
-		// The typed note is kept for another attempt.
-		await expect(noteField(pane)).toHaveValue('Address the naming comments.');
-	}}
-/>
-
-<Story
-	name="Feedback round, code host unavailable"
-	args={build(ticketDetailReadyForHandoff, {
-		feedback: {
-			feedback: {
-				phase: 'rejected',
-				explanation: `${problemCodeHostUnavailable.title} ${problemCodeHostUnavailable.detail}`
-			}
-		}
-	})}
-	play={async ({ canvasElement }) => {
-		await expectFailure(
-			firstPane(canvasElement),
-			'feedback',
-			`Code host unavailable ${problemCodeHostUnavailable.detail}`
-		);
+		await expect(pane.querySelector('[data-action="feedback"]')).toBeNull();
+		await expect(within(pane).queryByRole('button', { name: /feedback round/i })).toBeNull();
+		await expect(within(pane).queryByRole('textbox')).toBeNull();
 	}}
 />
 
@@ -648,8 +496,7 @@
 		await expectActions(pane, {
 			stop: 'disabled',
 			retry: 'disabled',
-			cancel: 'disabled',
-			feedback: 'disabled'
+			cancel: 'disabled'
 		});
 		for (const button of within(pane).getAllByRole('button')) {
 			await expect(button).toBeDisabled();

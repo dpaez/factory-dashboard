@@ -35,7 +35,8 @@ export type CommandFields = {
 	retry: { ticket: string };
 	complete: { ticket: string };
 	cancel: { ticket: string; reason?: string };
-	feedback: { ticket: string; note?: string };
+	/** `only`: the pending comments' refs the round takes; omitted takes every pending comment. */
+	feedback: { ticket: string; note?: string; only?: string[] };
 	rerun: { ticket: string };
 	stop: { run: string };
 };
@@ -187,7 +188,21 @@ export function parseCommandBody(command: CommandName, body: unknown): ParsedCom
 				fail('note', 'Must be text.');
 			}
 			const note = typeof input.note === 'string' ? input.note.trim() : '';
-			request = { command, intent, ticket: key, ...(note !== '' && { note }) };
+			// `StartFeedbackRound.only` has minItems 1 and items minLength 1: an
+			// empty list is dropped (it takes every pending comment), a blank or
+			// non-text ref is refused. Refs are opaque: sent as given.
+			const only = input.only;
+			const validOnly =
+				only === undefined || (Array.isArray(only) && only.every((ref) => nonEmpty(ref)));
+			if (!validOnly) fail('only', 'Must be a list of comment refs, none blank.');
+			const refs = Array.isArray(only) && validOnly ? (only as string[]) : [];
+			request = {
+				command,
+				intent,
+				ticket: key,
+				...(note !== '' && { note }),
+				...(refs.length > 0 && { only: [...refs] })
+			};
 			break;
 		}
 		case 'stop': {

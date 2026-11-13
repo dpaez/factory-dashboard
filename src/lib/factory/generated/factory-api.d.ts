@@ -388,8 +388,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Take the open pull request's new feedback back through work, review, and wrap-up on the same branch. Only at ready_for_handoff. */
+        /** Take the open pull request's pending feedback, or the comments `only` names, back through work, review, and wrap-up on the same branch. Only at ready_for_handoff. */
         post: operations["startFeedbackRound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tickets/{key}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the open pull request's pending feedback, to pick a round's comments */
+        get: operations["listPendingFeedback"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -476,6 +493,10 @@ export interface components {
         StartFeedbackRound: {
             /** @description The operator's own feedback, addressed as the last item. */
             note?: string;
+            /** @description Take only these pending comments; the rest stay pending. */
+            only?: string[];
+            /** @description Take every pending comment but these, which are dismissed for good. */
+            skip?: string[];
         };
         Health: {
             /** @description The server instance holding the lease. It changes on every start. */
@@ -666,6 +687,8 @@ export interface components {
         };
         Task: {
             blockedBy: string[];
+            /** @description A feedback round's items, for task `F<n>`; null for a planned task. */
+            feedback: components["schemas"]["FeedbackRound"] | null;
             id: string;
             ordinal: number;
             stage: ("plan" | "qa" | "review" | "work" | "wrapup") | null;
@@ -682,6 +705,36 @@ export interface components {
                 };
             };
             title: string;
+        };
+        FeedbackRound: {
+            /** @description GitHub ids of the comments the operator dismissed with this round. */
+            dismissed: string[];
+            items: components["schemas"]["FeedbackRoundItem"][];
+            pullRequestUrl: string;
+            round: number;
+            /** @description Feedback left out: not from collaborators or codeHost.feedback.authors. */
+            skipped: {
+                author: string;
+                /** @enum {string} */
+                kind: "comment" | "review" | "thread";
+                url: string | null;
+            }[];
+            /** @description GitHub ids of the comments this round took; no later round offers them. */
+            taken: string[];
+        };
+        FeedbackRoundItem: {
+            author: string;
+            /** @description `F1`..`Fn`. */
+            id: string;
+            /** @enum {string} */
+            kind: "comment" | "note" | "review" | "thread";
+            /** @description `path:line` of a review thread; null otherwise. */
+            location: string | null;
+            /** @description The comment’s ref, as `only` names it; null for the operator’s note. */
+            ref: string | null;
+            /** @description The comment's first line, at most 160 characters. The full text is at `url`, and in the round's task file. */
+            summary: string;
+            url: string | null;
         };
         Usage: {
             costUsd: number;
@@ -1093,6 +1146,33 @@ export interface components {
              * @enum {string}
              */
             type: "run";
+        };
+        PendingFeedback: {
+            candidates: components["schemas"]["FeedbackCandidate"][];
+            pullRequestUrl: string;
+            /** @description Not from collaborators or codeHost.feedback.authors. */
+            skipped: {
+                author: string;
+                id: string;
+                /** @enum {string} */
+                kind: "comment" | "review" | "thread";
+                url: string | null;
+            }[];
+            ticket: string;
+            /** @description GitHub had more than one page; only the newest 100 of each list were read. */
+            truncated: boolean;
+        };
+        FeedbackCandidate: {
+            author: string;
+            /** @enum {string} */
+            kind: "comment" | "review" | "thread";
+            /** @description `path:line` of a review thread. */
+            location: string | null;
+            /** @description What `only` and `skip` name it by. */
+            ref: string;
+            /** @description Its first line, at most 160 characters. */
+            summary: string;
+            url: string | null;
         };
         WebhookReceived: {
             /** @description The ticket the delivery updated, or null when it was ignored. */
@@ -1937,6 +2017,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandAccepted"];
+                };
+            };
+            /** @description A problem: the request was refused or failed. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPendingFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A ticket key: the name of its factory directory, `<slug>-<hash8>`. */
+                key: components["schemas"]["TicketKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pull request's comments no feedback round took or dismissed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingFeedback"];
                 };
             };
             /** @description A problem: the request was refused or failed. */
