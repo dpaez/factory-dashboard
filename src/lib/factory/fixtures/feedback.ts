@@ -60,6 +60,14 @@ export const pendingFeedbackMany = {
 	})
 } satisfies Schemas['PendingFeedback'];
 
+/** A comment GitHub gave no link for (`url` null), beside linked ones. */
+export const pendingFeedbackNoUrl = {
+	...pendingFeedback,
+	candidates: pendingFeedback.candidates.map((candidate) =>
+		candidate.kind === 'review' ? { ...candidate, url: null } : candidate
+	)
+} satisfies Schemas['PendingFeedback'];
+
 /** Every comment already taken or dismissed by a round. */
 export const pendingFeedbackNone = {
 	...pendingFeedback,

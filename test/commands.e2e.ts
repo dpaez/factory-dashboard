@@ -643,9 +643,11 @@ test.describe('Feedback rounds box: the pending comments', () => {
 			await expect(first.getByTestId('location')).toHaveText(thread!.location!);
 			await expect(first).toContainText(thread!.summary);
 			await expect(first).toContainText(thread!.ref);
-			await expect(
-				first.getByRole('link', { name: `Open ${thread!.ref} on GitHub` })
-			).toHaveAttribute('href', thread!.url!);
+			// The ref itself is the link to the comment on GitHub, in a new tab.
+			const link = first.getByRole('link', { name: `Open ${thread!.ref} on GitHub` });
+			await expect(link).toHaveAttribute('href', thread!.url!);
+			await expect(link).toHaveAttribute('target', '_blank');
+			await expect(link).toHaveText(thread!.ref);
 			for (const [index, item, kind] of [
 				[1, review!, 'Review'],
 				[2, comment!, 'Comment']
@@ -663,6 +665,39 @@ test.describe('Feedback rounds box: the pending comments', () => {
 			await shot(`ac2-pending-comments-${slug(placement)}`);
 		});
 	}
+
+	test.describe('a comment without a link', () => {
+		test.use({ fakeOptions: { pendingFeedbackCohort: 'noUrl' } });
+
+		test('its ref shows as plain text, the others stay links, and its checkbox still controls the selection', async ({
+			page,
+			fake,
+			shot
+		}) => {
+			await gotoLive(page, PLACEMENTS[0]!.url(HANDOFF));
+			await expect(rows(page)).toHaveCount(3);
+			const plain = rows(page).nth(1);
+			await expect(plain.getByTestId('ref')).toHaveText(review!.ref);
+			await expect(plain.getByRole('link')).toHaveCount(0);
+			for (const [index, item] of [
+				[0, thread!],
+				[2, comment!]
+			] as const) {
+				const link = rows(page)
+					.nth(index)
+					.getByRole('link', { name: `Open ${item.ref} on GitHub` });
+				await expect(link).toHaveAttribute('href', item.url!);
+				await expect(link).toHaveAttribute('target', '_blank');
+			}
+			await shot('f1-pending-comment-without-link');
+
+			await plain.getByRole('checkbox').uncheck();
+			await expect(start(page)).toHaveText('Start round with 2 comments');
+			await start(page).click();
+			const [sent] = await received(fake, 0);
+			expect(sent!.body).toEqual({ only: [thread!.ref, comment!.ref] });
+		});
+	});
 
 	test('starting with every comment ticked posts no only; with some unticked it posts exactly the ticked refs and the note', async ({
 		page,
@@ -953,9 +988,10 @@ test.describe('Feedback rounds box: earlier rounds', () => {
 			await expect.soft(row).toContainText(it.id);
 			await expect.soft(row).toContainText(it.author);
 			await expect.soft(row.getByTestId('summary')).toHaveText(it.summary);
-			await expect
-				.soft(row.getByRole('link', { name: `Open ${it.ref} on GitHub` }))
-				.toHaveAttribute('href', it.url!);
+			const link = row.getByRole('link', { name: `Open ${it.ref} on GitHub` });
+			await expect.soft(link).toHaveAttribute('href', it.url!);
+			await expect.soft(link).toHaveAttribute('target', '_blank');
+			await expect.soft(link).toHaveText(it.ref);
 		}
 		await expect
 			.soft(item(page, 1, thread!.id).getByTestId('location'))
@@ -965,6 +1001,7 @@ test.describe('Feedback rounds box: earlier rounds', () => {
 		await expect.soft(noteRow).toContainText(operatorNote!.author);
 		await expect.soft(noteRow.getByTestId('summary')).toHaveText(operatorNote!.summary);
 		await expect.soft(noteRow.getByRole('link')).toHaveCount(0);
+		await expect.soft(noteRow.getByTestId('ref')).toHaveCount(0);
 	}
 
 	test.describe('round 1 done, back at handoff with the pull request open', () => {

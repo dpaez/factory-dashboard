@@ -57,6 +57,9 @@
 	 * - `rounds`: the execution's earlier rounds (`F<n>`), in round order, each
 	 *   with its items (no checkbox; the note has no ref and no link). With
 	 *   rounds and no pending list the box is read-only: no start control.
+	 * - Each comment's ref links to its `url` on GitHub, in a new tab; the
+	 *   checkbox alone controls the selection. A null `url` shows the ref as
+	 *   plain text, never as an empty link.
 	 */
 	const uid = $props.id();
 
@@ -139,6 +142,25 @@
 	// One page's height: FEEDBACK_PAGE_SIZE rows of h-14 (3.5rem).
 	const PAGE_HEIGHT = `${FEEDBACK_PAGE_SIZE * 3.5}rem`;
 </script>
+
+<!-- A comment's ref, as a link to it on GitHub (new tab); plain text without a link. -->
+{#snippet refLink(ref: string, url: string | null)}
+	{#if url}
+		<a
+			href={url}
+			target="_blank"
+			rel="noopener noreferrer"
+			class="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-foreground/75 underline-offset-2 hover:text-foreground hover:underline"
+			aria-label="Open {ref} on GitHub"
+			data-testid="ref"
+		>
+			{ref}
+			<ExternalLink class="size-3" aria-hidden="true" />
+		</a>
+	{:else}
+		<span class="ml-auto shrink-0 font-mono text-foreground/75" data-testid="ref">{ref}</span>
+	{/if}
+{/snippet}
 
 <div
 	role="group"
@@ -247,18 +269,7 @@
 											>{candidate.location}</span
 										>
 									{/if}
-									<span class="ml-auto shrink-0 font-mono text-foreground/75">{candidate.ref}</span>
-									{#if candidate.url}
-										<a
-											href={candidate.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="shrink-0 text-foreground/75 hover:text-foreground"
-											aria-label="Open {candidate.ref} on GitHub"
-										>
-											<ExternalLink class="size-3" aria-hidden="true" />
-										</a>
-									{/if}
+									{@render refLink(candidate.ref, candidate.url)}
 								</div>
 								<label for={id} class="truncate" data-testid="summary">{candidate.summary}</label>
 							</div>
@@ -380,18 +391,7 @@
 											>
 										{/if}
 										{#if item.ref}
-											<span class="ml-auto shrink-0 font-mono text-foreground/75">{item.ref}</span>
-										{/if}
-										{#if item.kind !== 'note' && item.url}
-											<a
-												href={item.url}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="shrink-0 text-foreground/75 hover:text-foreground"
-												aria-label="Open {item.ref ?? item.id} on GitHub"
-											>
-												<ExternalLink class="size-3" aria-hidden="true" />
-											</a>
+											{@render refLink(item.ref, item.kind === 'note' ? null : item.url)}
 										{/if}
 									</div>
 									<p class="truncate" data-testid="summary">{item.summary}</p>

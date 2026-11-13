@@ -11,6 +11,7 @@
 		pendingFeedback,
 		pendingFeedbackMany,
 		pendingFeedbackNone,
+		pendingFeedbackNoUrl,
 		pendingFeedbackSkippedTruncated,
 		problemCodeHostUnavailable,
 		ticketDetailReadyForHandoffAfterRound,
@@ -119,8 +120,17 @@
 		await expect(first).toHaveTextContent(thread!.location!);
 		await expect(first).toHaveTextContent(thread!.summary);
 		await expect(first).toHaveTextContent(thread!.ref);
-		await expect(within(first).getByRole('link')).toHaveAttribute('href', thread!.url!);
-		await expect(within(first).getByRole('link')).toHaveAttribute('target', '_blank');
+		// The ref is the link to the comment on GitHub, in a new tab, apart from the checkbox.
+		const link = within(first).getByRole('link', { name: `Open ${thread!.ref} on GitHub` });
+		await expect(link).toHaveAttribute('href', thread!.url!);
+		await expect(link).toHaveAttribute('target', '_blank');
+		await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+		await expect(link).toHaveTextContent(thread!.ref);
+		await expect(link.closest('label')).toBeNull();
+		for (const candidate of pendingFeedback.candidates) {
+			const row = pane.querySelector<HTMLElement>(`[data-ref="${candidate.ref}"]`)!;
+			await expect(within(row).getByRole('link')).toHaveAttribute('href', candidate.url!);
+		}
 		await expect(
 			within(first).getByRole('checkbox', { name: new RegExp(thread!.author) })
 		).toBeChecked();
@@ -158,6 +168,25 @@
 
 		await userEvent.click(button(pane, 'Refresh'));
 		await expect(args.onrefresh).toHaveBeenCalledOnce();
+	}}
+/>
+
+<Story
+	name="Comment without a link"
+	args={build({ pending: ready(pendingFeedbackNoUrl) })}
+	play={async ({ canvasElement }) => {
+		const pane = firstPane(canvasElement);
+		const [thread, review] = pendingFeedbackNoUrl.candidates;
+		// A null `url` shows the ref as plain text, never an empty link.
+		const plain = pane.querySelector<HTMLElement>(`[data-ref="${review!.ref}"]`)!;
+		await expect(within(plain).queryByRole('link')).toBeNull();
+		await expect(within(plain).getByTestId('ref')).toHaveTextContent(review!.ref);
+		const linked = pane.querySelector<HTMLElement>(`[data-ref="${thread!.ref}"]`)!;
+		await expect(within(linked).getByRole('link')).toHaveAttribute('href', thread!.url!);
+		// The checkbox still controls the selection.
+		await expect(within(plain).getByRole('checkbox')).toBeChecked();
+		await userEvent.click(within(plain).getByRole('checkbox'));
+		await waitFor(() => expect(start(pane)).toHaveTextContent('Start round with 2 comments'));
 	}}
 />
 
@@ -407,6 +436,7 @@
 		await expect(noteRow).toHaveTextContent("Operator's note");
 		await expect(noteRow).toHaveTextContent(note!.summary);
 		await expect(within(noteRow).queryByRole('link')).toBeNull();
+		await expect(within(noteRow).queryByTestId('ref')).toBeNull();
 
 		const comment = twoRounds[1]!.items[0]!;
 		const commentRow = two!.querySelector<HTMLElement>(`[data-item="${comment.id}"]`)!;

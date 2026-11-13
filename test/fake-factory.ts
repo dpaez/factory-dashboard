@@ -23,6 +23,7 @@ import {
 	pendingFeedback,
 	pendingFeedbackMany,
 	pendingFeedbackNone,
+	pendingFeedbackNoUrl,
 	pendingFeedbackSkippedTruncated
 } from '../src/lib/factory/fixtures/feedback.ts';
 import {
@@ -252,6 +253,7 @@ export const FAKE_PENDING_FEEDBACK_COHORTS = {
 	few: pendingFeedback,
 	many: pendingFeedbackMany,
 	none: pendingFeedbackNone,
+	noUrl: pendingFeedbackNoUrl,
 	skippedTruncated: pendingFeedbackSkippedTruncated
 } satisfies Record<string, Schemas['PendingFeedback']>;
 export type FakePendingFeedbackCohort = keyof typeof FAKE_PENDING_FEEDBACK_COHORTS;
