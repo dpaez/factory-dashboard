@@ -32,7 +32,7 @@ This replaces the whole list. If `sbx settings get kit.allowedSources` already s
 
 ```bash
 sbx run --name factory ghcr.io/geut/sbx-shell-pi:node-24-factory /path/to/project \
-  --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0
+  --kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.3.0
 ```
 
 The `--kit` line adds the dashboard. The kit set is fixed when the sandbox is created, so adding the dashboard later means creating a new sandbox.
@@ -132,7 +132,7 @@ The factory server isn't running. After a restart it only comes back once Herdr 
 
 **The dashboard port can't be opened.**
 
-- `sbx ports factory` lists no `factory-dashboard`: the sandbox was created without `--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.2.0`. Create a new sandbox with it.
+- `sbx ports factory` lists no `factory-dashboard`: the sandbox was created without `--kit ghcr.io/dpaez/sbx-kit-factory-dashboard:0.3.0`. Create a new sandbox with it.
 - `sbx run` refused the kit: its source isn't allowed. Repeat [step 1](#1-allow-the-kit-sources-host).
 - The port is listed but the browser can't connect: check that the sandbox is running (`sbx ls`), and that you used the `factory-dashboard` port, not `factory-api`. In the sandbox, `curl -fsS http://127.0.0.1:7732/` shows whether the dashboard answers, and its log is `~/.local/state/factory-dashboard/dashboard.log`.
 

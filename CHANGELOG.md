@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-16
+
 ### Added
 - A Feedback rounds box on the ticket page and the Inspector replaces the one-click Feedback round action. At handoff with an open pull request it lists the pending review comments, 5 per page, each ticked by default, and starts a round with only the ticked ones and an optional note. It also shows each earlier round's items. The dashboard serves the pending list at `GET /api/factory/tickets/[key]/feedback` (#72).
 
