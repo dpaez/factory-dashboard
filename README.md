@@ -4,7 +4,7 @@ A web dashboard for one [factory](https://github.com/geut/factory-skills): see e
 
 It ships with the [factory sandbox](https://github.com/geut/sbx-shell-pi) as an optional kit. The factory works without it; the dashboard is a window onto it and a few controls.
 
-![The Flow board](./Screenshot.png)
+![Factory Dashboard Flow board with ticket lanes and an attention summary](./Screenshot.png)
 
 - [Quickstart: the factory sandbox](#quickstart-the-factory-sandbox)
 - [How the dashboard connects to the factory](#how-the-dashboard-connects-to-the-factory)
